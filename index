@@ -1,50 +1,129 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>ネタ帳アプリ</title>
   <style>
-    /* CSSは前回と同じものをここに貼ってください */
-    body { font-family: sans-serif; background-color: #f2f2f2; margin: 0; padding: 10px; color: #333; }
-    /* ...中略... */
-    #loading { text-align: center; margin-top: 20px; color: #666; }
+    /* デザイン設定（スマホ最適化） */
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f2f2f2; margin: 0; padding: 10px; color: #333; }
+    
+    /* 検索ボックス */
+    #search-box { width: 100%; padding: 12px; font-size: 16px; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+
+    /* 人物リスト */
+    #person-list { list-style: none; padding: 0; margin: 0; padding-bottom: 50px; }
+    .person-card {
+      background: white; border-radius: 10px; padding: 15px; margin-bottom: 10px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: pointer; transition: background 0.2s;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .person-card:active { background-color: #f0f0f0; transform: scale(0.98); }
+    .p-info { flex: 1; }
+    .p-name { font-size: 17px; font-weight: bold; margin-bottom: 4px; color: #333; }
+    .p-kana { font-size: 11px; color: #999; margin-left: 8px; font-weight: normal; }
+    .p-detail { font-size: 12px; color: #666; margin-top: 2px; }
+    .p-role { color: #00b900; font-weight: bold; } /* LINE Green color for accent */
+    
+    /* アイコン */
+    .icon-edit { font-size: 20px; color: #ccc; }
+
+    /* モーダル（入力画面） */
+    #modal {
+      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5); align-items: flex-end; justify-content: center; z-index: 1000;
+      /* アニメーション用 */
+      opacity: 0; transition: opacity 0.3s;
+    }
+    #modal.show { opacity: 1; }
+    
+    .modal-content {
+      background: white; width: 100%; max-width: 600px; padding: 20px 20px 40px 20px; 
+      border-radius: 20px 20px 0 0; box-sizing: border-box;
+      display: flex; flex-direction: column; max-height: 90vh;
+      transform: translateY(100%); transition: transform 0.3s;
+    }
+    #modal.show .modal-content { transform: translateY(0); }
+
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+    .m-name { font-size: 18px; font-weight: bold; }
+    .m-detail { font-size: 12px; color: #666; }
+
+    textarea { 
+      width: 100%; height: 120px; padding: 12px; border: 1px solid #ddd; border-radius: 8px; 
+      font-size: 16px; resize: none; box-sizing: border-box; background: #fafafa; margin-bottom: 15px;
+    }
+    textarea:focus { outline: none; border-color: #00b900; background: white; }
+
+    /* 履歴エリア */
+    .history-label { font-size: 13px; font-weight: bold; color: #555; margin-bottom: 8px; display: block; }
+    #history-area {
+      background: #f9f9f9; padding: 10px; border-radius: 8px; flex-grow: 1; 
+      overflow-y: auto; font-size: 13px; margin-bottom: 20px; border: 1px solid #eee;
+      min-height: 100px; max-height: 250px;
+    }
+    .history-item { border-bottom: 1px solid #eee; padding: 8px 0; }
+    .history-date { color: #00b900; font-weight: bold; font-size: 11px; margin-bottom: 2px; }
+    .history-text { color: #333; line-height: 1.4; }
+
+    /* ボタン群 */
+    .btn-group { display: flex; gap: 10px; }
+    button { padding: 14px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; flex: 1; }
+    .btn-cancel { background: #eee; color: #555; }
+    .btn-submit { background: #00b900; color: white; }
+    .btn-submit:disabled { background: #ccc; }
+
+    #loading { text-align: center; margin-top: 50px; color: #888; font-size: 14px; }
   </style>
 </head>
 <body>
-  <input type="text" id="search-box" placeholder="名前・ふりがなで検索..." onkeyup="filterList()">
-  <div id="loading">読み込み中...</div>
+
+  <input type="text" id="search-box" placeholder="名前・ふりがな・所属で検索..." onkeyup="filterList()">
+  
+  <div id="loading">データを読み込んでいます...<br>（初回は数秒かかります）</div>
   <ul id="person-list"></ul>
 
-  <div id="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); align-items:center; justify-content:center;">
-    <div class="modal-content" style="background:white; width:90%; padding:20px; border-radius:10px;">
-      <div id="modal-name" style="font-weight:bold; margin-bottom:10px;"></div>
-      <textarea id="memo-text" style="width:100%; height:100px; margin-bottom:10px;"></textarea>
-      <div id="history-area" style="background:#eee; padding:10px; height:100px; overflow-y:scroll; font-size:12px; margin-bottom:10px;"></div>
-      <button onclick="closeModal()">閉じる</button>
-      <button onclick="submitMemo()" style="background:#00C300; color:white; border:none; padding:10px;">送信</button>
+  <div id="modal" onclick="if(event.target === this) closeModal()">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <div id="modal-name" class="m-name"></div>
+          <div id="modal-detail" class="m-detail"></div>
+        </div>
+      </div>
+      
+      <textarea id="memo-text" placeholder="ここに話題やメモを入力..."></textarea>
+      
+      <span class="history-label">▼ 過去の会話メモ</span>
+      <div id="history-area">読み込み中...</div>
+
+      <div class="btn-group">
+        <button class="btn-cancel" onclick="closeModal()">閉じる</button>
+        <button class="btn-submit" onclick="submitMemo()">送信</button>
+      </div>
     </div>
   </div>
 
   <script>
-    // ★
-    const API_URL = "https://script.google.com/macros/s/AKfycbzApCiru2la88of72dyGRs-2yaFwLlR-qA9NQQztY-UbZFEvIILqBfnYPtb8Rap32t7/exec";
+    // ★ここにGASのURLを貼り付けてください
+    const API_URL = "https://script.google.com/macros/s/AKfycbyqqEx1V9mpascBehFdIHebXYxIdTnMQ_DuASu4D35vhWo4lXoZFySCxFQVGGzF63jxMA/exec";
 
     let allPeople = [];
     let selectedPerson = "";
 
-    // 読み込み時
+    // 起動時の処理
     window.onload = async function() {
-      // GASからデータを取得 (fetchを使用)
       try {
-        const res = await fetch(API_URL);
-        const data = await res.json();
+        // GASから一覧データを取得
+        const response = await fetch(API_URL);
+        const data = await response.json();
         renderList(data);
       } catch (e) {
-        alert("読み込みエラー: " + e);
+        document.getElementById('loading').innerText = "エラーが発生しました:\n" + e;
       }
     };
 
+    // リスト描画
     function renderList(data) {
       allPeople = data;
       const list = document.getElementById('person-list');
@@ -53,55 +132,112 @@
 
       data.forEach(p => {
         const li = document.createElement('li');
-        // CSSクラスなどは適宜追加してください
-        li.style.background = "white"; li.style.padding = "10px"; li.style.marginBottom = "5px";
-        li.dataset.searchText = (p.name + p.kana + p.section).toLowerCase();
-        li.innerHTML = `<b>${p.name}</b> (${p.role})`;
+        li.className = 'person-card';
+        // 検索用テキスト（名前、かな、所属）
+        li.dataset.searchText = (p.name + p.kana + p.section + p.role).toLowerCase();
+        
+        li.innerHTML = `
+          <div class="p-info">
+            <div class="p-name">${p.name}<span class="p-kana">${p.kana}</span></div>
+            <div class="p-detail">
+              <span class="p-role">${p.role}</span> | ${p.section}
+            </div>
+          </div>
+          <div class="icon-edit">✎</div>
+        `;
         li.onclick = () => openModal(p);
         list.appendChild(li);
       });
     }
 
-    function filterList() { /* 前回と同じロジック */ }
+    // 検索フィルタ
+    function filterList() {
+      const term = document.getElementById('search-box').value.toLowerCase();
+      const items = document.querySelectorAll('.person-card');
+      items.forEach(item => {
+        const text = item.dataset.searchText;
+        // 部分一致検索（スペース区切り対応なしのシンプル版）
+        item.style.display = text.includes(term) ? 'flex' : 'none';
+      });
+    }
 
+    // モーダルを開く
     async function openModal(person) {
       selectedPerson = person.name;
       document.getElementById('modal-name').innerText = person.name;
-      document.getElementById('modal').style.display = 'flex';
+      document.getElementById('modal-detail').innerText = `${person.section} / ${person.role}`;
+      document.getElementById('memo-text').value = "";
       
-      // 履歴取得
-      document.getElementById('history-area').innerText = "読み込み中...";
-      
-      // GASに履歴を問い合わせ (POSTで送信)
-      const res = await fetch(API_URL, {
-        method: "POST",
-        body: JSON.stringify({ action: "getHistory", name: person.name })
-      });
-      const history = await res.json();
-      
-      // 履歴描画（簡略化）
-      let html = "";
-      history.forEach(h => { html += `<div>${h.date}: ${h.memo}</div><hr>`; });
-      document.getElementById('history-area').innerHTML = html;
+      const modal = document.getElementById('modal');
+      modal.style.display = 'flex';
+      // 少し待ってからクラス追加（アニメーション用）
+      setTimeout(() => modal.classList.add('show'), 10);
+
+      // 履歴エリアの初期化
+      const historyArea = document.getElementById('history-area');
+      historyArea.innerHTML = '<div style="color:#999; padding:10px;">読み込み中...</div>';
+
+      // 履歴を取得（CORS対策のため text/plain でPOST送信）
+      try {
+        const res = await fetch(API_URL, {
+          method: "POST",
+          body: JSON.stringify({ action: "getHistory", name: person.name })
+          // Content-Typeは指定しない（text/plainとして送る）
+        });
+        const history = await res.json();
+        
+        if (history.length === 0) {
+          historyArea.innerHTML = '<div style="color:#ccc; padding:10px;">履歴はありません</div>';
+        } else {
+          let html = "";
+          history.forEach(h => {
+            html += `
+              <div class="history-item">
+                <div class="history-date">${h.date}</div>
+                <div class="history-text">${h.memo}</div>
+              </div>`;
+          });
+          historyArea.innerHTML = html;
+        }
+      } catch (e) {
+        historyArea.innerText = "履歴読み込みエラー";
+      }
     }
 
+    // モーダルを閉じる
     function closeModal() {
-      document.getElementById('modal').style.display = 'none';
+      const modal = document.getElementById('modal');
+      modal.classList.remove('show');
+      setTimeout(() => modal.style.display = 'none', 300);
     }
 
+    // メモ送信
     async function submitMemo() {
       const memo = document.getElementById('memo-text').value;
-      if(!memo) return;
+      if (!memo) return;
 
-      // 保存処理
-      await fetch(API_URL, {
-        method: "POST",
-        body: JSON.stringify({ action: "save", name: selectedPerson, memo: memo })
-      });
-      
-      alert("保存しました");
-      closeModal();
-      location.reload(); // 再読み込み
+      const btn = document.querySelector('.btn-submit');
+      const originalText = btn.innerText;
+      btn.innerText = "送信中...";
+      btn.disabled = true;
+
+      try {
+        await fetch(API_URL, {
+          method: "POST",
+          body: JSON.stringify({ action: "save", name: selectedPerson, memo: memo })
+        });
+
+        alert("保存しました！");
+        closeModal();
+        
+        // 最新順に並び直すためリロード（または再取得）
+        location.reload(); 
+
+      } catch (e) {
+        alert("送信エラー: " + e);
+        btn.innerText = originalText;
+        btn.disabled = false;
+      }
     }
   </script>
 </body>
