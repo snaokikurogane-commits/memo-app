@@ -2,107 +2,73 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ネタ帳アプリ</title>
   <style>
-    /* 全体のスタイル（スマホで見やすいように調整） */
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: #f2f2f2; margin: 0; padding: 10px; color: #333; -webkit-text-size-adjust: 100%; }
-    
-    /* 検索ボックス */
-    #search-box { 
-      width: 100%; padding: 12px; font-size: 16px; border-radius: 8px; 
-      border: 1px solid #ddd; box-sizing: border-box; margin-bottom: 15px; 
-      background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1); appearance: none;
-    }
-
-    /* 人物リスト */
-    #person-list { list-style: none; padding: 0; margin: 0; padding-bottom: 50px; }
-    .person-card { 
-      background: white; border-radius: 10px; padding: 15px; margin-bottom: 10px; 
-      display: flex; justify-content: space-between; align-items: center; 
-      box-shadow: 0 1px 2px rgba(0,0,0,0.1); cursor: pointer; transition: background 0.2s;
-    }
-    .person-card:active { background-color: #f0f0f0; }
-    
-    .p-info { flex: 1; }
-    .p-name { font-size: 17px; font-weight: bold; margin-bottom: 4px; display: block; }
-    .p-kana { font-size: 11px; color: #999; margin-left: 8px; font-weight: normal; }
+    /* ベースCSS（前回と同じ） */
+    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f2f2f2; margin: 0; padding: 10px; color: #333; }
+    #search-box { width: 100%; padding: 12px; font-size: 16px; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; margin-bottom: 15px; background: white; appearance: none; }
+    #person-list { list-style: none; padding: 0; margin: 0; padding-bottom: 60px; }
+    .person-card { background: white; border-radius: 10px; padding: 15px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.1); cursor: pointer; }
+    .p-name { font-size: 17px; font-weight: bold; }
+    .p-kana { font-size: 11px; color: #999; margin-left: 8px; }
     .p-detail { font-size: 12px; color: #666; margin-top: 2px; }
-    .p-role { color: #00b900; font-weight: bold; } /* LINE風グリーン */
-    .icon-edit { font-size: 18px; color: #ccc; margin-left: 10px; }
+    .p-role { color: #00b900; font-weight: bold; }
+    .icon-edit { font-size: 18px; color: #ccc; }
     
-    /* モーダル（ポップアップ画面） */
-    #modal { 
-      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-      background: rgba(0,0,0,0.5); align-items: flex-end; justify-content: center; z-index: 1000; 
-    }
-    .modal-content { 
-      background: white; width: 100%; max-width: 600px; padding: 20px; 
-      border-radius: 16px 16px 0 0; box-sizing: border-box; 
-      display: flex; flex-direction: column; max-height: 90vh; 
-      box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
-    }
-    
-    .modal-header { 
-      display: flex; justify-content: space-between; margin-bottom: 15px; 
-      border-bottom: 1px solid #eee; padding-bottom: 10px; 
-    }
+    /* モーダル */
+    #modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: flex-end; justify-content: center; z-index: 1000; }
+    .modal-content { background: white; width: 100%; max-width: 600px; padding: 20px; border-radius: 16px 16px 0 0; box-sizing: border-box; display: flex; flex-direction: column; max-height: 95vh; overflow-y: auto; }
+    .modal-header { display: flex; justify-content: space-between; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
     .m-name { font-size: 18px; font-weight: bold; }
-    .m-detail { font-size: 12px; color: #666; margin-top: 2px; }
     
-    textarea { 
-      width: 100%; height: 100px; padding: 12px; border: 1px solid #ddd; 
-      border-radius: 8px; font-size: 16px; margin-bottom: 15px; resize: none; 
-      box-sizing: border-box; background-color: #fafafa;
-    }
-    textarea:focus { outline: none; border-color: #00b900; background-color: #fff; }
+    textarea { width: 100%; height: 80px; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; margin-bottom: 15px; resize: none; background: #fafafa; }
     
-    /* 履歴表示エリア */
-    .history-label { font-size: 12px; font-weight: bold; color: #555; margin-bottom: 5px; }
-    #history-area { 
-      background: #f9f9f9; padding: 10px; border-radius: 8px; overflow-y: auto; 
-      font-size: 13px; margin-bottom: 15px; border: 1px solid #eee; 
-      min-height: 80px; max-height: 200px; -webkit-overflow-scrolling: touch;
-    }
-    .history-item { border-bottom: 1px solid #eee; padding: 8px 0; }
-    .history-item:last-child { border-bottom: none; }
-    .history-date { color: #00b900; font-weight: bold; font-size: 11px; margin-bottom: 2px; }
-    .history-text { line-height: 1.4; color: #333; }
+    .event-section { background: #f0f8ff; padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #d0e0ff; }
+    .input-row { display: flex; gap: 10px; }
+    .input-date { flex: 1; padding: 8px; border-radius: 5px; border: 1px solid #ccc; font-size: 14px; }
+    .input-text { flex: 2; padding: 8px; border-radius: 5px; border: 1px solid #ccc; font-size: 14px; }
 
-    /* ボタン */
+    /* ★AI履歴エリアのデザイン */
+    #history-area { background: #f9f9f9; padding: 10px; border-radius: 8px; overflow-y: auto; font-size: 13px; margin-bottom: 15px; border: 1px solid #eee; min-height: 80px; max-height: 250px; }
+    .history-item { border-bottom: 1px solid #ddd; padding: 10px 0; }
+    .history-date { color: #00b900; font-weight: bold; font-size: 11px; margin-bottom: 4px; }
+    .history-text { font-size: 14px; color: #333; margin-bottom: 8px; }
+    
+    /* AIアドバイスの箱 */
+    .ai-box { background: #fff5f5; border-left: 4px solid #ff6b6b; padding: 8px; border-radius: 4px; font-size: 12px; color: #555; margin-top: 5px; }
+    .ai-title { font-weight: bold; color: #d63333; margin-bottom: 4px; display: flex; align-items: center; }
+
     .btn-group { display: flex; gap: 10px; }
-    button { 
-      padding: 14px; border: none; border-radius: 8px; font-size: 16px; 
-      font-weight: bold; cursor: pointer; flex: 1; -webkit-appearance: none;
-    }
+    button { padding: 12px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; flex: 1; }
     .btn-cancel { background: #eee; color: #555; }
     .btn-submit { background: #00b900; color: white; }
-    .btn-submit:active { background: #009900; }
-    .btn-submit:disabled { background: #ccc; }
-    
-    #loading { text-align: center; margin-top: 50px; color: #666; font-size: 14px; }
+    #loading { text-align: center; margin-top: 50px; color: #666; }
   </style>
 </head>
 <body>
 
-  <input type="text" id="search-box" placeholder="名前・ふりがな・所属で検索..." onkeyup="filterList()">
-  
-  <div id="loading">データを読み込んでいます...<br>(初回は数秒かかります)</div>
-  
+  <input type="text" id="search-box" placeholder="名前・ふりがなで検索..." onkeyup="filterList()">
+  <div id="loading">読み込み中...</div>
   <ul id="person-list"></ul>
 
   <div id="modal" onclick="if(event.target === this) closeModal()">
     <div class="modal-content">
       <div class="modal-header">
-        <div>
-          <div id="modal-name" class="m-name"></div>
-          <div id="modal-detail" class="m-detail"></div>
-        </div>
+        <div><div id="modal-name" class="m-name"></div><div id="modal-detail" style="font-size:12px; color:#666;"></div></div>
       </div>
       
-      <textarea id="memo-text" placeholder="ここにメモを入力..."></textarea>
+      <textarea id="memo-text" placeholder="メモを入力..."></textarea>
       
-      <div class="history-label">▼ 過去の会話メモ</div>
+      <div class="event-section">
+        <label style="font-size:12px; font-weight:bold; color:#0056b3;">🔔 イベント通知</label>
+        <div class="input-row">
+          <input type="date" id="event-date" class="input-date">
+          <input type="text" id="event-name" class="input-text" placeholder="例: 誕生日">
+        </div>
+      </div>
+
+      <div style="font-size:12px; font-weight:bold; color:#555; margin-bottom:5px;">▼ 過去のメモ＆AI提案</div>
       <div id="history-area">読み込み中...</div>
       
       <div class="btn-group">
@@ -113,31 +79,20 @@
   </div>
 
   <script>
-    // ★あなたのGASアプリのURLを設定済みです
-    const API_URL = "https://script.google.com/macros/s/AKfycbyqqEx1V9mpascBehFdIHebXYxIdTnMQ_DuASu4D35vhWo4lXoZFySCxFQVGGzF63jxMA/exec";
+    // ★GASのURLをセット
+    const API_URL = "https://script.google.com/macros/s/AKfycbyDU51p06sfivYJ05DCj60CBoJi8J62kLuagR88fVXviopESvT3_uqERuNZyE3wohD1tA/exec";
 
     let allPeople = [];
     let selectedPerson = "";
 
-    // 画面読み込み時に実行
     window.onload = async function() {
       try {
-        // GASからデータを取得 (GET)
         const res = await fetch(API_URL);
         const data = await res.json();
-        
-        // エラーチェック
-        if (data.error) {
-           alert("エラー: " + data.error);
-           return;
-        }
         renderList(data);
-      } catch (e) {
-        document.getElementById('loading').innerHTML = "読み込みに失敗しました。<br>GASのデプロイ設定(全員に公開)を確認してください。<br><br>" + e;
-      }
+      } catch (e) { document.getElementById('loading').innerText = "Load Error"; }
     };
 
-    // リストを描画する関数
     function renderList(data) {
       allPeople = data;
       const list = document.getElementById('person-list');
@@ -147,15 +102,12 @@
       data.forEach(p => {
         const li = document.createElement('li');
         li.className = 'person-card';
-        // 検索用テキスト（名前、ふりがな、所属、役職）
         li.dataset.searchText = (p.name + p.kana + p.section + p.role).toLowerCase();
-        
+        const bell = p.eventDate ? "🔔" : "";
         li.innerHTML = `
           <div class="p-info">
-            <div class="p-name">${p.name}<span class="p-kana">${p.kana}</span></div>
-            <div class="p-detail">
-              <span class="p-role">${p.role}</span> | ${p.section}
-            </div>
+            <div class="p-name">${p.name} ${bell} <span class="p-kana">${p.kana}</span></div>
+            <div class="p-detail"><span class="p-role">${p.role}</span> | ${p.section}</div>
           </div>
           <div class="icon-edit">✎</div>
         `;
@@ -164,32 +116,26 @@
       });
     }
 
-    // 検索フィルタ機能
     function filterList() {
       const term = document.getElementById('search-box').value.toLowerCase();
       document.querySelectorAll('.person-card').forEach(item => {
-        // 検索ワードが含まれていれば表示、なければ非表示
         item.style.display = item.dataset.searchText.includes(term) ? 'flex' : 'none';
       });
     }
 
-    // モーダルを開く関数
     async function openModal(person) {
       selectedPerson = person.name;
       document.getElementById('modal-name').innerText = person.name;
       document.getElementById('modal-detail').innerText = `${person.section} / ${person.role}`;
       document.getElementById('memo-text').value = "";
+      document.getElementById('event-date').value = person.eventDate || "";
+      document.getElementById('event-name').value = person.eventName || "";
+      document.getElementById('modal').style.display = 'flex';
       
-      const modal = document.getElementById('modal');
-      modal.style.display = 'flex';
-
-      // 履歴エリアの初期化
       const historyArea = document.getElementById('history-area');
-      historyArea.innerHTML = '<div style="color:#999; padding:10px;">読み込み中...</div>';
-
+      historyArea.innerHTML = '<div style="color:#999;">読み込み中...</div>';
+      
       try {
-        // 履歴取得リクエスト (POST)
-        // CORS対策のためJSON文字列をプレーンテキストとして送信
         const res = await fetch(API_URL, {
           method: "POST",
           body: JSON.stringify({ action: "getHistory", name: person.name })
@@ -197,60 +143,69 @@
         const history = await res.json();
         
         if (!history || history.length === 0) {
-          historyArea.innerHTML = '<div style="color:#ccc; padding:10px;">履歴はありません</div>';
+          historyArea.innerHTML = '<div style="color:#ccc;">履歴なし</div>';
         } else {
           let html = "";
           history.forEach(h => {
+            // ★AI提案があれば表示する
+            let aiHtml = "";
+            if (h.aiAdvice) {
+              aiHtml = `
+                <div class="ai-box">
+                  <div class="ai-title">🤖 AIからの話題提案</div>
+                  ${h.aiAdvice.replace(/\n/g, '<br>')}
+                </div>
+              `;
+            }
+
             html += `
               <div class="history-item">
                 <div class="history-date">${h.date}</div>
                 <div class="history-text">${h.memo}</div>
+                ${aiHtml}
               </div>`;
           });
           historyArea.innerHTML = html;
         }
-      } catch (e) {
-        historyArea.innerText = "履歴の読み込みに失敗しました";
-        console.error(e);
-      }
+      } catch (e) { historyArea.innerText = "Error"; }
     }
 
-    // モーダルを閉じる関数
-    function closeModal() { 
-      document.getElementById('modal').style.display = 'none'; 
-    }
+    function closeModal() { document.getElementById('modal').style.display = 'none'; }
 
-    // メモを送信・保存する関数
     async function submitMemo() {
       const memo = document.getElementById('memo-text').value;
-      if (!memo) return;
+      const eventDate = document.getElementById('event-date').value;
+      const eventName = document.getElementById('event-name').value;
+      
+      if (!memo && !eventDate) return;
 
       const btn = document.querySelector('.btn-submit');
-      const originalText = btn.innerText;
-      btn.innerText = "送信中...";
+      btn.innerText = "AI思考中..."; // ★AIが考えるので少し時間がかかることを表示
       btn.disabled = true;
 
       try {
-        // 保存リクエスト (POST)
         const res = await fetch(API_URL, {
           method: "POST",
-          body: JSON.stringify({ action: "save", name: selectedPerson, memo: memo })
+          body: JSON.stringify({ 
+            action: "save", 
+            name: selectedPerson, 
+            memo: memo,
+            eventDate: eventDate,
+            eventName: eventName
+          })
         });
         const result = await res.json();
         
         if (result.status === "success") {
-          alert("保存しました！");
+          alert("保存しました！\nAIが次回の話題を考えました。履歴を確認してみてください。");
           closeModal();
-          // リストの並び順を更新するために再読み込み
           location.reload(); 
         } else {
-          alert("保存失敗: " + result.message);
-          btn.innerText = originalText;
-          btn.disabled = false;
+          alert("失敗: " + result.message);
         }
-      } catch (e) {
-        alert("送信エラーが発生しました。\n" + e);
-        btn.innerText = originalText;
+      } catch (e) { alert("Error: " + e); } 
+      finally {
+        btn.innerText = "送信";
         btn.disabled = false;
       }
     }
