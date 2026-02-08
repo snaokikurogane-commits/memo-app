@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>究極のネタ帳</title>
+  <title>ネタ帳＆電車</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f2f2f2; margin: 0; padding: 10px; color: #333; }
     
-    /* ウィジェット類 */
+    /* 電車ウィジェット */
     .train-widget { background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 99%); padding: 15px; border-radius: 12px; margin-bottom: 20px; color: white; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
     .train-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
     .train-select { background: rgba(255,255,255,0.9); border: none; padding: 5px 10px; border-radius: 20px; font-weight: bold; color: #333; font-size: 14px; }
@@ -22,7 +22,7 @@
     .view-content { display: none; }
     .view-content.active { display: block; }
 
-    /* リスト汎用 */
+    /* リスト */
     #search-box { width: 100%; padding: 12px; font-size: 16px; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; margin-bottom: 15px; background: white; appearance: none; }
     #person-list, #timer-list { list-style: none; padding: 0; margin: 0; padding-bottom: 60px; }
     .person-card { background: white; border-radius: 10px; padding: 15px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.1); cursor: pointer; border-left: 5px solid transparent; position: relative; }
@@ -98,7 +98,7 @@
     .history-item { border-bottom: 1px solid #ddd; padding: 10px 0; }
     .history-date { color: #00b900; font-weight: bold; font-size: 11px; margin-bottom: 4px; }
     
-    /* タグボタン */
+    /* ★タグボタン */
     .tag-buttons { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
     .tag-btn { background: white; border: 1px solid #007bff; color: #007bff; padding: 4px 10px; border-radius: 20px; font-size: 12px; cursor: pointer; }
     .ai-box { background: #fff5f5; border-left: 4px solid #ff6b6b; padding: 8px; border-radius: 4px; font-size: 12px; color: #555; margin-top: 5px; }
@@ -220,7 +220,7 @@
 
   <script>
     // ★新しいGASのURLに差し替えてください（「デプロイ」>「新しいデプロイ」で発行されたもの）
-    const API_URL = "https://script.google.com/macros/s/AKfycbytL_5F_jBbJQ4XTUoE8xZXVBP4Fj68jugcMb1YEQrTnEtM1iSa9oQmYACymO1oFcYXLw/exec";
+    const API_URL = "https://script.google.com/macros/s/AKfycbxV0ZhdIXX5NOF5r-_iBg8OZoy-SJxkloNR3O0aaP_DN-SQImYbAMxQAi1J2A2Z-VvaWw/exec";
 
     /* 電車・共通変数 */
     const TIMETABLE = { toWork: { startHour: 6, endHour: 23, minutes: [6, 21, 36, 51] }, toHome: { startHour: 6, endHour: 23, minutes: [7, 22, 37, 52] } };
