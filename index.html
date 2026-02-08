@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>究極のネタ帳アプリ</title>
+  <title>究極のネタ帳</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f2f2f2; margin: 0; padding: 10px; color: #333; }
     
@@ -38,7 +38,7 @@
     .p-tags { font-size: 11px; color: #007bff; margin-top: 2px; }
     .icon-edit { font-size: 18px; color: #ccc; }
 
-    /* ★SinceTimer用デザイン */
+    /* SinceTimer */
     .timer-card { background: white; border-radius: 10px; padding: 15px; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); cursor: pointer; }
     .t-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
     .t-name { font-size: 16px; font-weight: bold; color: #333; }
@@ -46,9 +46,8 @@
     .t-body { display: flex; align-items: baseline; gap: 5px; }
     .t-days { font-size: 28px; font-weight: bold; color: #333; }
     .t-unit { font-size: 12px; color: #666; }
-    .t-past { color: #d32f2f; } /* 過去（〜日前） */
-    .t-future { color: #00b900; } /* 未来（あと〜日） */
-    
+    .t-past { color: #d32f2f; }
+    .t-future { color: #00b900; }
     .timer-add-btn { width: 100%; padding: 15px; background: #007bff; color: white; border: none; border-radius: 8px; font-weight: bold; margin-bottom: 15px; cursor: pointer; font-size: 16px; }
 
     /* 会話道場 */
@@ -67,13 +66,11 @@
     .sim-input { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #ddd; }
     .sim-btn { padding: 10px 15px; background: #d32f2f; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
 
-    /* モーダル汎用 */
+    /* モーダル */
     #modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: flex-end; justify-content: center; z-index: 1000; }
     .modal-content { background: white; width: 100%; max-width: 600px; padding: 20px; border-radius: 16px 16px 0 0; box-sizing: border-box; display: flex; flex-direction: column; max-height: 95vh; overflow-y: auto; }
     .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
     .m-name { font-size: 18px; font-weight: bold; }
-    
-    /* タブ・入力汎用 */
     .tab-group { display: flex; margin-bottom: 10px; border-bottom: 1px solid #ddd; }
     .tab-btn { flex: 1; padding: 10px; text-align: center; cursor: pointer; color: #666; border-bottom: 3px solid transparent; font-weight: bold; }
     .tab-btn.active { color: #00b900; border-bottom-color: #00b900; }
@@ -91,7 +88,6 @@
     .btn-cancel { background: #eee; color: #555; }
     .btn-submit { background: #00b900; color: white; }
     #loading { text-align: center; margin-top: 50px; color: #666; }
-    /* 贈答・履歴スタイル */
     .gift-form { background: #fff8e1; padding: 10px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #ffecb3; }
     .gift-type-select { padding: 8px; border-radius: 5px; border: 1px solid #ccc; background: white; margin-right: 5px; }
     .gift-add-btn { background: #ffa000; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; }
@@ -101,6 +97,8 @@
     #history-area { background: #f9f9f9; padding: 10px; border-radius: 8px; overflow-y: auto; font-size: 13px; margin-bottom: 15px; border: 1px solid #eee; min-height: 80px; max-height: 250px; }
     .history-item { border-bottom: 1px solid #ddd; padding: 10px 0; }
     .history-date { color: #00b900; font-weight: bold; font-size: 11px; margin-bottom: 4px; }
+    
+    /* タグボタン */
     .tag-buttons { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
     .tag-btn { background: white; border: 1px solid #007bff; color: #007bff; padding: 4px 10px; border-radius: 20px; font-size: 12px; cursor: pointer; }
     .ai-box { background: #fff5f5; border-left: 4px solid #ff6b6b; padding: 8px; border-radius: 4px; font-size: 12px; color: #555; margin-top: 5px; }
@@ -187,10 +185,16 @@
         <div class="event-section">
           <div class="input-row"><input type="date" id="event-date" class="input-date"><input type="text" id="event-name" class="input-text" placeholder="イベント名"></div>
           <div class="input-row" style="margin-top:5px;"><input type="text" id="tags" class="input-text" style="flex:1;" placeholder="タグ"></div>
+          
           <div class="tag-buttons">
-            <button class="tag-btn" onclick="addTag('ゴルフ')">ゴルフ</button><button class="tag-btn" onclick="addTag('日本酒')">日本酒</button><button class="tag-btn" onclick="addTag('サウナ')">サウナ</button>
-            <button class="tag-btn" onclick="addTag('家族')">家族</button><button class="tag-btn" onclick="addTag('仕事')">仕事</button><button class="tag-btn" onclick="addTag('同僚')">同僚</button>
+            <button class="tag-btn" onclick="addTag('ゴルフ')">ゴルフ</button>
+            <button class="tag-btn" onclick="addTag('日本酒')">日本酒</button>
+            <button class="tag-btn" onclick="addTag('車')">🚙 車</button>
+            <button class="tag-btn" onclick="addTag('マラソン')">🏃 マラソン</button>
+            <button class="tag-btn" onclick="addTag('家族')">家族</button>
+            <button class="tag-btn" onclick="addTag('仕事')">仕事</button>
           </div>
+
         </div>
         <div style="font-size:12px; font-weight:bold; color:#555; margin-bottom:5px;">▼ 過去のメモ＆AI提案</div>
         <div id="history-area">読み込み中...</div>
@@ -205,40 +209,24 @@
 
   <div id="timer-modal" onclick="if(event.target === this) closeTimerModal()" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); align-items:flex-end; justify-content:center; z-index:1100;">
     <div class="modal-content">
-      <div class="modal-header">
-        <div class="m-name" id="timer-modal-title">新しい記録</div>
-      </div>
-      <div class="input-row">
-        <input type="text" id="timer-name" class="input-text" placeholder="イベント名 (例: 美容院)">
-      </div>
-      <div class="input-row">
-        <input type="date" id="timer-date" class="input-date">
-      </div>
-      <div class="memo-area-wrapper">
-        <textarea id="timer-memo" placeholder="メモ (カット, カラーなど)"></textarea>
-      </div>
-      
-      <div id="timer-history-container" style="display:none; margin-top:15px;">
-        <div style="font-size:12px; font-weight:bold; color:#555; margin-bottom:5px;">▼ 過去の履歴</div>
-        <div id="timer-history-list" style="max-height:150px; overflow-y:auto; border:1px solid #eee; padding:5px; border-radius:5px;"></div>
-      </div>
-
-      <div class="btn-group">
-        <button class="btn-cancel" onclick="closeTimerModal()">閉じる</button>
-        <button class="btn-submit" onclick="saveTimer()">保存</button>
-      </div>
+      <div class="modal-header"><div class="m-name" id="timer-modal-title">新しい記録</div></div>
+      <div class="input-row"><input type="text" id="timer-name" class="input-text" placeholder="イベント名"></div>
+      <div class="input-row"><input type="date" id="timer-date" class="input-date"></div>
+      <div class="memo-area-wrapper"><textarea id="timer-memo" placeholder="メモ"></textarea></div>
+      <div id="timer-history-container" style="display:none; margin-top:15px;"><div style="font-size:12px; font-weight:bold; color:#555; margin-bottom:5px;">▼ 過去の履歴</div><div id="timer-history-list" style="max-height:150px; overflow-y:auto; border:1px solid #eee; padding:5px; border-radius:5px;"></div></div>
+      <div class="btn-group"><button class="btn-cancel" onclick="closeTimerModal()">閉じる</button><button class="btn-submit" onclick="saveTimer()">保存</button></div>
     </div>
   </div>
 
   <script>
-    // ★GAS URL
+    // ★新しいGASのURLに差し替えてください（「デプロイ」>「新しいデプロイ」で発行されたもの）
     const API_URL = "https://script.google.com/macros/s/AKfycbytL_5F_jBbJQ4XTUoE8xZXVBP4Fj68jugcMb1YEQrTnEtM1iSa9oQmYACymO1oFcYXLw/exec";
 
-    /* 電車・タブ切り替え等の共通変数 */
+    /* 電車・共通変数 */
     const TIMETABLE = { toWork: { startHour: 6, endHour: 23, minutes: [6, 21, 36, 51] }, toHome: { startHour: 6, endHour: 23, minutes: [7, 22, 37, 52] } };
     let timerInterval = null;
     let allPeople = []; let selectedPerson = null; let isPinnedCurrent = false; let currentGiftList = [];
-    let allTimers = []; // SinceTimer用データ
+    let allTimers = [];
 
     document.addEventListener("DOMContentLoaded", () => {
       const savedRoute = localStorage.getItem("trainRoute");
@@ -261,18 +249,14 @@
       const btns = document.querySelectorAll('.main-tab-btn');
       btns.forEach(b => b.classList.remove('active'));
       if(viewId === 'list') btns[0].classList.add('active');
-      else if(viewId === 'timer') {
-        btns[1].classList.add('active');
-        loadTimerData(); // タブ切り替え時にデータ取得
-      } else btns[2].classList.add('active');
+      else if(viewId === 'timer') { btns[1].classList.add('active'); loadTimerData(); } 
+      else btns[2].classList.add('active');
     }
 
-    /* --- ★SinceTimerロジック --- */
+    /* SinceTimerロジック */
     async function loadTimerData() {
-      const list = document.getElementById('timer-list');
       const loading = document.getElementById('timer-loading');
-      if (allTimers.length === 0) loading.style.display = 'block'; // 初回のみローディング表示
-      
+      if (allTimers.length === 0) loading.style.display = 'block';
       try {
         const res = await fetch(API_URL + "?action=getTimer");
         allTimers = await res.json();
@@ -284,128 +268,43 @@
     function renderTimerList() {
       const list = document.getElementById('timer-list');
       list.innerHTML = "";
-      
-      // イベント名でグループ化し、最新の日付を取得
       const grouped = {};
-      allTimers.forEach(t => {
-        if (!grouped[t.name]) grouped[t.name] = [];
-        grouped[t.name].push(t);
-      });
-
-      const now = new Date();
-      now.setHours(0,0,0,0);
-
-      // 表示用に整形
+      allTimers.forEach(t => { if (!grouped[t.name]) grouped[t.name] = []; grouped[t.name].push(t); });
+      const now = new Date(); now.setHours(0,0,0,0);
       Object.keys(grouped).forEach(name => {
-        const history = grouped[name]; // 日付降順になっているはず
-        const latest = history[0];
-        const latestDate = new Date(latest.date);
-        latestDate.setHours(0,0,0,0);
-        
-        const diffTime = now - latestDate;
-        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-        
+        const history = grouped[name]; const latest = history[0]; const latestDate = new Date(latest.date); latestDate.setHours(0,0,0,0);
+        const diffTime = now - latestDate; const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
         let daysHtml = "";
         if (diffDays > 0) daysHtml = `<span class="t-days t-past">${diffDays}</span> <span class="t-unit">日前</span>`;
         else if (diffDays < 0) daysHtml = `<span class="t-unit">あと</span> <span class="t-days t-future">${Math.abs(diffDays)}</span> <span class="t-unit">日</span>`;
         else daysHtml = `<span class="t-days t-future">今日</span>`;
-
-        const li = document.createElement('li');
-        li.className = 'timer-card';
-        li.innerHTML = `
-          <div class="t-header">
-            <span class="t-name">${latest.name}</span>
-            <span class="t-date">最終: ${latest.date}</span>
-          </div>
-          <div class="t-body">${daysHtml}</div>
-          <div style="font-size:12px; color:#888; margin-top:5px;">${latest.memo || ""}</div>
-        `;
-        li.onclick = () => openTimerModal(name); // 既存の名前をクリックで履歴モード
-        list.appendChild(li);
+        const li = document.createElement('li'); li.className = 'timer-card';
+        li.innerHTML = `<div class="t-header"><span class="t-name">${latest.name}</span><span class="t-date">最終: ${latest.date}</span></div><div class="t-body">${daysHtml}</div><div style="font-size:12px; color:#888; margin-top:5px;">${latest.memo || ""}</div>`;
+        li.onclick = () => openTimerModal(name); list.appendChild(li);
       });
     }
 
     function openTimerModal(name = "") {
-      const modal = document.getElementById('timer-modal');
-      const title = document.getElementById('timer-modal-title');
-      const nameInput = document.getElementById('timer-name');
-      const dateInput = document.getElementById('timer-date');
-      const memoInput = document.getElementById('timer-memo');
-      const historyBox = document.getElementById('timer-history-container');
-      const historyList = document.getElementById('timer-history-list');
-
-      // 今日の日付をセット
-      const now = new Date();
-      const yyyy = now.getFullYear();
-      const mm = ("0"+(now.getMonth()+1)).slice(-2);
-      const dd = ("0"+now.getDate()).slice(-2);
-      dateInput.value = `${yyyy}-${mm}-${dd}`;
-      memoInput.value = "";
-
+      const modal = document.getElementById('timer-modal'); const title = document.getElementById('timer-modal-title'); const nameInput = document.getElementById('timer-name'); const dateInput = document.getElementById('timer-date'); const memoInput = document.getElementById('timer-memo'); const historyBox = document.getElementById('timer-history-container'); const historyList = document.getElementById('timer-history-list');
+      const now = new Date(); const yyyy = now.getFullYear(); const mm = ("0"+(now.getMonth()+1)).slice(-2); const dd = ("0"+now.getDate()).slice(-2);
+      dateInput.value = `${yyyy}-${mm}-${dd}`; memoInput.value = "";
       if (name) {
-        // 既存イベントの追加・履歴モード
-        title.innerText = name + " の記録";
-        nameInput.value = name;
-        // nameInput.disabled = true; // 名前変更不可にするならコメントアウト解除
-        
-        // 履歴表示
-        historyBox.style.display = 'block';
-        historyList.innerHTML = "";
+        title.innerText = name + " の記録"; nameInput.value = name; historyBox.style.display = 'block'; historyList.innerHTML = "";
         const historyData = allTimers.filter(t => t.name === name);
-        historyData.forEach(h => {
-          const div = document.createElement('div');
-          div.style.borderBottom = "1px solid #eee";
-          div.style.padding = "5px 0";
-          div.style.fontSize = "13px";
-          div.innerHTML = `<span style="font-weight:bold;">${h.date}</span> <span style="color:#666;">${h.memo}</span>`;
-          historyList.appendChild(div);
-        });
-
-      } else {
-        // 新規作成モード
-        title.innerText = "新しい記録を追加";
-        nameInput.value = "";
-        nameInput.disabled = false;
-        historyBox.style.display = 'none';
-      }
-
+        historyData.forEach(h => { const div = document.createElement('div'); div.style.borderBottom = "1px solid #eee"; div.style.padding = "5px 0"; div.style.fontSize = "13px"; div.innerHTML = `<span style="font-weight:bold;">${h.date}</span> <span style="color:#666;">${h.memo}</span>`; historyList.appendChild(div); });
+      } else { title.innerText = "新しい記録を追加"; nameInput.value = ""; historyBox.style.display = 'none'; }
       modal.style.display = 'flex';
     }
 
     function closeTimerModal() { document.getElementById('timer-modal').style.display = 'none'; }
-
     async function saveTimer() {
-      const name = document.getElementById('timer-name').value;
-      const date = document.getElementById('timer-date').value;
-      const memo = document.getElementById('timer-memo').value;
-      
-      if (!name || !date) return alert("イベント名と日付は必須です");
-
-      const btn = document.querySelector('#timer-modal .btn-submit');
-      btn.innerText = "保存中...";
-      btn.disabled = true;
-
-      try {
-        const res = await fetch(API_URL, {
-          method: "POST",
-          body: JSON.stringify({ 
-            action: "saveTimer", 
-            eventName: name, 
-            date: date, 
-            memo: memo 
-          })
-        });
-        const result = await res.json();
-        if (result.status === "success") {
-          alert("記録しました！");
-          closeTimerModal();
-          loadTimerData(); // リスト更新
-        } else { alert("失敗"); }
-      } catch(e) { alert("Error"); }
-      finally { btn.innerText = "保存"; btn.disabled = false; }
+      const name = document.getElementById('timer-name').value; const date = document.getElementById('timer-date').value; const memo = document.getElementById('timer-memo').value;
+      if (!name || !date) return alert("必須項目です");
+      const btn = document.querySelector('#timer-modal .btn-submit'); btn.innerText = "保存中..."; btn.disabled = true;
+      try { const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "saveTimer", eventName: name, date: date, memo: memo }) }); const result = await res.json(); if (result.status === "success") { alert("記録しました！"); closeTimerModal(); loadTimerData(); } else { alert("失敗"); } } catch(e) { alert("Error"); } finally { btn.innerText = "保存"; btn.disabled = false; }
     }
 
-    /* --- その他 (既存機能) --- */
+    /* その他 (電車, リスト) */
     function changeRoute() { localStorage.setItem("trainRoute", document.getElementById("route-select").value); updateTrainTimer(); }
     function updateTrainTimer() {
       const routeKey = document.getElementById("route-select").value; const schedule = TIMETABLE[routeKey];
@@ -414,9 +313,7 @@
       for (let h = currentHour; h <= schedule.endHour; h++) {
         if (h < schedule.startHour) continue;
         for (let m of schedule.minutes) {
-          if (h > currentHour || (h === currentHour && m > currentMin)) {
-            nextTrain = new Date(); nextTrain.setHours(h); nextTrain.setMinutes(m); nextTrain.setSeconds(0); break;
-          }
+          if (h > currentHour || (h === currentHour && m > currentMin)) { nextTrain = new Date(); nextTrain.setHours(h); nextTrain.setMinutes(m); nextTrain.setSeconds(0); break; }
         }
         if (nextTrain) break;
       }
@@ -427,7 +324,7 @@
       sub.innerText = `発車時刻: ${('0'+nextTrain.getHours()).slice(-2)}:${('0'+nextTrain.getMinutes()).slice(-2)}`;
     }
     
-    function renderList(data) { /* 人物リスト描画 (省略せず記載) */
+    function renderList(data) {
       allPeople = data; const list = document.getElementById('person-list'); list.innerHTML = ""; document.getElementById('loading').style.display = 'none';
       const now = new Date().getTime(); const DAY_MS = 24 * 60 * 60 * 1000;
       data.forEach(p => {
@@ -466,8 +363,7 @@
       const btn = document.querySelector('#modal .btn-submit'); btn.innerText = "保存中..."; btn.disabled = true;
       try { const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "save", name: selectedPerson.name, memo: memo, eventDate: eventDate, eventName: eventName, tags: tags, isPinned: isPinnedCurrent, giftHistory: giftJson }) }); const result = await res.json(); if (result.status === "success") { alert("保存しました！"); closeModal(); location.reload(); } else { alert("失敗: " + result.message); } } catch (e) { alert("Error: " + e); } finally { btn.innerText = "保存"; btn.disabled = false; }
     }
-    // 話題ガチャ・シミュレータ
-    async function drawTopic(category) { const resBox = document.getElementById('gacha-result'); resBox.style.display = 'block'; resBox.innerHTML = '<div style="text-align:center;">AI思考中...</div>'; try { const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "training", mode: "gacha", text: category }) }); const data = await res.json(); resBox.innerHTML = `<div class="gr-topic">💡 ${data.topic}</div><div class="gr-detail">「${data.detail}」</div><div class="gr-tip">☝️ アドバイス: ${data.tip}</div>`; } catch(e) { resBox.innerText = "エラー"; } }
+    async function drawTopic(category) { const resBox = document.getElementById('gacha-result'); resBox.style.display = 'block'; resBox.innerHTML = '<div style="text-align:center;">AI思考中...</div>'; try { const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "training", mode: "gacha", text: category }) }); const data = await res.json(); resBox.innerHTML = `<div class="gr-topic">💡 ${data.topic}</div><div class="gr-detail">「${data.detail}」</div><div class="gr-tip">☝️ アドバイス: ${data.tip}</div>`; } catch(e) { resBox.innerText = "エラー: AI許可を確認してください"; } }
     async function sendSim() { const inputEl = document.getElementById('sim-input'); const text = inputEl.value; if(!text) return; const role = document.getElementById('sim-role').value; const chatBox = document.getElementById('sim-chat'); chatBox.innerHTML += `<div class="chat-msg msg-user">${text}</div>`; inputEl.value = ""; chatBox.scrollTop = chatBox.scrollHeight; const loadingId = "l-"+new Date().getTime(); chatBox.innerHTML += `<div id="${loadingId}" class="chat-msg msg-ai">...</div>`; try { const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "training", mode: "sim", text: `相手役=${role}, ユーザー発言=${text}` }) }); const data = await res.json(); document.getElementById(loadingId).remove(); chatBox.innerHTML += `<div class="chat-msg msg-ai">${data.reply}<span class="msg-feedback">📊 ${data.score}点: ${data.advice}</span></div>`; chatBox.scrollTop = chatBox.scrollHeight; } catch(e) { document.getElementById(loadingId).innerText = "エラー"; } }
   </script>
 </body>
