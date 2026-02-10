@@ -3,368 +3,312 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ネタ帳＆電車</title>
+  <title>究極の業務支援アプリ</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f2f2f2; margin: 0; padding: 10px; color: #333; }
     
-    /* 電車ウィジェット */
-    .train-widget { background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 99%); padding: 15px; border-radius: 12px; margin-bottom: 20px; color: white; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-    .train-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-    .train-select { background: rgba(255,255,255,0.9); border: none; padding: 5px 10px; border-radius: 20px; font-weight: bold; color: #333; font-size: 14px; }
-    .train-timer { text-align: center; }
-    .countdown-big { font-size: 36px; font-weight: bold; line-height: 1.2; text-shadow: 1px 1px 2px rgba(0,0,0,0.2); }
-    .next-time-sub { font-size: 14px; font-weight: bold; margin-top: 5px; }
+    /* ヘッダー・電車 */
+    .train-widget { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 15px; border-radius: 12px; margin-bottom: 15px; color: white; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    .train-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+    .train-select { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.5); padding: 5px; border-radius: 15px; color: white; font-size: 12px; }
+    .train-select option { color: #333; }
+    .countdown-big { font-size: 32px; font-weight: bold; text-align: center; text-shadow: 1px 1px 2px rgba(0,0,0,0.2); }
 
     /* メインタブ */
-    .main-tabs { display: flex; gap: 5px; margin-bottom: 15px; overflow-x: auto; }
-    .main-tab-btn { flex: 1; min-width: 90px; padding: 10px 5px; background: white; border-radius: 8px; text-align: center; font-weight: bold; color: #666; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.1); font-size: 13px; }
+    .main-tabs { display: flex; gap: 5px; margin-bottom: 15px; overflow-x: auto; white-space: nowrap; padding-bottom: 5px; }
+    .main-tab-btn { flex: 1; min-width: 80px; padding: 10px 5px; background: white; border-radius: 8px; text-align: center; font-weight: bold; color: #666; cursor: pointer; font-size: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
     .main-tab-btn.active { background: #333; color: white; }
-    .view-content { display: none; }
-    .view-content.active { display: block; }
-
-    /* リスト */
-    #search-box { width: 100%; padding: 12px; font-size: 16px; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; margin-bottom: 15px; background: white; appearance: none; }
-    #person-list, #timer-list { list-style: none; padding: 0; margin: 0; padding-bottom: 60px; }
-    .person-card { background: white; border-radius: 10px; padding: 15px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.1); cursor: pointer; border-left: 5px solid transparent; position: relative; }
-    .status-warning { border-left-color: #ffc107; background-color: #fffdf5; }
-    .status-danger { border-left-color: #ff4d4d; background-color: #fff5f5; }
-    .pin-icon { position: absolute; top: 10px; right: 40px; font-size: 18px; color: #ccc; z-index: 10; }
-    .pin-icon.active { color: #f4b400; text-shadow: 0 0 2px orange; }
-    .p-info { flex: 1; }
-    .p-name { font-size: 17px; font-weight: bold; }
-    .p-kana { font-size: 11px; color: #999; margin-left: 8px; }
-    .p-detail { font-size: 12px; color: #666; margin-top: 2px; }
-    .p-personality { font-size: 10px; background: #e0f7fa; color: #006064; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-top: 2px; margin-right: 4px; }
-    .p-tags { font-size: 11px; color: #007bff; margin-top: 2px; }
-    .icon-edit { font-size: 18px; color: #ccc; }
-
-    /* SinceTimer */
-    .timer-card { background: white; border-radius: 10px; padding: 15px; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.1); cursor: pointer; }
-    .t-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
-    .t-name { font-size: 16px; font-weight: bold; color: #333; }
-    .t-date { font-size: 12px; color: #888; }
-    .t-body { display: flex; align-items: baseline; gap: 5px; }
-    .t-days { font-size: 28px; font-weight: bold; color: #333; }
-    .t-unit { font-size: 12px; color: #666; }
-    .t-past { color: #d32f2f; }
-    .t-future { color: #00b900; }
-    .timer-add-btn { width: 100%; padding: 15px; background: #007bff; color: white; border: none; border-radius: 8px; font-weight: bold; margin-bottom: 15px; cursor: pointer; font-size: 16px; }
-
-    /* 会話道場 */
-    .dojo-card { background: white; padding: 15px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-    .dojo-title { font-weight: bold; margin-bottom: 10px; color: #d32f2f; }
-    .gacha-btns { display: flex; flex-wrap: wrap; gap: 8px; }
-    .gacha-btn { flex: 1; min-width: 80px; padding: 10px; border: 1px solid #ddd; background: #fafafa; border-radius: 8px; cursor: pointer; font-size: 13px; text-align: center; }
-    .gacha-result { margin-top: 15px; background: #fff8e1; padding: 15px; border-radius: 8px; display: none; border: 2px dashed #ffecb3; }
-    .gr-topic { font-weight: bold; font-size: 16px; margin-bottom: 5px; color: #f57f17; }
-    .chat-box { height: 200px; overflow-y: auto; background: #f9f9f9; border: 1px solid #eee; border-radius: 8px; padding: 10px; margin-bottom: 10px; }
-    .chat-msg { margin-bottom: 10px; padding: 8px 12px; border-radius: 12px; font-size: 13px; max-width: 80%; }
-    .msg-user { background: #dcedc8; margin-left: auto; text-align: right; color: #33691e; }
-    .msg-ai { background: white; margin-right: auto; border: 1px solid #ddd; }
-    .msg-feedback { font-size: 11px; color: #d32f2f; margin-top: 2px; display: block; background: #ffebee; padding: 4px; border-radius: 4px; }
-    .sim-input-area { display: flex; gap: 5px; }
-    .sim-input { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid #ddd; }
-    .sim-btn { padding: 10px 15px; background: #d32f2f; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
-
-    /* モーダル */
-    #modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: flex-end; justify-content: center; z-index: 1000; }
-    .modal-content { background: white; width: 100%; max-width: 600px; padding: 20px; border-radius: 16px 16px 0 0; box-sizing: border-box; display: flex; flex-direction: column; max-height: 95vh; overflow-y: auto; }
-    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
-    .m-name { font-size: 18px; font-weight: bold; }
-    .tab-group { display: flex; margin-bottom: 10px; border-bottom: 1px solid #ddd; }
-    .tab-btn { flex: 1; padding: 10px; text-align: center; cursor: pointer; color: #666; border-bottom: 3px solid transparent; font-weight: bold; }
-    .tab-btn.active { color: #00b900; border-bottom-color: #00b900; }
-    .tab-content { display: none; }
-    .tab-content.active { display: block; }
-    .memo-area-wrapper { position: relative; margin-bottom: 15px; }
-    textarea { width: 100%; height: 80px; padding: 10px; padding-right: 40px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; resize: none; background: #fafafa; box-sizing: border-box;}
-    .mic-btn { position: absolute; right: 10px; bottom: 10px; width: 30px; height: 30px; border-radius: 50%; background: #eee; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; border: none; }
-    .mic-btn.recording { background: #ff4d4d; color: white; animation: pulse 1s infinite; }
-    .input-row { display: flex; gap: 10px; margin-bottom: 5px;}
-    .input-date { flex: 1; padding: 8px; border-radius: 5px; border: 1px solid #ccc; font-size: 14px; }
-    .input-text { flex: 2; padding: 8px; border-radius: 5px; border: 1px solid #ccc; font-size: 14px; }
-    .btn-group { display: flex; gap: 10px; margin-top: 15px; }
-    button { padding: 12px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; flex: 1; }
-    .btn-cancel { background: #eee; color: #555; }
-    .btn-submit { background: #00b900; color: white; }
-    #loading { text-align: center; margin-top: 50px; color: #666; }
-    .gift-form { background: #fff8e1; padding: 10px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #ffecb3; }
-    .gift-type-select { padding: 8px; border-radius: 5px; border: 1px solid #ccc; background: white; margin-right: 5px; }
-    .gift-add-btn { background: #ffa000; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; }
-    #gift-list { list-style: none; padding: 0; max-height: 200px; overflow-y: auto; }
-    .gift-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #ccc; font-size: 13px; }
-    .gift-give { color: #d32f2f; font-weight: bold; } .gift-receive { color: #388e3c; font-weight: bold; }
-    #history-area { background: #f9f9f9; padding: 10px; border-radius: 8px; overflow-y: auto; font-size: 13px; margin-bottom: 15px; border: 1px solid #eee; min-height: 80px; max-height: 250px; }
-    .history-item { border-bottom: 1px solid #ddd; padding: 10px 0; }
-    .history-date { color: #00b900; font-weight: bold; font-size: 11px; margin-bottom: 4px; }
     
-    /* ★タグボタン */
-    .tag-buttons { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
-    .tag-btn { background: white; border: 1px solid #007bff; color: #007bff; padding: 4px 10px; border-radius: 20px; font-size: 12px; cursor: pointer; }
-    .ai-box { background: #fff5f5; border-left: 4px solid #ff6b6b; padding: 8px; border-radius: 4px; font-size: 12px; color: #555; margin-top: 5px; }
-    @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+    .view-content { display: none; }
+    .view-content.active { display: block; animation: fadeIn 0.3s ease; }
+
+    /* 共通カード */
+    .card { background: white; border-radius: 10px; padding: 15px; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    
+    /* リスト画面 */
+    #search-box { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 10px; box-sizing: border-box; }
+    .person-card { display: flex; justify-content: space-between; align-items: center; position: relative; border-left: 5px solid transparent; }
+    .person-card.pinned { border-left-color: #f4b400; }
+    .p-name { font-weight: bold; font-size: 16px; }
+    .p-detail { font-size: 12px; color: #666; }
+    .p-tags { font-size: 10px; color: #007bff; margin-top: 2px; }
+    
+    /* 今日の話題画面 */
+    .weather-selector { text-align: center; margin-bottom: 15px; }
+    .w-btn { border: 1px solid #ddd; background: white; padding: 8px 12px; border-radius: 20px; font-size: 18px; margin: 0 3px; cursor: pointer; }
+    .w-btn.selected { background: #e3f2fd; border-color: #2196f3; transform: scale(1.1); }
+    .gen-btn { width: 100%; padding: 12px; background: #333; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+    .topic-item { border-left: 4px solid #ddd; padding-left: 10px; margin-bottom: 10px; }
+    .topic-title { font-weight: bold; color: #d32f2f; font-size: 14px; }
+    .topic-content { font-size: 13px; color: #444; margin-top: 2px; }
+    
+    /* 学びボタン */
+    .study-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
+    .study-btn { padding: 15px; border-radius: 10px; border: none; color: white; font-weight: bold; cursor: pointer; text-align: center; font-size: 13px; }
+    .btn-k { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    .btn-g { background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%); color: #005c4b; }
+    .btn-w { grid-column: span 2; background: linear-gradient(135deg, #0f2027 0%, #203a43 100%); }
+
+    /* その他 */
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: flex-end; z-index: 1000; }
+    .modal-content { background: white; width: 100%; padding: 20px; border-radius: 15px 15px 0 0; max-height: 90vh; overflow-y: auto; box-sizing: border-box; }
+    #loading { text-align: center; padding: 20px; color: #888; display: none; }
+    .tag-btn { background: white; border: 1px solid #007bff; color: #007bff; padding: 4px 8px; border-radius: 15px; font-size: 11px; cursor: pointer; margin-right: 3px; margin-bottom: 3px; }
+    
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
   </style>
 </head>
 <body>
 
   <div class="train-widget">
     <div class="train-header">
-      <span style="font-weight:bold;">🚃 次の電車</span>
+      <span>🚃 次の電車</span>
       <select id="route-select" class="train-select" onchange="changeRoute()">
         <option value="toWork">行き：山西 → 衣山</option>
         <option value="toHome">帰り：衣山 → 山西</option>
       </select>
     </div>
-    <div class="train-timer">
-      <div id="countdown-text" class="countdown-big">-- 分 -- 秒</div>
-      <div id="next-time-text" class="next-time-sub">発車時刻: --:--</div>
-    </div>
+    <div id="countdown-text" class="countdown-big">--:--</div>
   </div>
 
   <div class="main-tabs">
-    <div class="main-tab-btn active" onclick="switchMainTab('list')">👥 人物リスト</div>
-    <div class="main-tab-btn" onclick="switchMainTab('timer')">⏳ 経過管理</div>
-    <div class="main-tab-btn" onclick="switchMainTab('dojo')">💪 会話道場</div>
+    <div class="main-tab-btn active" onclick="switchMainTab('list')">👥 人物</div>
+    <div class="main-tab-btn" onclick="switchMainTab('daily')">☕ 話題/学び</div>
+    <div class="main-tab-btn" onclick="switchMainTab('timer')">⏳ 経過</div>
+    <div class="main-tab-btn" onclick="switchMainTab('dojo')">💪 道場</div>
   </div>
 
   <div id="view-list" class="view-content active">
-    <input type="text" id="search-box" placeholder="名前・タグ・性格で検索..." onkeyup="filterList()">
-    <div id="loading">読み込み中...</div>
-    <ul id="person-list"></ul>
+    <input type="text" id="search-box" placeholder="検索..." onkeyup="filterList()">
+    <div id="person-list">読み込み中...</div>
+  </div>
+
+  <div id="view-daily" class="view-content">
+    <div class="card">
+      <div style="text-align:center; font-weight:bold; margin-bottom:10px;">☀ 今日の話題生成</div>
+      <div class="weather-selector">
+        <button class="w-btn selected" onclick="selW('☀ 晴れ',this)">☀</button>
+        <button class="w-btn" onclick="selW('☁ 曇り',this)">☁</button>
+        <button class="w-btn" onclick="selW('☂ 雨',this)">☂</button>
+        <button class="w-btn" onclick="selW('❄ 寒い',this)">❄</button>
+      </div>
+      <button class="gen-btn" onclick="genTopics()">話題をつくる</button>
+      <div id="daily-result" style="margin-top:15px;"></div>
+    </div>
+
+    <div class="study-grid">
+      <button class="study-btn btn-k" onclick="genStudy('kokugo')">🇯🇵 国語力<br>(漢字・敬語)</button>
+      <button class="study-btn btn-g" onclick="genStudy('geo')">🗾 地理雑学<br>(47都道府県)</button>
+      <button class="study-btn btn-w" onclick="genStudy('work')">🏢 仕事の知識<br>(FP・社保・労働法)</button>
+    </div>
+    
+    <div id="study-modal" class="modal" onclick="if(event.target===this)this.style.display='none'">
+      <div class="modal-content">
+        <h3 id="s-cat" style="margin-top:0;">カテゴリ</h3>
+        <p id="s-ques" style="font-size:18px; font-weight:bold;">問題</p>
+        <button class="gen-btn" onclick="document.getElementById('s-ans-box').style.display='block';this.style.display='none'" id="s-show-btn">正解を見る</button>
+        <div id="s-ans-box" style="display:none; margin-top:15px; border-top:1px dashed #ccc; padding-top:10px;">
+          <div id="s-ans" style="color:#d32f2f; font-weight:bold; font-size:20px; margin-bottom:5px;">正解</div>
+          <div id="s-exp" style="font-size:14px; color:#555; background:#f9f9f9; padding:10px; border-radius:8px;">解説</div>
+        </div>
+        <button style="width:100%; margin-top:15px; padding:10px; border:none; background:#eee;" onclick="document.getElementById('study-modal').style.display='none'">閉じる</button>
+      </div>
+    </div>
   </div>
 
   <div id="view-timer" class="view-content">
-    <button class="timer-add-btn" onclick="openTimerModal()">＋ 新しい記録を追加</button>
-    <div id="timer-loading" style="text-align:center; color:#999; display:none;">読み込み中...</div>
-    <ul id="timer-list"></ul>
+    <button class="gen-btn" style="background:#007bff; margin-bottom:10px;" onclick="openTimerModal()">＋ 記録追加</button>
+    <div id="timer-list"></div>
   </div>
 
   <div id="view-dojo" class="view-content">
-    <div class="dojo-card">
-      <div class="dojo-title">🎲 話題ガチャ</div>
-      <div class="gacha-btns">
-        <div class="gacha-btn" onclick="drawTopic('雑談')">☕ 雑談</div>
-        <div class="gacha-btn" onclick="drawTopic('仕事')">💼 仕事</div>
-        <div class="gacha-btn" onclick="drawTopic('愛媛')">🍊 愛媛</div>
-        <div class="gacha-btn" onclick="drawTopic('恋愛')">💕 恋愛</div>
-        <div class="gacha-btn" onclick="drawTopic('季節')">☀ 季節</div>
+    <div class="card">
+      <h3>🎲 話題ガチャ</h3>
+      <div style="display:flex; gap:5px; flex-wrap:wrap;">
+        <button onclick="dojoGacha('雑談')" style="flex:1; padding:10px;">雑談</button>
+        <button onclick="dojoGacha('仕事')" style="flex:1; padding:10px;">仕事</button>
+        <button onclick="dojoGacha('愛媛')" style="flex:1; padding:10px;">愛媛</button>
       </div>
-      <div id="gacha-result" class="gacha-result">
-        <div id="gr-topic" class="gr-topic"></div>
-        <div id="gr-detail" class="gr-detail"></div>
-        <div id="gr-tip" class="gr-tip"></div>
-      </div>
+      <div id="gacha-res" style="margin-top:10px; background:#fff8e1; padding:10px; border-radius:5px; display:none;"></div>
     </div>
-    <div class="dojo-card">
-      <div class="dojo-title">🥊 会話シミュレーション</div>
-      <select id="sim-role" style="width:100%; padding:8px; margin-bottom:10px; border-radius:5px; border:1px solid #ddd;">
-        <option value="同僚">相手：職場の同僚</option>
-        <option value="上司">相手：上司</option>
-        <option value="彼女">相手：彼女</option>
-        <option value="初対面">相手：初対面の人</option>
-      </select>
-      <div class="chat-box" id="sim-chat"><div class="chat-msg msg-ai">こんにちは。練習しましょう！</div></div>
-      <div class="sim-input-area">
-        <input type="text" id="sim-input" class="sim-input" placeholder="会話を入力...">
-        <button class="sim-btn" onclick="sendSim()">送信</button>
-      </div>
+    <div class="card">
+      <h3>🥊 シミュレーション</h3>
+      <input type="text" id="sim-in" style="width:100%; padding:10px; margin-bottom:5px;" placeholder="会話入力...">
+      <button class="gen-btn" onclick="dojoSim()">送信</button>
+      <div id="sim-res" style="margin-top:10px; height:150px; overflow-y:auto; background:#f9f9f9; padding:5px;"></div>
     </div>
   </div>
 
-  <div id="modal" onclick="if(event.target === this) closeModal()">
+  <div id="p-modal" class="modal" onclick="if(event.target===this)this.style.display='none'">
     <div class="modal-content">
-      <div class="modal-header">
-        <div><span id="modal-name" class="m-name"></span><span id="modal-pin" onclick="togglePin()">★</span><div id="modal-detail" style="font-size:12px; color:#666;"></div></div>
+      <h3 id="pm-name">名前</h3>
+      <textarea id="pm-memo" style="width:100%; height:80px; padding:5px; border:1px solid #ddd;" placeholder="メモ..."></textarea>
+      
+      <div style="display:flex; gap:2px; margin-top:5px; flex-wrap:wrap;">
+        <button class="tag-btn" onclick="addTag('ゴルフ')">ゴルフ</button>
+        <button class="tag-btn" onclick="addTag('車')">🚙 車</button>
+        <button class="tag-btn" onclick="addTag('マラソン')">🏃 マラソン</button>
+        <button class="tag-btn" onclick="addTag('友人')">🤝 友人</button>
+        <button class="tag-btn" onclick="addTag('地元')">🏠 地元</button>
+        <button class="tag-btn" onclick="addTag('大学')">🎓 大学</button>
       </div>
-      <div class="tab-group">
-        <div class="tab-btn active" onclick="switchTab('memo')">📝 メモ・イベント</div>
-        <div class="tab-btn" onclick="switchTab('gift')">🎁 贈答リスト</div>
-      </div>
-      <div id="tab-memo" class="tab-content active">
-        <div class="memo-area-wrapper"><textarea id="memo-text" placeholder="メモ..."></textarea><button class="mic-btn" onclick="startVoiceInput()">🎤</button></div>
-        <div class="event-section">
-          <div class="input-row"><input type="date" id="event-date" class="input-date"><input type="text" id="event-name" class="input-text" placeholder="イベント名"></div>
-          <div class="input-row" style="margin-top:5px;"><input type="text" id="tags" class="input-text" style="flex:1;" placeholder="タグ"></div>
-          
-          <div class="tag-buttons">
-            <button class="tag-btn" onclick="addTag('ゴルフ')">ゴルフ</button>
-            <button class="tag-btn" onclick="addTag('日本酒')">日本酒</button>
-            <button class="tag-btn" onclick="addTag('車')">🚙 車</button>
-            <button class="tag-btn" onclick="addTag('マラソン')">🏃 マラソン</button>
-            <button class="tag-btn" onclick="addTag('家族')">家族</button>
-            <button class="tag-btn" onclick="addTag('仕事')">仕事</button>
-          </div>
 
-        </div>
-        <div style="font-size:12px; font-weight:bold; color:#555; margin-bottom:5px;">▼ 過去のメモ＆AI提案</div>
-        <div id="history-area">読み込み中...</div>
-      </div>
-      <div id="tab-gift" class="tab-content">
-        <div class="gift-form"><div class="input-row"><select id="gift-type" class="gift-type-select"><option value="receive">もらった</option><option value="give">あげた</option></select><input type="text" id="gift-item" class="input-text" placeholder="品名"><button class="gift-add-btn" onclick="addGift()">追加</button></div></div>
-        <ul id="gift-list"></ul>
-      </div>
-      <div class="btn-group"><button class="btn-cancel" onclick="closeModal()">閉じる</button><button class="btn-submit" onclick="submitMemo()">保存</button></div>
+      <button class="gen-btn" style="margin-top:10px;" onclick="savePerson()">保存</button>
+      <div id="pm-hist" style="margin-top:10px; font-size:12px; color:#666;"></div>
     </div>
   </div>
-
-  <div id="timer-modal" onclick="if(event.target === this) closeTimerModal()" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); align-items:flex-end; justify-content:center; z-index:1100;">
+  
+  <div id="t-modal" class="modal" onclick="if(event.target===this)this.style.display='none'">
     <div class="modal-content">
-      <div class="modal-header"><div class="m-name" id="timer-modal-title">新しい記録</div></div>
-      <div class="input-row"><input type="text" id="timer-name" class="input-text" placeholder="イベント名"></div>
-      <div class="input-row"><input type="date" id="timer-date" class="input-date"></div>
-      <div class="memo-area-wrapper"><textarea id="timer-memo" placeholder="メモ"></textarea></div>
-      <div id="timer-history-container" style="display:none; margin-top:15px;"><div style="font-size:12px; font-weight:bold; color:#555; margin-bottom:5px;">▼ 過去の履歴</div><div id="timer-history-list" style="max-height:150px; overflow-y:auto; border:1px solid #eee; padding:5px; border-radius:5px;"></div></div>
-      <div class="btn-group"><button class="btn-cancel" onclick="closeTimerModal()">閉じる</button><button class="btn-submit" onclick="saveTimer()">保存</button></div>
+      <h3>記録追加</h3>
+      <input type="text" id="tm-name" placeholder="項目名(美容院など)" style="width:100%; padding:10px; margin-bottom:5px;">
+      <input type="date" id="tm-date" style="width:100%; padding:10px; margin-bottom:5px;">
+      <button class="gen-btn" onclick="saveTimer()">保存</button>
     </div>
   </div>
+
+  <div id="loading" class="modal" style="background:rgba(255,255,255,0.8); align-items:center; justify-content:center; color:#333; font-weight:bold;">処理中...</div>
 
   <script>
-    // ★新しいGASのURLに差し替えてください（「デプロイ」>「新しいデプロイ」で発行されたもの）
-    const API_URL = "https://script.google.com/macros/s/AKfycbxV0ZhdIXX5NOF5r-_iBg8OZoy-SJxkloNR3O0aaP_DN-SQImYbAMxQAi1J2A2Z-VvaWw/exec";
+    // ★API_URLを貼り付けてください
+    const API_URL = "https://script.google.com/macros/s/AKfycbyRkS09x1E5TL8rHLUCnKWiKMH743XaDOWWfZ3mPBU7xhp9wzIAGKWyCU7oFGp-I94s-Q/exec";
 
-    /* 電車・共通変数 */
-    const TIMETABLE = { toWork: { startHour: 6, endHour: 23, minutes: [6, 21, 36, 51] }, toHome: { startHour: 6, endHour: 23, minutes: [7, 22, 37, 52] } };
-    let timerInterval = null;
-    let allPeople = []; let selectedPerson = null; let isPinnedCurrent = false; let currentGiftList = [];
-    let allTimers = [];
+    let allData = [];
+    let curWeather = "☀ 晴れ";
+    let curPerson = null;
 
-    document.addEventListener("DOMContentLoaded", () => {
-      const savedRoute = localStorage.getItem("trainRoute");
-      if (savedRoute) document.getElementById("route-select").value = savedRoute;
-      updateTrainTimer();
-      timerInterval = setInterval(updateTrainTimer, 1000);
-    });
-
-    window.onload = async function() {
+    window.onload = async () => {
       try {
         const res = await fetch(API_URL);
-        const data = await res.json();
-        renderList(data);
-      } catch (e) { document.getElementById('loading').innerText = "Load Error"; }
+        allData = await res.json();
+        renderList(allData);
+      } catch(e) { console.log(e); }
+      loadTimer();
     };
 
-    function switchMainTab(viewId) {
-      document.querySelectorAll('.view-content').forEach(el => el.classList.remove('active'));
-      document.getElementById('view-' + viewId).classList.add('active');
-      const btns = document.querySelectorAll('.main-tab-btn');
-      btns.forEach(b => b.classList.remove('active'));
-      if(viewId === 'list') btns[0].classList.add('active');
-      else if(viewId === 'timer') { btns[1].classList.add('active'); loadTimerData(); } 
-      else btns[2].classList.add('active');
+    function switchMainTab(id) {
+      document.querySelectorAll('.view-content').forEach(e => e.classList.remove('active'));
+      document.querySelectorAll('.main-tab-btn').forEach(e => e.classList.remove('active'));
+      document.getElementById('view-'+id).classList.add('active');
     }
 
-    /* SinceTimerロジック */
-    async function loadTimerData() {
-      const loading = document.getElementById('timer-loading');
-      if (allTimers.length === 0) loading.style.display = 'block';
+    /* 今日の話題 */
+    function selW(w, btn) { curWeather = w; document.querySelectorAll('.w-btn').forEach(b => b.classList.remove('selected')); btn.classList.add('selected'); }
+    async function genTopics() {
+      showLoad(true);
       try {
-        const res = await fetch(API_URL + "?action=getTimer");
-        allTimers = await res.json();
-        renderTimerList();
-      } catch(e) { console.error(e); }
-      loading.style.display = 'none';
+        const res = await fetch(API_URL, { method:"POST", body:JSON.stringify({action:"news", weather:curWeather}) });
+        const data = await res.json();
+        const box = document.getElementById('daily-result');
+        box.innerHTML = data.map(t => `<div class="topic-item"><div class="topic-title">${t.title}</div><div class="topic-content">${t.content}</div></div>`).join('');
+      } catch(e) { alert("エラー"); }
+      showLoad(false);
     }
 
-    function renderTimerList() {
-      const list = document.getElementById('timer-list');
-      list.innerHTML = "";
+    /* 学び */
+    async function genStudy(mode) {
+      showLoad(true);
+      try {
+        const res = await fetch(API_URL, { method:"POST", body:JSON.stringify({action:"study", mode:mode}) });
+        const data = await res.json();
+        document.getElementById('s-cat').innerText = mode==='geo' ? "📍 "+data.prefecture : (data.category||"知識");
+        document.getElementById('s-ques').innerText = mode==='geo' ? `お土産は？\n「${data.souvenir}」` : data.question;
+        document.getElementById('s-ans').innerText = mode==='geo' ? "💡 雑学" : data.answer;
+        document.getElementById('s-exp').innerText = mode==='geo' ? data.detail : data.explanation;
+        document.getElementById('s-ans-box').style.display = 'none';
+        document.getElementById('s-show-btn').style.display = 'block';
+        document.getElementById('study-modal').style.display = 'flex';
+      } catch(e) { alert("エラー"); }
+      showLoad(false);
+    }
+
+    /* 人物リスト */
+    function renderList(list) {
+      document.getElementById('person-list').innerHTML = list.map(p => 
+        `<div class="card person-card ${p.isPinned?'pinned':''}" onclick='openPerson(${JSON.stringify(p)})'>
+           <div>
+             <div class="p-name">${p.name}</div>
+             <div class="p-detail">${p.section} | ${p.role}</div>
+             <div class="p-tags">${p.tags||""}</div>
+           </div>
+           ${p.eventDate ? "🔔" : ""}
+         </div>`
+      ).join('');
+    }
+    function filterList() {
+      const v = document.getElementById('search-box').value.toLowerCase();
+      renderList(allData.filter(p => (p.name+p.tags).toLowerCase().includes(v)));
+    }
+    function openPerson(p) {
+      curPerson = p;
+      document.getElementById('pm-name').innerText = p.name;
+      document.getElementById('pm-memo').value = "";
+      document.getElementById('p-modal').style.display = 'flex';
+    }
+    async function savePerson() {
+      showLoad(true);
+      const memo = document.getElementById('pm-memo').value;
+      if(!memo) { showLoad(false); return; }
+      await fetch(API_URL, { method:"POST", body:JSON.stringify({action:"save", name:curPerson.name, memo:memo}) });
+      alert("保存完了");
+      location.reload();
+    }
+    function addTag(t) { document.getElementById('pm-memo').value += " #"+t; }
+
+    /* 経過管理 */
+    async function loadTimer() {
+      const res = await fetch(API_URL + "?action=getTimer");
+      const data = await res.json();
       const grouped = {};
-      allTimers.forEach(t => { if (!grouped[t.name]) grouped[t.name] = []; grouped[t.name].push(t); });
-      const now = new Date(); now.setHours(0,0,0,0);
-      Object.keys(grouped).forEach(name => {
-        const history = grouped[name]; const latest = history[0]; const latestDate = new Date(latest.date); latestDate.setHours(0,0,0,0);
-        const diffTime = now - latestDate; const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-        let daysHtml = "";
-        if (diffDays > 0) daysHtml = `<span class="t-days t-past">${diffDays}</span> <span class="t-unit">日前</span>`;
-        else if (diffDays < 0) daysHtml = `<span class="t-unit">あと</span> <span class="t-days t-future">${Math.abs(diffDays)}</span> <span class="t-unit">日</span>`;
-        else daysHtml = `<span class="t-days t-future">今日</span>`;
-        const li = document.createElement('li'); li.className = 'timer-card';
-        li.innerHTML = `<div class="t-header"><span class="t-name">${latest.name}</span><span class="t-date">最終: ${latest.date}</span></div><div class="t-body">${daysHtml}</div><div style="font-size:12px; color:#888; margin-top:5px;">${latest.memo || ""}</div>`;
-        li.onclick = () => openTimerModal(name); list.appendChild(li);
-      });
+      data.forEach(t => { if(!grouped[t.name]) grouped[t.name]=t; });
+      document.getElementById('timer-list').innerHTML = Object.values(grouped).map(t => {
+        const diff = Math.floor((new Date() - new Date(t.date))/(86400000));
+        return `<div class="card"><div>${t.name}</div><div style="font-size:20px; font-weight:bold;">${diff}日前</div></div>`;
+      }).join('');
     }
-
-    function openTimerModal(name = "") {
-      const modal = document.getElementById('timer-modal'); const title = document.getElementById('timer-modal-title'); const nameInput = document.getElementById('timer-name'); const dateInput = document.getElementById('timer-date'); const memoInput = document.getElementById('timer-memo'); const historyBox = document.getElementById('timer-history-container'); const historyList = document.getElementById('timer-history-list');
-      const now = new Date(); const yyyy = now.getFullYear(); const mm = ("0"+(now.getMonth()+1)).slice(-2); const dd = ("0"+now.getDate()).slice(-2);
-      dateInput.value = `${yyyy}-${mm}-${dd}`; memoInput.value = "";
-      if (name) {
-        title.innerText = name + " の記録"; nameInput.value = name; historyBox.style.display = 'block'; historyList.innerHTML = "";
-        const historyData = allTimers.filter(t => t.name === name);
-        historyData.forEach(h => { const div = document.createElement('div'); div.style.borderBottom = "1px solid #eee"; div.style.padding = "5px 0"; div.style.fontSize = "13px"; div.innerHTML = `<span style="font-weight:bold;">${h.date}</span> <span style="color:#666;">${h.memo}</span>`; historyList.appendChild(div); });
-      } else { title.innerText = "新しい記録を追加"; nameInput.value = ""; historyBox.style.display = 'none'; }
-      modal.style.display = 'flex';
-    }
-
-    function closeTimerModal() { document.getElementById('timer-modal').style.display = 'none'; }
+    function openTimerModal() { document.getElementById('t-modal').style.display = 'flex'; }
     async function saveTimer() {
-      const name = document.getElementById('timer-name').value; const date = document.getElementById('timer-date').value; const memo = document.getElementById('timer-memo').value;
-      if (!name || !date) return alert("必須項目です");
-      const btn = document.querySelector('#timer-modal .btn-submit'); btn.innerText = "保存中..."; btn.disabled = true;
-      try { const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "saveTimer", eventName: name, date: date, memo: memo }) }); const result = await res.json(); if (result.status === "success") { alert("記録しました！"); closeTimerModal(); loadTimerData(); } else { alert("失敗"); } } catch(e) { alert("Error"); } finally { btn.innerText = "保存"; btn.disabled = false; }
+      showLoad(true);
+      const name = document.getElementById('tm-name').value;
+      const date = document.getElementById('tm-date').value;
+      await fetch(API_URL, { method:"POST", body:JSON.stringify({action:"saveTimer", eventName:name, date:date}) });
+      alert("完了");
+      location.reload();
     }
 
-    /* その他 (電車, リスト) */
-    function changeRoute() { localStorage.setItem("trainRoute", document.getElementById("route-select").value); updateTrainTimer(); }
-    function updateTrainTimer() {
-      const routeKey = document.getElementById("route-select").value; const schedule = TIMETABLE[routeKey];
-      const now = new Date(); const currentHour = now.getHours(); const currentMin = now.getMinutes();
-      let nextTrain = null;
-      for (let h = currentHour; h <= schedule.endHour; h++) {
-        if (h < schedule.startHour) continue;
-        for (let m of schedule.minutes) {
-          if (h > currentHour || (h === currentHour && m > currentMin)) { nextTrain = new Date(); nextTrain.setHours(h); nextTrain.setMinutes(m); nextTrain.setSeconds(0); break; }
-        }
-        if (nextTrain) break;
-      }
-      const disp = document.getElementById("countdown-text"); const sub = document.getElementById("next-time-text");
-      if (!nextTrain) { disp.innerText = "運転終了"; sub.innerText = "--:--"; return; }
-      const diffMs = nextTrain - now; const diffMin = Math.floor(diffMs / 60000); const diffSec = Math.floor((diffMs % 60000) / 1000);
-      if (diffMin <= 0 && diffSec <= 0) disp.innerText = "まもなく発車"; else disp.innerHTML = `<span style="font-size:48px;">${diffMin}</span>分 <span style="font-size:24px;">${diffSec}</span>秒`;
-      sub.innerText = `発車時刻: ${('0'+nextTrain.getHours()).slice(-2)}:${('0'+nextTrain.getMinutes()).slice(-2)}`;
+    /* 道場 */
+    async function dojoGacha(topic) {
+      showLoad(true);
+      const res = await fetch(API_URL, { method:"POST", body:JSON.stringify({action:"training", mode:"gacha", text:topic}) });
+      const d = await res.json();
+      document.getElementById('gacha-res').style.display = 'block';
+      document.getElementById('gacha-res').innerHTML = `<b>${d.topic}</b><br>${d.detail}`;
+      showLoad(false);
     }
+    async function dojoSim() {
+      const txt = document.getElementById('sim-in').value;
+      if(!txt) return;
+      document.getElementById('sim-res').innerHTML += `<div>自分: ${txt}</div>`;
+      document.getElementById('sim-in').value = "";
+      const res = await fetch(API_URL, { method:"POST", body:JSON.stringify({action:"training", mode:"sim", text:txt}) });
+      const d = await res.json();
+      document.getElementById('sim-res').innerHTML += `<div style="color:blue;">AI: ${d.reply}</div><div style="font-size:10px; color:red;">${d.score}点: ${d.advice}</div>`;
+    }
+
+    function showLoad(b) { document.getElementById('loading').style.display = b ? 'flex' : 'none'; }
     
-    function renderList(data) {
-      allPeople = data; const list = document.getElementById('person-list'); list.innerHTML = ""; document.getElementById('loading').style.display = 'none';
-      const now = new Date().getTime(); const DAY_MS = 24 * 60 * 60 * 1000;
-      data.forEach(p => {
-        const li = document.createElement('li'); li.className = 'person-card';
-        if (p.lastUpdated > 0) { const diffDays = (now - p.lastUpdated) / DAY_MS; if (diffDays > 90) li.classList.add('status-danger'); else if (diffDays > 30) li.classList.add('status-warning'); }
-        li.dataset.searchText = (p.name + p.kana + p.section + p.role + p.tags + p.personality).toLowerCase();
-        const bell = p.eventDate ? "🔔" : ""; const tagsHtml = p.tags ? `<div class="p-tags">${p.tags}</div>` : "";
-        let personHtml = ""; if (p.personality) { p.personality.split(',').forEach(item => { personHtml += `<span class="p-personality">🧠${item.trim()}</span>`; }); }
-        const pinClass = p.isPinned ? "pin-icon active" : "pin-icon"; const pinHtml = `<div class="${pinClass}">★</div>`;
-        li.innerHTML = `<div class="p-info"><div class="p-name">${p.name} ${bell} <span class="p-kana">${p.kana}</span></div><div class="p-detail"><span class="p-role">${p.role}</span> | ${p.section}</div>${personHtml}${tagsHtml}</div>${pinHtml}<div class="icon-edit">✎</div>`;
-        li.onclick = () => openModal(p); list.appendChild(li);
-      });
-    }
-    function filterList() { const term = document.getElementById('search-box').value.toLowerCase(); document.querySelectorAll('.person-card').forEach(item => { item.style.display = item.dataset.searchText.includes(term) ? 'flex' : 'none'; }); }
-    function switchTab(tabName) { document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active')); document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active')); document.getElementById('tab-' + tabName).classList.add('active'); const btns = document.querySelectorAll('#modal .tab-btn'); if(tabName === 'memo') btns[0].classList.add('active'); else btns[1].classList.add('active'); }
-    function renderGiftList() { const ul = document.getElementById('gift-list'); ul.innerHTML = ""; if (currentGiftList.length === 0) { ul.innerHTML = '<li style="color:#999; padding:10px; text-align:center;">記録なし</li>'; return; } currentGiftList.forEach(g => { const li = document.createElement('li'); li.className = 'gift-item'; const typeLabel = g.type === 'receive' ? '<span class="gift-receive">←もらった</span>' : '<span class="gift-give">→あげた</span>'; li.innerHTML = `<span>${typeLabel} ${g.item}</span> <span style="color:#888;">${g.date}</span>`; ul.appendChild(li); }); }
-    function addGift() { const type = document.getElementById('gift-type').value; const item = document.getElementById('gift-item').value; if (!item) return; const now = new Date(); const dateStr = `${now.getFullYear()}/${now.getMonth()+1}/${now.getDate()}`; currentGiftList.unshift({ type: type, item: item, date: dateStr }); document.getElementById('gift-item').value = ""; renderGiftList(); }
-    async function openModal(person) {
-      selectedPerson = person; isPinnedCurrent = person.isPinned;
-      try { currentGiftList = JSON.parse(person.giftHistory || "[]"); } catch(e) { currentGiftList = []; }
-      document.getElementById('modal-name').innerText = person.name; document.getElementById('modal-detail').innerText = `${person.section} / ${person.role}`; document.getElementById('memo-text').value = ""; document.getElementById('event-date').value = person.eventDate || ""; document.getElementById('event-name').value = person.eventName || ""; document.getElementById('tags').value = person.tags ? person.tags.replace(/#/g, '').replace(/ /g, ' ') : "";
-      const pinBtn = document.getElementById('modal-pin'); if (isPinnedCurrent) pinBtn.classList.add('active'); else pinBtn.classList.remove('active');
-      renderGiftList(); switchTab('memo'); document.getElementById('modal').style.display = 'flex';
-      const historyArea = document.getElementById('history-area'); historyArea.innerHTML = '<div style="color:#999;">読み込み中...</div>';
-      try { const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "getHistory", name: person.name }) }); const history = await res.json(); if (!history || history.length === 0) historyArea.innerHTML = '<div style="color:#ccc;">履歴なし</div>'; else { let html = ""; history.forEach(h => { let aiHtml = h.aiAdvice ? `<div class="ai-box"><div class="ai-title">🤖 AI提案</div>${h.aiAdvice.replace(/\n/g, '<br>')}</div>` : ""; html += `<div class="history-item"><div class="history-date">${h.date}</div><div class="history-text">${h.memo}</div>${aiHtml}</div>`; }); historyArea.innerHTML = html; } } catch (e) { historyArea.innerText = "Error"; }
-    }
-    function closeModal() { document.getElementById('modal').style.display = 'none'; }
-    function togglePin() { isPinnedCurrent = !isPinnedCurrent; const b = document.getElementById('modal-pin'); isPinnedCurrent ? b.classList.add('active') : b.classList.remove('active'); }
-    function startVoiceInput() { const btn = document.querySelector('.mic-btn'); const ta = document.getElementById('memo-text'); if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) { alert("非対応"); return; } const R = window.SpeechRecognition || window.webkitSpeechRecognition; const r = new R(); r.lang = 'ja-JP'; r.onstart=()=>btn.classList.add('recording'); r.onend=()=>btn.classList.remove('recording'); r.onresult=(e)=>{ta.value+=(ta.value?"\n":"")+e.results[0][0].transcript;}; r.start(); }
-    function addTag(t) { const el = document.getElementById('tags'); if(!el.value.includes(t)) el.value = el.value ? el.value+" "+t : t; }
-    async function submitMemo() {
-      const memo = document.getElementById('memo-text').value; const eventDate = document.getElementById('event-date').value; const eventName = document.getElementById('event-name').value;
-      let rawTags = document.getElementById('tags').value; let tags = ""; if (rawTags) { tags = rawTags.replace(/　/g, ' ').split(' ').filter(t => t.trim() !== "").map(t => t.startsWith('#') ? t : '#' + t).join(' '); }
-      const giftJson = JSON.stringify(currentGiftList); const isGiftChanged = giftJson !== (selectedPerson.giftHistory || "[]");
-      if (!memo && !eventDate && !tags && isPinnedCurrent === selectedPerson.isPinned && !isGiftChanged) return;
-      const btn = document.querySelector('#modal .btn-submit'); btn.innerText = "保存中..."; btn.disabled = true;
-      try { const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "save", name: selectedPerson.name, memo: memo, eventDate: eventDate, eventName: eventName, tags: tags, isPinned: isPinnedCurrent, giftHistory: giftJson }) }); const result = await res.json(); if (result.status === "success") { alert("保存しました！"); closeModal(); location.reload(); } else { alert("失敗: " + result.message); } } catch (e) { alert("Error: " + e); } finally { btn.innerText = "保存"; btn.disabled = false; }
-    }
-    async function drawTopic(category) { const resBox = document.getElementById('gacha-result'); resBox.style.display = 'block'; resBox.innerHTML = '<div style="text-align:center;">AI思考中...</div>'; try { const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "training", mode: "gacha", text: category }) }); const data = await res.json(); resBox.innerHTML = `<div class="gr-topic">💡 ${data.topic}</div><div class="gr-detail">「${data.detail}」</div><div class="gr-tip">☝️ アドバイス: ${data.tip}</div>`; } catch(e) { resBox.innerText = "エラー: AI許可を確認してください"; } }
-    async function sendSim() { const inputEl = document.getElementById('sim-input'); const text = inputEl.value; if(!text) return; const role = document.getElementById('sim-role').value; const chatBox = document.getElementById('sim-chat'); chatBox.innerHTML += `<div class="chat-msg msg-user">${text}</div>`; inputEl.value = ""; chatBox.scrollTop = chatBox.scrollHeight; const loadingId = "l-"+new Date().getTime(); chatBox.innerHTML += `<div id="${loadingId}" class="chat-msg msg-ai">...</div>`; try { const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "training", mode: "sim", text: `相手役=${role}, ユーザー発言=${text}` }) }); const data = await res.json(); document.getElementById(loadingId).remove(); chatBox.innerHTML += `<div class="chat-msg msg-ai">${data.reply}<span class="msg-feedback">📊 ${data.score}点: ${data.advice}</span></div>`; chatBox.scrollTop = chatBox.scrollHeight; } catch(e) { document.getElementById(loadingId).innerText = "エラー"; } }
+    // 電車タイマー (簡易版)
+    setInterval(() => {
+      const now = new Date();
+      const mins = [6, 21, 36, 51];
+      let next = null;
+      for(let m of mins) {
+        if(now.getMinutes() < m) { next = new Date(now); next.setMinutes(m); next.setSeconds(0); break; }
+      }
+      if(!next) { next = new Date(now); next.setHours(now.getHours()+1); next.setMinutes(mins[0]); next.setSeconds(0); }
+      const diff = Math.floor((next - now)/1000);
+      document.getElementById('countdown-text').innerText = `${Math.floor(diff/60)}分${diff%60}秒`;
+    }, 1000);
   </script>
 </body>
 </html>
