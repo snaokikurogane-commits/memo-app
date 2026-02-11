@@ -3,57 +3,75 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>究極の業務支援アプリ</title>
+  <title>業務支援シンプル</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f2f2f2; margin: 0; padding: 10px; color: #333; }
     
-    /* ヘッダー・電車 */
+    /* 電車ウィジェット */
     .train-widget { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 15px; border-radius: 12px; margin-bottom: 15px; color: white; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
     .train-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
     .train-select { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.5); padding: 5px; border-radius: 15px; color: white; font-size: 12px; }
     .train-select option { color: #333; }
     .countdown-big { font-size: 32px; font-weight: bold; text-align: center; text-shadow: 1px 1px 2px rgba(0,0,0,0.2); }
 
-    /* メインタブ */
-    .main-tabs { display: flex; gap: 5px; margin-bottom: 15px; overflow-x: auto; white-space: nowrap; padding-bottom: 5px; }
-    .main-tab-btn { flex: 1; min-width: 80px; padding: 10px 5px; background: white; border-radius: 8px; text-align: center; font-weight: bold; color: #666; cursor: pointer; font-size: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    /* タブ */
+    .main-tabs { display: flex; gap: 10px; margin-bottom: 15px; }
+    .main-tab-btn { flex: 1; padding: 12px; background: white; border-radius: 8px; text-align: center; font-weight: bold; color: #666; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
     .main-tab-btn.active { background: #333; color: white; }
     
     .view-content { display: none; }
     .view-content.active { display: block; animation: fadeIn 0.3s ease; }
 
-    /* 共通カード */
-    .card { background: white; border-radius: 10px; padding: 15px; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    /* 共通カードスタイル */
+    .card { background: white; border-radius: 10px; padding: 15px; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); cursor: pointer; }
     
     /* リスト画面 */
-    #search-box { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 10px; box-sizing: border-box; }
+    #search-box { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 15px; box-sizing: border-box; font-size: 16px; }
     .person-card { display: flex; justify-content: space-between; align-items: center; position: relative; border-left: 5px solid transparent; }
     .person-card.pinned { border-left-color: #f4b400; }
-    .p-name { font-weight: bold; font-size: 16px; }
-    .p-detail { font-size: 12px; color: #666; }
-    .p-tags { font-size: 10px; color: #007bff; margin-top: 2px; }
-    
-    /* 今日の話題画面 */
-    .weather-selector { text-align: center; margin-bottom: 15px; }
-    .w-btn { border: 1px solid #ddd; background: white; padding: 8px 12px; border-radius: 20px; font-size: 18px; margin: 0 3px; cursor: pointer; }
-    .w-btn.selected { background: #e3f2fd; border-color: #2196f3; transform: scale(1.1); }
-    .gen-btn { width: 100%; padding: 12px; background: #333; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
-    .topic-item { border-left: 4px solid #ddd; padding-left: 10px; margin-bottom: 10px; }
-    .topic-title { font-weight: bold; color: #d32f2f; font-size: 14px; }
-    .topic-content { font-size: 13px; color: #444; margin-top: 2px; }
-    
-    /* 学びボタン */
-    .study-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
-    .study-btn { padding: 15px; border-radius: 10px; border: none; color: white; font-weight: bold; cursor: pointer; text-align: center; font-size: 13px; }
-    .btn-k { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-    .btn-g { background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%); color: #005c4b; }
-    .btn-w { grid-column: span 2; background: linear-gradient(135deg, #0f2027 0%, #203a43 100%); }
+    .p-name { font-weight: bold; font-size: 17px; }
+    .p-detail { font-size: 12px; color: #666; margin-top: 2px; }
+    .p-tags { font-size: 11px; color: #007bff; margin-top: 4px; }
+    .bell { color: #f4b400; font-size: 14px; margin-left: 5px; }
 
-    /* その他 */
-    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: flex-end; z-index: 1000; }
-    .modal-content { background: white; width: 100%; padding: 20px; border-radius: 15px 15px 0 0; max-height: 90vh; overflow-y: auto; box-sizing: border-box; }
-    #loading { text-align: center; padding: 20px; color: #888; display: none; }
-    .tag-btn { background: white; border: 1px solid #007bff; color: #007bff; padding: 4px 8px; border-radius: 15px; font-size: 11px; cursor: pointer; margin-right: 3px; margin-bottom: 3px; }
+    /* タイマー画面 */
+    .timer-add-btn { width: 100%; padding: 15px; background: #007bff; color: white; border: none; border-radius: 8px; font-weight: bold; margin-bottom: 15px; cursor: pointer; }
+    .timer-date { font-size: 12px; color: #999; }
+    .timer-diff { font-size: 20px; font-weight: bold; color: #333; }
+
+    /* モーダル */
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: flex-end; justify-content: center; z-index: 1000; }
+    .modal-content { background: white; width: 100%; max-width: 600px; padding: 20px; border-radius: 15px 15px 0 0; max-height: 90vh; overflow-y: auto; box-sizing: border-box; display: flex; flex-direction: column; }
+    
+    /* 詳細画面の要素 */
+    .m-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+    .m-name { font-size: 20px; font-weight: bold; }
+    
+    textarea { width: 100%; height: 80px; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; resize: none; background: #fafafa; box-sizing: border-box; margin-bottom: 10px; }
+    
+    /* タグボタン */
+    .tag-area { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 15px; }
+    .tag-btn { background: white; border: 1px solid #007bff; color: #007bff; padding: 5px 10px; border-radius: 15px; font-size: 12px; cursor: pointer; }
+    
+    /* 復活させたイベント入力欄 */
+    .event-box { background: #f0f8ff; padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #d0e0ff; }
+    .event-label { font-size: 12px; font-weight: bold; color: #007bff; margin-bottom: 5px; }
+    .input-row { display: flex; gap: 10px; }
+    .input-date { flex: 1; padding: 8px; border-radius: 5px; border: 1px solid #ccc; font-size: 14px; }
+    .input-text { flex: 2; padding: 8px; border-radius: 5px; border: 1px solid #ccc; font-size: 14px; }
+
+    /* 復活させた履歴エリア */
+    .history-box { background: #f9f9f9; padding: 10px; border-radius: 8px; border: 1px solid #eee; max-height: 200px; overflow-y: auto; margin-top: 10px; }
+    .h-item { border-bottom: 1px solid #eee; padding: 8px 0; font-size: 13px; }
+    .h-date { color: #00b900; font-weight: bold; font-size: 11px; margin-bottom: 2px; }
+    .h-ai { background: #fff5f5; color: #666; font-size: 11px; padding: 5px; margin-top: 5px; border-radius: 4px; }
+
+    .btn-group { display: flex; gap: 10px; margin-top: 15px; }
+    button.action-btn { padding: 12px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; flex: 1; }
+    .btn-save { background: #333; color: white; }
+    .btn-close { background: #eee; color: #555; }
+    
+    #loading { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8); align-items:center; justify-content:center; font-weight:bold; color:#333; z-index:2000; }
     
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
   </style>
@@ -72,79 +90,30 @@
   </div>
 
   <div class="main-tabs">
-    <div class="main-tab-btn active" onclick="switchMainTab('list')">👥 人物</div>
-    <div class="main-tab-btn" onclick="switchMainTab('daily')">☕ 話題/学び</div>
-    <div class="main-tab-btn" onclick="switchMainTab('timer')">⏳ 経過</div>
-    <div class="main-tab-btn" onclick="switchMainTab('dojo')">💪 道場</div>
+    <div class="main-tab-btn active" onclick="switchMainTab('list')">👥 人物リスト</div>
+    <div class="main-tab-btn" onclick="switchMainTab('timer')">⏳ 経過管理</div>
   </div>
 
   <div id="view-list" class="view-content active">
-    <input type="text" id="search-box" placeholder="検索..." onkeyup="filterList()">
+    <input type="text" id="search-box" placeholder="名前・タグで検索..." onkeyup="filterList()">
     <div id="person-list">読み込み中...</div>
   </div>
 
-  <div id="view-daily" class="view-content">
-    <div class="card">
-      <div style="text-align:center; font-weight:bold; margin-bottom:10px;">☀ 今日の話題生成</div>
-      <div class="weather-selector">
-        <button class="w-btn selected" onclick="selW('☀ 晴れ',this)">☀</button>
-        <button class="w-btn" onclick="selW('☁ 曇り',this)">☁</button>
-        <button class="w-btn" onclick="selW('☂ 雨',this)">☂</button>
-        <button class="w-btn" onclick="selW('❄ 寒い',this)">❄</button>
-      </div>
-      <button class="gen-btn" onclick="genTopics()">話題をつくる</button>
-      <div id="daily-result" style="margin-top:15px;"></div>
-    </div>
-
-    <div class="study-grid">
-      <button class="study-btn btn-k" onclick="genStudy('kokugo')">🇯🇵 国語力<br>(漢字・敬語)</button>
-      <button class="study-btn btn-g" onclick="genStudy('geo')">🗾 地理雑学<br>(47都道府県)</button>
-      <button class="study-btn btn-w" onclick="genStudy('work')">🏢 仕事の知識<br>(FP・社保・労働法)</button>
-    </div>
-    
-    <div id="study-modal" class="modal" onclick="if(event.target===this)this.style.display='none'">
-      <div class="modal-content">
-        <h3 id="s-cat" style="margin-top:0;">カテゴリ</h3>
-        <p id="s-ques" style="font-size:18px; font-weight:bold;">問題</p>
-        <button class="gen-btn" onclick="document.getElementById('s-ans-box').style.display='block';this.style.display='none'" id="s-show-btn">正解を見る</button>
-        <div id="s-ans-box" style="display:none; margin-top:15px; border-top:1px dashed #ccc; padding-top:10px;">
-          <div id="s-ans" style="color:#d32f2f; font-weight:bold; font-size:20px; margin-bottom:5px;">正解</div>
-          <div id="s-exp" style="font-size:14px; color:#555; background:#f9f9f9; padding:10px; border-radius:8px;">解説</div>
-        </div>
-        <button style="width:100%; margin-top:15px; padding:10px; border:none; background:#eee;" onclick="document.getElementById('study-modal').style.display='none'">閉じる</button>
-      </div>
-    </div>
-  </div>
-
   <div id="view-timer" class="view-content">
-    <button class="gen-btn" style="background:#007bff; margin-bottom:10px;" onclick="openTimerModal()">＋ 記録追加</button>
+    <button class="timer-add-btn" onclick="openTimerModal()">＋ 記録追加</button>
     <div id="timer-list"></div>
   </div>
 
-  <div id="view-dojo" class="view-content">
-    <div class="card">
-      <h3>🎲 話題ガチャ</h3>
-      <div style="display:flex; gap:5px; flex-wrap:wrap;">
-        <button onclick="dojoGacha('雑談')" style="flex:1; padding:10px;">雑談</button>
-        <button onclick="dojoGacha('仕事')" style="flex:1; padding:10px;">仕事</button>
-        <button onclick="dojoGacha('愛媛')" style="flex:1; padding:10px;">愛媛</button>
-      </div>
-      <div id="gacha-res" style="margin-top:10px; background:#fff8e1; padding:10px; border-radius:5px; display:none;"></div>
-    </div>
-    <div class="card">
-      <h3>🥊 シミュレーション</h3>
-      <input type="text" id="sim-in" style="width:100%; padding:10px; margin-bottom:5px;" placeholder="会話入力...">
-      <button class="gen-btn" onclick="dojoSim()">送信</button>
-      <div id="sim-res" style="margin-top:10px; height:150px; overflow-y:auto; background:#f9f9f9; padding:5px;"></div>
-    </div>
-  </div>
-
-  <div id="p-modal" class="modal" onclick="if(event.target===this)this.style.display='none'">
+  <div id="p-modal" class="modal" onclick="if(event.target===this)closePerson()">
     <div class="modal-content">
-      <h3 id="pm-name">名前</h3>
-      <textarea id="pm-memo" style="width:100%; height:80px; padding:5px; border:1px solid #ddd;" placeholder="メモ..."></textarea>
+      <div class="m-header">
+        <div class="m-name" id="pm-name">名前</div>
+        <div style="font-size:12px; color:#666;" id="pm-detail">詳細</div>
+      </div>
       
-      <div style="display:flex; gap:2px; margin-top:5px; flex-wrap:wrap;">
+      <textarea id="pm-memo" placeholder="新しいメモを入力..."></textarea>
+      
+      <div class="tag-area">
         <button class="tag-btn" onclick="addTag('ゴルフ')">ゴルフ</button>
         <button class="tag-btn" onclick="addTag('車')">🚙 車</button>
         <button class="tag-btn" onclick="addTag('マラソン')">🏃 マラソン</button>
@@ -153,28 +122,46 @@
         <button class="tag-btn" onclick="addTag('大学')">🎓 大学</button>
       </div>
 
-      <button class="gen-btn" style="margin-top:10px;" onclick="savePerson()">保存</button>
-      <div id="pm-hist" style="margin-top:10px; font-size:12px; color:#666;"></div>
+      <div class="event-box">
+        <div class="event-label">📅 誕生日・イベント設定</div>
+        <div class="input-row">
+          <input type="date" id="pm-date" class="input-date">
+          <input type="text" id="pm-event" class="input-text" placeholder="例: 誕生日">
+        </div>
+      </div>
+
+      <div style="font-size:12px; font-weight:bold; color:#555;">▼ 過去のメモ履歴</div>
+      <div id="pm-history" class="history-box">読み込み中...</div>
+
+      <div class="btn-group">
+        <button class="action-btn btn-close" onclick="closePerson()">閉じる</button>
+        <button class="action-btn btn-save" onclick="savePerson()">保存</button>
+      </div>
     </div>
   </div>
   
   <div id="t-modal" class="modal" onclick="if(event.target===this)this.style.display='none'">
     <div class="modal-content">
       <h3>記録追加</h3>
-      <input type="text" id="tm-name" placeholder="項目名(美容院など)" style="width:100%; padding:10px; margin-bottom:5px;">
-      <input type="date" id="tm-date" style="width:100%; padding:10px; margin-bottom:5px;">
-      <button class="gen-btn" onclick="saveTimer()">保存</button>
+      <input type="text" id="tm-name" class="input-text" placeholder="項目名(美容院など)" style="width:100%; margin-bottom:10px;">
+      <input type="date" id="tm-date" class="input-date" style="width:100%; margin-bottom:10px;">
+      <textarea id="tm-memo" placeholder="メモ" style="height:60px;"></textarea>
+      <div class="btn-group">
+        <button class="action-btn btn-close" onclick="document.getElementById('t-modal').style.display='none'">閉じる</button>
+        <button class="action-btn btn-save" onclick="saveTimer()">保存</button>
+      </div>
     </div>
   </div>
 
-  <div id="loading" class="modal" style="background:rgba(255,255,255,0.8); align-items:center; justify-content:center; color:#333; font-weight:bold;">処理中...</div>
+  <div id="loading">処理中...</div>
 
   <script>
-    // ★API_URLを貼り付けてください
-    const API_URL = "https://script.google.com/macros/s/AKfycbwpWDx483xSYkFH-878kZIY8b9oIdH7tR1oH14GsAGDb2J7assI1AxQiILZgfqbxBgpGw/exec";
+    // ★ここに新しいGASのURLを貼り付けてください
+    const API_URL = "https://script.google.com/macros/s/AKfycbzFszUa3gFBGOZeKynvNkwZzjUcVgnDZTrADu_HNkcLxp3oTPu4bUbby4WXEQ0Jh9TkRQ/exec";
 
+    /* 電車データ */
+    const TIMETABLE = { toWork: { startHour: 6, endHour: 23, minutes: [6, 21, 36, 51] }, toHome: { startHour: 6, endHour: 23, minutes: [7, 22, 37, 52] } };
     let allData = [];
-    let curWeather = "☀ 晴れ";
     let curPerson = null;
 
     window.onload = async () => {
@@ -190,70 +177,97 @@
       document.querySelectorAll('.view-content').forEach(e => e.classList.remove('active'));
       document.querySelectorAll('.main-tab-btn').forEach(e => e.classList.remove('active'));
       document.getElementById('view-'+id).classList.add('active');
-    }
-
-    /* 今日の話題 */
-    function selW(w, btn) { curWeather = w; document.querySelectorAll('.w-btn').forEach(b => b.classList.remove('selected')); btn.classList.add('selected'); }
-    async function genTopics() {
-      showLoad(true);
-      try {
-        const res = await fetch(API_URL, { method:"POST", body:JSON.stringify({action:"news", weather:curWeather}) });
-        const data = await res.json();
-        const box = document.getElementById('daily-result');
-        box.innerHTML = data.map(t => `<div class="topic-item"><div class="topic-title">${t.title}</div><div class="topic-content">${t.content}</div></div>`).join('');
-      } catch(e) { alert("エラー"); }
-      showLoad(false);
-    }
-
-    /* 学び */
-    async function genStudy(mode) {
-      showLoad(true);
-      try {
-        const res = await fetch(API_URL, { method:"POST", body:JSON.stringify({action:"study", mode:mode}) });
-        const data = await res.json();
-        document.getElementById('s-cat').innerText = mode==='geo' ? "📍 "+data.prefecture : (data.category||"知識");
-        document.getElementById('s-ques').innerText = mode==='geo' ? `お土産は？\n「${data.souvenir}」` : data.question;
-        document.getElementById('s-ans').innerText = mode==='geo' ? "💡 雑学" : data.answer;
-        document.getElementById('s-exp').innerText = mode==='geo' ? data.detail : data.explanation;
-        document.getElementById('s-ans-box').style.display = 'none';
-        document.getElementById('s-show-btn').style.display = 'block';
-        document.getElementById('study-modal').style.display = 'flex';
-      } catch(e) { alert("エラー"); }
-      showLoad(false);
+      // ボタンのアクティブ切り替え
+      const btns = document.querySelectorAll('.main-tab-btn');
+      if(id === 'list') btns[0].classList.add('active'); else btns[1].classList.add('active');
     }
 
     /* 人物リスト */
     function renderList(list) {
-      document.getElementById('person-list').innerHTML = list.map(p => 
+      const box = document.getElementById('person-list');
+      if(list.length === 0) { box.innerHTML = "データなし"; return; }
+      box.innerHTML = list.map(p => 
         `<div class="card person-card ${p.isPinned?'pinned':''}" onclick='openPerson(${JSON.stringify(p)})'>
            <div>
-             <div class="p-name">${p.name}</div>
+             <div class="p-name">${p.name} <span class="bell">${p.eventDate ? "🔔" : ""}</span></div>
              <div class="p-detail">${p.section} | ${p.role}</div>
              <div class="p-tags">${p.tags||""}</div>
            </div>
-           ${p.eventDate ? "🔔" : ""}
          </div>`
       ).join('');
     }
+
     function filterList() {
       const v = document.getElementById('search-box').value.toLowerCase();
       renderList(allData.filter(p => (p.name+p.tags).toLowerCase().includes(v)));
     }
-    function openPerson(p) {
+
+    /* 詳細モーダル（履歴読み込み付き） */
+    async function openPerson(p) {
       curPerson = p;
       document.getElementById('pm-name').innerText = p.name;
+      document.getElementById('pm-detail').innerText = `${p.section} / ${p.role}`;
       document.getElementById('pm-memo').value = "";
+      
+      // イベント情報をセット
+      document.getElementById('pm-date').value = p.eventDate || "";
+      document.getElementById('pm-event').value = p.eventName || "";
+
       document.getElementById('p-modal').style.display = 'flex';
+      
+      // ★履歴を取得して表示
+      const histBox = document.getElementById('pm-history');
+      histBox.innerHTML = "読み込み中...";
+      try {
+        const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "getHistory", name: p.name }) });
+        const history = await res.json();
+        if(history.length === 0) {
+          histBox.innerHTML = "履歴なし";
+        } else {
+          histBox.innerHTML = history.map(h => 
+            `<div class="h-item">
+               <div class="h-date">${h.date}</div>
+               <div>${h.memo}</div>
+               ${h.aiAdvice ? `<div class="h-ai">💡 ${h.aiAdvice}</div>` : ""}
+             </div>`
+          ).join('');
+        }
+      } catch(e) {
+        histBox.innerHTML = "エラーが発生しました";
+      }
     }
+
+    function closePerson() { document.getElementById('p-modal').style.display = 'none'; }
+    function addTag(t) { document.getElementById('pm-memo').value += " #"+t; }
+
     async function savePerson() {
       showLoad(true);
       const memo = document.getElementById('pm-memo').value;
-      if(!memo) { showLoad(false); return; }
-      await fetch(API_URL, { method:"POST", body:JSON.stringify({action:"save", name:curPerson.name, memo:memo}) });
-      alert("保存完了");
+      const eDate = document.getElementById('pm-date').value;
+      const eName = document.getElementById('pm-event').value;
+      
+      // メモからタグ抽出
+      let tags = "";
+      if (memo.includes("#")) {
+        tags = memo.match(/#[^\s]+/g).join(" ");
+      } else {
+        tags = curPerson.tags || ""; // 新しいタグがなければ既存を維持
+      }
+
+      await fetch(API_URL, { 
+        method:"POST", 
+        body:JSON.stringify({
+          action: "save", 
+          name: curPerson.name, 
+          memo: memo,
+          eventDate: eDate,
+          eventName: eName,
+          tags: tags // タグも更新
+        }) 
+      });
+      alert("保存しました");
       location.reload();
     }
-    function addTag(t) { document.getElementById('pm-memo').value += " #"+t; }
 
     /* 経過管理 */
     async function loadTimer() {
@@ -263,7 +277,12 @@
       data.forEach(t => { if(!grouped[t.name]) grouped[t.name]=t; });
       document.getElementById('timer-list').innerHTML = Object.values(grouped).map(t => {
         const diff = Math.floor((new Date() - new Date(t.date))/(86400000));
-        return `<div class="card"><div>${t.name}</div><div style="font-size:20px; font-weight:bold;">${diff}日前</div></div>`;
+        return `<div class="card">
+                  <div>${t.name}</div>
+                  <div class="timer-date">最終: ${t.date}</div>
+                  <div class="timer-diff">${diff}日前</div>
+                  <div style="font-size:12px; color:#666;">${t.memo||""}</div>
+                </div>`;
       }).join('');
     }
     function openTimerModal() { document.getElementById('t-modal').style.display = 'flex'; }
@@ -271,33 +290,17 @@
       showLoad(true);
       const name = document.getElementById('tm-name').value;
       const date = document.getElementById('tm-date').value;
-      await fetch(API_URL, { method:"POST", body:JSON.stringify({action:"saveTimer", eventName:name, date:date}) });
+      const memo = document.getElementById('tm-memo').value;
+      await fetch(API_URL, { method:"POST", body:JSON.stringify({action:"saveTimer", eventName:name, date:date, memo:memo}) });
       alert("完了");
       location.reload();
     }
 
-    /* 道場 */
-    async function dojoGacha(topic) {
-      showLoad(true);
-      const res = await fetch(API_URL, { method:"POST", body:JSON.stringify({action:"training", mode:"gacha", text:topic}) });
-      const d = await res.json();
-      document.getElementById('gacha-res').style.display = 'block';
-      document.getElementById('gacha-res').innerHTML = `<b>${d.topic}</b><br>${d.detail}`;
-      showLoad(false);
-    }
-    async function dojoSim() {
-      const txt = document.getElementById('sim-in').value;
-      if(!txt) return;
-      document.getElementById('sim-res').innerHTML += `<div>自分: ${txt}</div>`;
-      document.getElementById('sim-in').value = "";
-      const res = await fetch(API_URL, { method:"POST", body:JSON.stringify({action:"training", mode:"sim", text:txt}) });
-      const d = await res.json();
-      document.getElementById('sim-res').innerHTML += `<div style="color:blue;">AI: ${d.reply}</div><div style="font-size:10px; color:red;">${d.score}点: ${d.advice}</div>`;
-    }
-
+    /* その他 */
+    function changeRoute() { localStorage.setItem("trainRoute", document.getElementById("route-select").value); }
     function showLoad(b) { document.getElementById('loading').style.display = b ? 'flex' : 'none'; }
     
-    // 電車タイマー (簡易版)
+    // 電車タイマー
     setInterval(() => {
       const now = new Date();
       const mins = [6, 21, 36, 51];
@@ -307,7 +310,7 @@
       }
       if(!next) { next = new Date(now); next.setHours(now.getHours()+1); next.setMinutes(mins[0]); next.setSeconds(0); }
       const diff = Math.floor((next - now)/1000);
-      document.getElementById('countdown-text').innerText = `${Math.floor(diff/60)}分${diff%60}秒`;
+      document.getElementById('countdown-text').innerText = `${Math.floor(diff/60)}分${('0'+diff%60).slice(-2)}秒`;
     }, 1000);
   </script>
 </body>
