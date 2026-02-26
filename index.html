@@ -53,14 +53,14 @@
     .tag-area { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 15px; }
     .tag-btn { background: white; border: 1px solid #007bff; color: #007bff; padding: 5px 10px; border-radius: 15px; font-size: 12px; cursor: pointer; }
     
-    /* 復活させたイベント入力欄 */
+    /* イベント入力欄 */
     .event-box { background: #f0f8ff; padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #d0e0ff; }
     .event-label { font-size: 12px; font-weight: bold; color: #007bff; margin-bottom: 5px; }
     .input-row { display: flex; gap: 10px; }
     .input-date { flex: 1; padding: 8px; border-radius: 5px; border: 1px solid #ccc; font-size: 14px; }
     .input-text { flex: 2; padding: 8px; border-radius: 5px; border: 1px solid #ccc; font-size: 14px; }
 
-    /* 復活させた履歴エリア */
+    /* 履歴エリア */
     .history-box { background: #f9f9f9; padding: 10px; border-radius: 8px; border: 1px solid #eee; max-height: 200px; overflow-y: auto; margin-top: 10px; }
     .h-item { border-bottom: 1px solid #eee; padding: 8px 0; font-size: 13px; }
     .h-date { color: #00b900; font-weight: bold; font-size: 11px; margin-bottom: 2px; }
@@ -80,10 +80,10 @@
 
   <div class="train-widget">
     <div class="train-header">
-      <span>🚃 次の電車</span>
+      <span>🚃 次の電車 (平日ダイヤ)</span>
       <select id="route-select" class="train-select" onchange="changeRoute()">
-        <option value="toWork">行き：山西 → 衣山</option>
-        <option value="toHome">帰り：衣山 → 山西</option>
+        <option value="toWork">行き：山西 → 衣山方面</option>
+        <option value="toHome">帰り：衣山 → 山西方面</option>
       </select>
     </div>
     <div id="countdown-text" class="countdown-big">--:--</div>
@@ -95,7 +95,7 @@
   </div>
 
   <div id="view-list" class="view-content active">
-    <input type="text" id="search-box" placeholder="名前・タグで検索..." onkeyup="filterList()">
+    <input type="text" id="search-box" placeholder="名前・ひらがな・タグで検索..." onkeyup="filterList()">
     <div id="person-list">読み込み中...</div>
   </div>
 
@@ -120,6 +120,11 @@
         <button class="tag-btn" onclick="addTag('友人')">🤝 友人</button>
         <button class="tag-btn" onclick="addTag('地元')">🏠 地元</button>
         <button class="tag-btn" onclick="addTag('大学')">🎓 大学</button>
+        <button class="tag-btn" onclick="addTag('同期')">🤝 同期</button>
+        <button class="tag-btn" onclick="addTag('特に仲良し')">✨ 特に仲良し</button>
+        <button class="tag-btn" onclick="addTag('LINEメンバー')">💬 LINEメンバー</button>
+        <button class="tag-btn" onclick="addTag('雇用保険')">🏢 雇用保険</button>
+        <button class="tag-btn" onclick="addTag('給付経験あり')">💰 給付経験あり</button>
       </div>
 
       <div class="event-box">
@@ -159,12 +164,32 @@
     // ★ここに新しいGASのURLを貼り付けてください
     const API_URL = "https://script.google.com/macros/s/AKfycbzFszUa3gFBGOZeKynvNkwZzjUcVgnDZTrADu_HNkcLxp3oTPu4bUbby4WXEQ0Jh9TkRQ/exec";
 
-    /* 電車データ */
-    const TIMETABLE = { toWork: { startHour: 6, endHour: 23, minutes: [6, 21, 36, 51] }, toHome: { startHour: 6, endHour: 23, minutes: [7, 22, 37, 52] } };
+    /* 伊予鉄道 平日 完全時刻表 (時間ごと) */
+    const SCHEDULE = {
+      toWork: { // 山西 -> 松山市方面 (衣山へ)
+        6: [23, 55], 7: [18, 44], 8: [7, 21, 35, 48], 9: [6, 21, 36, 51],
+        10: [6, 21, 36, 51], 11: [6, 21, 36, 51], 12: [6, 21, 36, 51], 13: [6, 21, 36, 51],
+        14: [6, 21, 36, 51], 15: [6, 21, 36, 51], 16: [6, 21, 36, 51], 17: [6, 21, 36, 51],
+        18: [6, 21, 36, 51], 19: [6, 21, 36, 51], 20: [6, 21, 36, 51], 21: [11, 31, 51],
+        22: [11, 31, 51], 23: [11]
+      },
+      toHome: { // 衣山 -> 高浜方面 (山西へ)
+        6: [47], 7: [2, 17, 30, 42, 52], 8: [6, 19, 28, 52], 9: [7, 22, 37, 52],
+        10: [7, 22, 37, 52], 11: [7, 22, 37, 52], 12: [7, 22, 37, 52], 13: [7, 22, 37, 52],
+        14: [7, 22, 37, 52], 15: [7, 22, 37, 52], 16: [7, 22, 37, 52], 17: [7, 22, 37, 52],
+        18: [7, 22, 37, 52], 19: [7, 22, 37, 52], 20: [7, 22, 37], 21: [7, 37],
+        22: [7, 37], 23: [7, 30]
+      }
+    };
+
     let allData = [];
     let curPerson = null;
 
     window.onload = async () => {
+      // 選択していたルートを復元
+      const savedRoute = localStorage.getItem("trainRoute");
+      if(savedRoute) document.getElementById("route-select").value = savedRoute;
+
       try {
         const res = await fetch(API_URL);
         allData = await res.json();
@@ -177,7 +202,6 @@
       document.querySelectorAll('.view-content').forEach(e => e.classList.remove('active'));
       document.querySelectorAll('.main-tab-btn').forEach(e => e.classList.remove('active'));
       document.getElementById('view-'+id).classList.add('active');
-      // ボタンのアクティブ切り替え
       const btns = document.querySelectorAll('.main-tab-btn');
       if(id === 'list') btns[0].classList.add('active'); else btns[1].classList.add('active');
     }
@@ -197,9 +221,15 @@
       ).join('');
     }
 
+    /* インクリメンタルサーチ（ひらがな対応版） */
     function filterList() {
+      // 入力された文字を小文字・ひらがなに統一して比較しやすくする
       const v = document.getElementById('search-box').value.toLowerCase();
-      renderList(allData.filter(p => (p.name+p.tags).toLowerCase().includes(v)));
+      renderList(allData.filter(p => {
+        // 名前 ＋ ふりがな(kana) ＋ タグ をすべて結合して、入力文字が含まれるかチェック
+        const targetString = (p.name + (p.kana || "") + (p.tags || "")).toLowerCase();
+        return targetString.includes(v);
+      }));
     }
 
     /* 詳細モーダル（履歴読み込み付き） */
@@ -209,13 +239,11 @@
       document.getElementById('pm-detail').innerText = `${p.section} / ${p.role}`;
       document.getElementById('pm-memo').value = "";
       
-      // イベント情報をセット
       document.getElementById('pm-date').value = p.eventDate || "";
       document.getElementById('pm-event').value = p.eventName || "";
 
       document.getElementById('p-modal').style.display = 'flex';
       
-      // ★履歴を取得して表示
       const histBox = document.getElementById('pm-history');
       histBox.innerHTML = "読み込み中...";
       try {
@@ -238,7 +266,7 @@
     }
 
     function closePerson() { document.getElementById('p-modal').style.display = 'none'; }
-    function addTag(t) { document.getElementById('pm-memo').value += " #"+t; }
+    function addTag(t) { document.getElementById('pm-memo').value += " #" + t; }
 
     async function savePerson() {
       showLoad(true);
@@ -246,12 +274,11 @@
       const eDate = document.getElementById('pm-date').value;
       const eName = document.getElementById('pm-event').value;
       
-      // メモからタグ抽出
       let tags = "";
       if (memo.includes("#")) {
         tags = memo.match(/#[^\s]+/g).join(" ");
       } else {
-        tags = curPerson.tags || ""; // 新しいタグがなければ既存を維持
+        tags = curPerson.tags || ""; 
       }
 
       await fetch(API_URL, { 
@@ -262,7 +289,7 @@
           memo: memo,
           eventDate: eDate,
           eventName: eName,
-          tags: tags // タグも更新
+          tags: tags
         }) 
       });
       alert("保存しました");
@@ -285,6 +312,7 @@
                 </div>`;
       }).join('');
     }
+    
     function openTimerModal() { document.getElementById('t-modal').style.display = 'flex'; }
     async function saveTimer() {
       showLoad(true);
@@ -300,16 +328,49 @@
     function changeRoute() { localStorage.setItem("trainRoute", document.getElementById("route-select").value); }
     function showLoad(b) { document.getElementById('loading').style.display = b ? 'flex' : 'none'; }
     
-    // 電車タイマー
+    // 電車タイマー (完全時刻表対応版)
     setInterval(() => {
+      const route = document.getElementById("route-select").value;
       const now = new Date();
-      const mins = [6, 21, 36, 51];
+      const h = now.getHours();
+      const m = now.getMinutes();
+      
       let next = null;
-      for(let m of mins) {
-        if(now.getMinutes() < m) { next = new Date(now); next.setMinutes(m); next.setSeconds(0); break; }
+      const currentSchedule = SCHEDULE[route];
+      
+      // 現在の時刻(h)に電車があるか確認
+      if (currentSchedule && currentSchedule[h]) {
+        for(let min of currentSchedule[h]) {
+          if(m < min) { // まだ出発していない電車を探す
+            next = new Date(now);
+            next.setMinutes(min);
+            next.setSeconds(0);
+            break;
+          }
+        }
       }
-      if(!next) { next = new Date(now); next.setHours(now.getHours()+1); next.setMinutes(mins[0]); next.setSeconds(0); }
-      const diff = Math.floor((next - now)/1000);
+      
+      // 今の1時間にない場合は、次の1時間以降の最初の電車を探す
+      if(!next) {
+        for(let nextH = h + 1; nextH < 24; nextH++) {
+           if(currentSchedule[nextH] && currentSchedule[nextH].length > 0) {
+             next = new Date(now);
+             next.setHours(nextH);
+             next.setMinutes(currentSchedule[nextH][0]);
+             next.setSeconds(0);
+             break;
+           }
+        }
+      }
+
+      // 電車が見つからない場合（終電後など）
+      if(!next) {
+        document.getElementById('countdown-text').innerText = "本日の運行終了";
+        return;
+      }
+
+      // カウントダウン計算
+      const diff = Math.floor((next - now) / 1000);
       document.getElementById('countdown-text').innerText = `${Math.floor(diff/60)}分${('0'+diff%60).slice(-2)}秒`;
     }, 1000);
   </script>
