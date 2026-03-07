@@ -30,8 +30,9 @@
     .person-card { display: flex; justify-content: space-between; align-items: center; position: relative; border-left: 5px solid transparent; }
     .person-card.pinned { border-left-color: #f4b400; }
     .p-name { font-weight: bold; font-size: 17px; }
-    .p-detail { font-size: 12px; color: #666; margin-top: 2px; }
-    .p-tags { font-size: 11px; color: #007bff; margin-top: 4px; }
+    .p-detail { font-size: 13px; color: #444; margin-top: 4px; line-height: 1.4; }
+    .p-sub-detail { font-size: 11px; color: #888; margin-top: 2px; }
+    .p-tags { font-size: 11px; color: #007bff; margin-top: 6px; }
     .bell { color: #f4b400; font-size: 14px; margin-left: 5px; }
 
     /* タイマー画面 */
@@ -44,9 +45,17 @@
     .modal-content { background: white; width: 100%; max-width: 600px; padding: 20px; border-radius: 15px 15px 0 0; max-height: 90vh; overflow-y: auto; box-sizing: border-box; display: flex; flex-direction: column; }
     
     /* 詳細画面の要素 */
-    .m-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+    .m-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
     .m-name { font-size: 20px; font-weight: bold; }
     
+    /* 追加情報入力エリア */
+    .info-box { background: #f9f9f9; padding: 12px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #ddd; font-size: 13px; }
+    .info-row { display: flex; align-items: center; margin-bottom: 8px; gap: 5px; }
+    .info-row:last-child { margin-bottom: 0; }
+    .info-label { font-weight: bold; color: #555; width: 70px; flex-shrink: 0; }
+    .info-input { flex: 1; padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
+    .info-input.short { width: 60px; flex: none; }
+
     textarea { width: 100%; height: 80px; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; resize: none; background: #fafafa; box-sizing: border-box; margin-bottom: 10px; }
     
     /* タグボタン */
@@ -60,11 +69,10 @@
     .input-date { flex: 1; padding: 8px; border-radius: 5px; border: 1px solid #ccc; font-size: 14px; }
     .input-text { flex: 2; padding: 8px; border-radius: 5px; border: 1px solid #ccc; font-size: 14px; }
 
-    /* 履歴エリア */
+    /* 履歴エリア (AIアドバイス表示なし) */
     .history-box { background: #f9f9f9; padding: 10px; border-radius: 8px; border: 1px solid #eee; max-height: 200px; overflow-y: auto; margin-top: 10px; }
     .h-item { border-bottom: 1px solid #eee; padding: 8px 0; font-size: 13px; }
     .h-date { color: #00b900; font-weight: bold; font-size: 11px; margin-bottom: 2px; }
-    .h-ai { background: #fff5f5; color: #666; font-size: 11px; padding: 5px; margin-top: 5px; border-radius: 4px; }
 
     .btn-group { display: flex; gap: 10px; margin-top: 15px; }
     button.action-btn { padding: 12px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; flex: 1; }
@@ -95,7 +103,7 @@
   </div>
 
   <div id="view-list" class="view-content active">
-    <input type="text" id="search-box" placeholder="名前・ひらがな・タグで検索..." onkeyup="filterList()">
+    <input type="text" id="search-box" placeholder="名前・ひらがな・タグで検索 (例: や)..." onkeyup="filterList()">
     <div id="person-list">読み込み中...</div>
   </div>
 
@@ -111,20 +119,36 @@
         <div style="font-size:12px; color:#666;" id="pm-detail">詳細</div>
       </div>
       
+      <div class="info-box">
+        <div class="info-row">
+          <span class="info-label">前部署:</span>
+          <input type="text" id="pm-prev-section" class="info-input" placeholder="例: R6 総務課">
+        </div>
+        <div class="info-row">
+          <span class="info-label">年齢:</span>
+          <input type="text" id="pm-age" class="info-input short" placeholder="例: 35"> 歳
+          <span class="info-label" style="margin-left: 10px; width: auto;">子供:</span>
+          <input type="text" id="pm-child-age" class="info-input short" placeholder="例: 5歳, 中2">
+        </div>
+      </div>
+
       <textarea id="pm-memo" placeholder="新しいメモを入力..."></textarea>
       
       <div class="tag-area">
         <button class="tag-btn" onclick="addTag('ゴルフ')">ゴルフ</button>
         <button class="tag-btn" onclick="addTag('車')">🚙 車</button>
         <button class="tag-btn" onclick="addTag('マラソン')">🏃 マラソン</button>
-        <button class="tag-btn" onclick="addTag('友人')">🤝 友人</button>
-        <button class="tag-btn" onclick="addTag('地元')">🏠 地元</button>
-        <button class="tag-btn" onclick="addTag('大学')">🎓 大学</button>
         <button class="tag-btn" onclick="addTag('同期')">🤝 同期</button>
         <button class="tag-btn" onclick="addTag('特に仲良し')">✨ 特に仲良し</button>
         <button class="tag-btn" onclick="addTag('LINEメンバー')">💬 LINEメンバー</button>
         <button class="tag-btn" onclick="addTag('雇用保険')">🏢 雇用保険</button>
         <button class="tag-btn" onclick="addTag('給付経験あり')">💰 給付経験あり</button>
+        
+        <button class="tag-btn" onclick="addTag('結婚済み')">💍 結婚済み</button>
+        <button class="tag-btn" onclick="addTag('子供いる')">👶 子供いる</button>
+        <button class="tag-btn" onclick="addTag('子供いない')">👤 子供いない</button>
+        <button class="tag-btn" onclick="addTag('ギャンブル')">🎰 ギャンブル</button>
+        <button class="tag-btn" onclick="addTag('酒飲めない')">🈲 酒飲めない</button>
       </div>
 
       <div class="event-box">
@@ -161,24 +185,16 @@
   <div id="loading">処理中...</div>
 
   <script>
-    // ★ここに新しいGASのURLを貼り付けてください
-    const API_URL = "https://script.google.com/macros/s/AKfycbzFszUa3gFBGOZeKynvNkwZzjUcVgnDZTrADu_HNkcLxp3oTPu4bUbby4WXEQ0Jh9TkRQ/exec";
+    // ★新しくデプロイしたGASのURLをここに貼り付けてください
+    const API_URL = "https://script.google.com/macros/s/AKfycbzE1sTfgCuDMqxKVFUOLNzpi4wIoa6F4YFBikBIKdpK4HrUgjjfG3xM_CGbAXO5zIXbRg/exec";
 
-    /* 伊予鉄道 平日 完全時刻表 (時間ごと) */
+    /* 伊予鉄道 平日 完全時刻表 */
     const SCHEDULE = {
-      toWork: { // 山西 -> 松山市方面 (衣山へ)
-        6: [23, 55], 7: [18, 44], 8: [7, 21, 35, 48], 9: [6, 21, 36, 51],
-        10: [6, 21, 36, 51], 11: [6, 21, 36, 51], 12: [6, 21, 36, 51], 13: [6, 21, 36, 51],
-        14: [6, 21, 36, 51], 15: [6, 21, 36, 51], 16: [6, 21, 36, 51], 17: [6, 21, 36, 51],
-        18: [6, 21, 36, 51], 19: [6, 21, 36, 51], 20: [6, 21, 36, 51], 21: [11, 31, 51],
-        22: [11, 31, 51], 23: [11]
+      toWork: { // 山西 -> 衣山方面
+        6: [23, 55], 7: [18, 44], 8: [7, 21, 35, 48], 9: [6, 21, 36, 51], 10: [6, 21, 36, 51], 11: [6, 21, 36, 51], 12: [6, 21, 36, 51], 13: [6, 21, 36, 51], 14: [6, 21, 36, 51], 15: [6, 21, 36, 51], 16: [6, 21, 36, 51], 17: [6, 21, 36, 51], 18: [6, 21, 36, 51], 19: [6, 21, 36, 51], 20: [6, 21, 36, 51], 21: [11, 31, 51], 22: [11, 31, 51], 23: [11]
       },
-      toHome: { // 衣山 -> 高浜方面 (山西へ)
-        6: [47], 7: [2, 17, 30, 42, 52], 8: [6, 19, 28, 52], 9: [7, 22, 37, 52],
-        10: [7, 22, 37, 52], 11: [7, 22, 37, 52], 12: [7, 22, 37, 52], 13: [7, 22, 37, 52],
-        14: [7, 22, 37, 52], 15: [7, 22, 37, 52], 16: [7, 22, 37, 52], 17: [7, 22, 37, 52],
-        18: [7, 22, 37, 52], 19: [7, 22, 37, 52], 20: [7, 22, 37], 21: [7, 37],
-        22: [7, 37], 23: [7, 30]
+      toHome: { // 衣山 -> 山西方面
+        6: [47], 7: [2, 17, 30, 42, 52], 8: [6, 19, 28, 52], 9: [7, 22, 37, 52], 10: [7, 22, 37, 52], 11: [7, 22, 37, 52], 12: [7, 22, 37, 52], 13: [7, 22, 37, 52], 14: [7, 22, 37, 52], 15: [7, 22, 37, 52], 16: [7, 22, 37, 52], 17: [7, 22, 37, 52], 18: [7, 22, 37, 52], 19: [7, 22, 37, 52], 20: [7, 22, 37], 21: [7, 37], 22: [7, 37], 23: [7, 30]
       }
     };
 
@@ -186,7 +202,6 @@
     let curPerson = null;
 
     window.onload = async () => {
-      // 選択していたルートを復元
       const savedRoute = localStorage.getItem("trainRoute");
       if(savedRoute) document.getElementById("route-select").value = savedRoute;
 
@@ -206,39 +221,43 @@
       if(id === 'list') btns[0].classList.add('active'); else btns[1].classList.add('active');
     }
 
-    /* 人物リスト */
+    /* 人物リスト表示（前部署なども表示） */
     function renderList(list) {
       const box = document.getElementById('person-list');
       if(list.length === 0) { box.innerHTML = "データなし"; return; }
       box.innerHTML = list.map(p => 
         `<div class="card person-card ${p.isPinned?'pinned':''}" onclick='openPerson(${JSON.stringify(p)})'>
-           <div>
+           <div style="width: 100%;">
              <div class="p-name">${p.name} <span class="bell">${p.eventDate ? "🔔" : ""}</span></div>
-             <div class="p-detail">${p.section} | ${p.role}</div>
+             <div class="p-detail">🏢現行: ${p.section||"-"} / ${p.role||"-"}</div>
+             <div class="p-sub-detail">🔙前部署: ${p.prevSection || "未登録"} | 年齢: ${p.age || "-"} | 子: ${p.childAge || "-"}</div>
              <div class="p-tags">${p.tags||""}</div>
            </div>
          </div>`
       ).join('');
     }
 
-    /* インクリメンタルサーチ（ひらがな対応版） */
+    /* 検索処理（ひらがな対応） */
     function filterList() {
-      // 入力された文字を小文字・ひらがなに統一して比較しやすくする
       const v = document.getElementById('search-box').value.toLowerCase();
       renderList(allData.filter(p => {
-        // 名前 ＋ ふりがな(kana) ＋ タグ をすべて結合して、入力文字が含まれるかチェック
         const targetString = (p.name + (p.kana || "") + (p.tags || "")).toLowerCase();
         return targetString.includes(v);
       }));
     }
 
-    /* 詳細モーダル（履歴読み込み付き） */
+    /* 詳細モーダルを開く */
     async function openPerson(p) {
       curPerson = p;
       document.getElementById('pm-name').innerText = p.name;
-      document.getElementById('pm-detail').innerText = `${p.section} / ${p.role}`;
-      document.getElementById('pm-memo').value = "";
+      document.getElementById('pm-detail').innerText = `${p.section||"-"} / ${p.role||"-"}`;
       
+      // 追加項目のデータをセット
+      document.getElementById('pm-prev-section').value = p.prevSection || "";
+      document.getElementById('pm-age').value = p.age || "";
+      document.getElementById('pm-child-age').value = p.childAge || "";
+      
+      document.getElementById('pm-memo').value = "";
       document.getElementById('pm-date').value = p.eventDate || "";
       document.getElementById('pm-event').value = p.eventName || "";
 
@@ -256,7 +275,6 @@
             `<div class="h-item">
                <div class="h-date">${h.date}</div>
                <div>${h.memo}</div>
-               ${h.aiAdvice ? `<div class="h-ai">💡 ${h.aiAdvice}</div>` : ""}
              </div>`
           ).join('');
         }
@@ -268,11 +286,16 @@
     function closePerson() { document.getElementById('p-modal').style.display = 'none'; }
     function addTag(t) { document.getElementById('pm-memo').value += " #" + t; }
 
+    /* データの保存処理 */
     async function savePerson() {
       showLoad(true);
       const memo = document.getElementById('pm-memo').value;
       const eDate = document.getElementById('pm-date').value;
       const eName = document.getElementById('pm-event').value;
+      
+      const prevSec = document.getElementById('pm-prev-section').value;
+      const pAge = document.getElementById('pm-age').value;
+      const pChildAge = document.getElementById('pm-child-age').value;
       
       let tags = "";
       if (memo.includes("#")) {
@@ -289,7 +312,10 @@
           memo: memo,
           eventDate: eDate,
           eventName: eName,
-          tags: tags
+          tags: tags,
+          prevSection: prevSec,
+          age: pAge,
+          childAge: pChildAge
         }) 
       });
       alert("保存しました");
@@ -312,7 +338,6 @@
                 </div>`;
       }).join('');
     }
-    
     function openTimerModal() { document.getElementById('t-modal').style.display = 'flex'; }
     async function saveTimer() {
       showLoad(true);
@@ -328,48 +353,30 @@
     function changeRoute() { localStorage.setItem("trainRoute", document.getElementById("route-select").value); }
     function showLoad(b) { document.getElementById('loading').style.display = b ? 'flex' : 'none'; }
     
-    // 電車タイマー (完全時刻表対応版)
+    // 電車タイマー
     setInterval(() => {
       const route = document.getElementById("route-select").value;
       const now = new Date();
       const h = now.getHours();
       const m = now.getMinutes();
-      
       let next = null;
       const currentSchedule = SCHEDULE[route];
       
-      // 現在の時刻(h)に電車があるか確認
       if (currentSchedule && currentSchedule[h]) {
         for(let min of currentSchedule[h]) {
-          if(m < min) { // まだ出発していない電車を探す
-            next = new Date(now);
-            next.setMinutes(min);
-            next.setSeconds(0);
-            break;
-          }
+          if(m < min) { next = new Date(now); next.setMinutes(min); next.setSeconds(0); break; }
         }
       }
       
-      // 今の1時間にない場合は、次の1時間以降の最初の電車を探す
       if(!next) {
         for(let nextH = h + 1; nextH < 24; nextH++) {
            if(currentSchedule[nextH] && currentSchedule[nextH].length > 0) {
-             next = new Date(now);
-             next.setHours(nextH);
-             next.setMinutes(currentSchedule[nextH][0]);
-             next.setSeconds(0);
-             break;
+             next = new Date(now); next.setHours(nextH); next.setMinutes(currentSchedule[nextH][0]); next.setSeconds(0); break;
            }
         }
       }
 
-      // 電車が見つからない場合（終電後など）
-      if(!next) {
-        document.getElementById('countdown-text').innerText = "本日の運行終了";
-        return;
-      }
-
-      // カウントダウン計算
+      if(!next) { document.getElementById('countdown-text').innerText = "運行終了"; return; }
       const diff = Math.floor((next - now) / 1000);
       document.getElementById('countdown-text').innerText = `${Math.floor(diff/60)}分${('0'+diff%60).slice(-2)}秒`;
     }, 1000);
