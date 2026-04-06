@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>業務支援シンプル</title>
+  <title>業務支援シンプル - 人物リスト</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f2f2f2; margin: 0; padding: 10px; color: #333; }
     
@@ -14,13 +14,7 @@
     .train-select option { color: #333; }
     .countdown-big { font-size: 32px; font-weight: bold; text-align: center; text-shadow: 1px 1px 2px rgba(0,0,0,0.2); }
 
-    /* タブ */
-    .main-tabs { display: flex; gap: 10px; margin-bottom: 15px; }
-    .main-tab-btn { flex: 1; padding: 12px; background: white; border-radius: 8px; text-align: center; font-weight: bold; color: #666; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-    .main-tab-btn.active { background: #333; color: white; }
-    
-    .view-content { display: none; }
-    .view-content.active { display: block; animation: fadeIn 0.3s ease; }
+    .view-content { display: block; animation: fadeIn 0.3s ease; }
 
     /* 共通カードスタイル */
     .card { background: white; border-radius: 10px; padding: 15px; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); cursor: pointer; }
@@ -34,11 +28,7 @@
     .p-sub-detail { font-size: 11px; color: #888; margin-top: 2px; }
     .p-tags { font-size: 11px; color: #007bff; margin-top: 6px; }
     .bell { color: #f4b400; font-size: 14px; margin-left: 5px; }
-
-    /* タイマー画面 */
-    .timer-add-btn { width: 100%; padding: 15px; background: #007bff; color: white; border: none; border-radius: 8px; font-weight: bold; margin-bottom: 15px; cursor: pointer; }
-    .timer-date { font-size: 12px; color: #999; }
-    .timer-diff { font-size: 20px; font-weight: bold; color: #333; }
+    .error-msg { color: #d32f2f; background: #ffebee; padding: 10px; border-radius: 8px; font-size: 14px; }
 
     /* モーダル */
     .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: flex-end; justify-content: center; z-index: 1000; }
@@ -69,11 +59,6 @@
     .input-date { flex: 1; padding: 8px; border-radius: 5px; border: 1px solid #ccc; font-size: 14px; }
     .input-text { flex: 2; padding: 8px; border-radius: 5px; border: 1px solid #ccc; font-size: 14px; }
 
-    /* 履歴エリア (AIアドバイス表示なし) */
-    .history-box { background: #f9f9f9; padding: 10px; border-radius: 8px; border: 1px solid #eee; max-height: 200px; overflow-y: auto; margin-top: 10px; }
-    .h-item { border-bottom: 1px solid #eee; padding: 8px 0; font-size: 13px; }
-    .h-date { color: #00b900; font-weight: bold; font-size: 11px; margin-bottom: 2px; }
-
     .btn-group { display: flex; gap: 10px; margin-top: 15px; }
     button.action-btn { padding: 12px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; flex: 1; }
     .btn-save { background: #333; color: white; }
@@ -97,19 +82,9 @@
     <div id="countdown-text" class="countdown-big">--:--</div>
   </div>
 
-  <div class="main-tabs">
-    <div class="main-tab-btn active" onclick="switchMainTab('list')">👥 人物リスト</div>
-    <div class="main-tab-btn" onclick="switchMainTab('timer')">⏳ 経過管理</div>
-  </div>
-
   <div id="view-list" class="view-content active">
     <input type="text" id="search-box" placeholder="名前・ひらがな・タグで検索 (例: や)..." onkeyup="filterList()">
     <div id="person-list">読み込み中...</div>
-  </div>
-
-  <div id="view-timer" class="view-content">
-    <button class="timer-add-btn" onclick="openTimerModal()">＋ 記録追加</button>
-    <div id="timer-list"></div>
   </div>
 
   <div id="p-modal" class="modal" onclick="if(event.target===this)closePerson()">
@@ -143,7 +118,6 @@
         <button class="tag-btn" onclick="addTag('LINEメンバー')">💬 LINEメンバー</button>
         <button class="tag-btn" onclick="addTag('雇用保険')">🏢 雇用保険</button>
         <button class="tag-btn" onclick="addTag('給付経験あり')">💰 給付経験あり</button>
-        
         <button class="tag-btn" onclick="addTag('結婚済み')">💍 結婚済み</button>
         <button class="tag-btn" onclick="addTag('子供いる')">👶 子供いる</button>
         <button class="tag-btn" onclick="addTag('子供いない')">👤 子供いない</button>
@@ -159,9 +133,6 @@
         </div>
       </div>
 
-      <div style="font-size:12px; font-weight:bold; color:#555;">▼ 過去のメモ履歴</div>
-      <div id="pm-history" class="history-box">読み込み中...</div>
-
       <div class="btn-group">
         <button class="action-btn btn-close" onclick="closePerson()">閉じる</button>
         <button class="action-btn btn-save" onclick="savePerson()">保存</button>
@@ -169,23 +140,10 @@
     </div>
   </div>
   
-  <div id="t-modal" class="modal" onclick="if(event.target===this)this.style.display='none'">
-    <div class="modal-content">
-      <h3>記録追加</h3>
-      <input type="text" id="tm-name" class="input-text" placeholder="項目名(美容院など)" style="width:100%; margin-bottom:10px;">
-      <input type="date" id="tm-date" class="input-date" style="width:100%; margin-bottom:10px;">
-      <textarea id="tm-memo" placeholder="メモ" style="height:60px;"></textarea>
-      <div class="btn-group">
-        <button class="action-btn btn-close" onclick="document.getElementById('t-modal').style.display='none'">閉じる</button>
-        <button class="action-btn btn-save" onclick="saveTimer()">保存</button>
-      </div>
-    </div>
-  </div>
-
   <div id="loading">処理中...</div>
 
   <script>
-    // ★新しくデプロイしたGASのURLをここに貼り付けてください
+    // ★GASのURL
     const API_URL = "https://script.google.com/macros/s/AKfycbzE1sTfgCuDMqxKVFUOLNzpi4wIoa6F4YFBikBIKdpK4HrUgjjfG3xM_CGbAXO5zIXbRg/exec";
 
     /* 伊予鉄道 平日 完全時刻表 */
@@ -205,30 +163,38 @@
       const savedRoute = localStorage.getItem("trainRoute");
       if(savedRoute) document.getElementById("route-select").value = savedRoute;
 
+      const listBox = document.getElementById('person-list');
+
       try {
         const res = await fetch(API_URL);
-        allData = await res.json();
-        renderList(allData);
-      } catch(e) { console.log(e); }
-      loadTimer();
+        
+        // GASからのレスポンスを一旦テキストとして取得（エラー原因特定のため）
+        const textData = await res.text();
+
+        try {
+          // テキストをJSONに変換
+          allData = JSON.parse(textData);
+          renderList(allData);
+        } catch(jsonErr) {
+          // JSONパースに失敗した場合（GASがHTMLやエラー画面を返している場合）
+          console.error("データ解析エラー:", textData);
+          listBox.innerHTML = `<div class="error-msg"><b>データの読み込みに失敗しました。</b><br>GASのスクリプトエラー、または権限設定（「アクセスできるユーザー」が「全員」になっていない等）が原因の可能性があります。</div>`;
+        }
+      } catch(e) { 
+        console.error("通信エラー:", e);
+        listBox.innerHTML = `<div class="error-msg"><b>通信エラーが発生しました。</b><br>API_URLが間違っているか、ネットワークが切断されています。</div>`;
+      }
     };
 
-    function switchMainTab(id) {
-      document.querySelectorAll('.view-content').forEach(e => e.classList.remove('active'));
-      document.querySelectorAll('.main-tab-btn').forEach(e => e.classList.remove('active'));
-      document.getElementById('view-'+id).classList.add('active');
-      const btns = document.querySelectorAll('.main-tab-btn');
-      if(id === 'list') btns[0].classList.add('active'); else btns[1].classList.add('active');
-    }
-
-    /* 人物リスト表示（前部署なども表示） */
+    /* 人物リスト表示 */
     function renderList(list) {
       const box = document.getElementById('person-list');
-      if(list.length === 0) { box.innerHTML = "データなし"; return; }
+      if(!Array.isArray(list) || list.length === 0) { box.innerHTML = "データがありません"; return; }
+      
       box.innerHTML = list.map(p => 
         `<div class="card person-card ${p.isPinned?'pinned':''}" onclick='openPerson(${JSON.stringify(p)})'>
            <div style="width: 100%;">
-             <div class="p-name">${p.name} <span class="bell">${p.eventDate ? "🔔" : ""}</span></div>
+             <div class="p-name">${p.name || "名称未設定"} <span class="bell">${p.eventDate ? "🔔" : ""}</span></div>
              <div class="p-detail">🏢現行: ${p.section||"-"} / ${p.role||"-"}</div>
              <div class="p-sub-detail">🔙前部署: ${p.prevSection || "未登録"} | 年齢: ${p.age || "-"} | 子: ${p.childAge || "-"}</div>
              <div class="p-tags">${p.tags||""}</div>
@@ -241,46 +207,26 @@
     function filterList() {
       const v = document.getElementById('search-box').value.toLowerCase();
       renderList(allData.filter(p => {
-        const targetString = (p.name + (p.kana || "") + (p.tags || "")).toLowerCase();
+        const targetString = ((p.name||"") + (p.kana || "") + (p.tags || "")).toLowerCase();
         return targetString.includes(v);
       }));
     }
 
     /* 詳細モーダルを開く */
-    async function openPerson(p) {
+    function openPerson(p) {
       curPerson = p;
-      document.getElementById('pm-name').innerText = p.name;
+      document.getElementById('pm-name').innerText = p.name || "名称未設定";
       document.getElementById('pm-detail').innerText = `${p.section||"-"} / ${p.role||"-"}`;
       
-      // 追加項目のデータをセット
       document.getElementById('pm-prev-section').value = p.prevSection || "";
       document.getElementById('pm-age').value = p.age || "";
       document.getElementById('pm-child-age').value = p.childAge || "";
       
-      document.getElementById('pm-memo').value = "";
+      document.getElementById('pm-memo').value = p.memo || "";
       document.getElementById('pm-date').value = p.eventDate || "";
       document.getElementById('pm-event').value = p.eventName || "";
 
       document.getElementById('p-modal').style.display = 'flex';
-      
-      const histBox = document.getElementById('pm-history');
-      histBox.innerHTML = "読み込み中...";
-      try {
-        const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "getHistory", name: p.name }) });
-        const history = await res.json();
-        if(history.length === 0) {
-          histBox.innerHTML = "履歴なし";
-        } else {
-          histBox.innerHTML = history.map(h => 
-            `<div class="h-item">
-               <div class="h-date">${h.date}</div>
-               <div>${h.memo}</div>
-             </div>`
-          ).join('');
-        }
-      } catch(e) {
-        histBox.innerHTML = "エラーが発生しました";
-      }
     }
 
     function closePerson() { document.getElementById('p-modal').style.display = 'none'; }
@@ -299,54 +245,33 @@
       
       let tags = "";
       if (memo.includes("#")) {
-        tags = memo.match(/#[^\s]+/g).join(" ");
+        const matches = memo.match(/#[^\s]+/g);
+        if(matches) tags = matches.join(" ");
       } else {
         tags = curPerson.tags || ""; 
       }
 
-      await fetch(API_URL, { 
-        method:"POST", 
-        body:JSON.stringify({
-          action: "save", 
-          name: curPerson.name, 
-          memo: memo,
-          eventDate: eDate,
-          eventName: eName,
-          tags: tags,
-          prevSection: prevSec,
-          age: pAge,
-          childAge: pChildAge
-        }) 
-      });
-      alert("保存しました");
-      location.reload();
-    }
-
-    /* 経過管理 */
-    async function loadTimer() {
-      const res = await fetch(API_URL + "?action=getTimer");
-      const data = await res.json();
-      const grouped = {};
-      data.forEach(t => { if(!grouped[t.name]) grouped[t.name]=t; });
-      document.getElementById('timer-list').innerHTML = Object.values(grouped).map(t => {
-        const diff = Math.floor((new Date() - new Date(t.date))/(86400000));
-        return `<div class="card">
-                  <div>${t.name}</div>
-                  <div class="timer-date">最終: ${t.date}</div>
-                  <div class="timer-diff">${diff}日前</div>
-                  <div style="font-size:12px; color:#666;">${t.memo||""}</div>
-                </div>`;
-      }).join('');
-    }
-    function openTimerModal() { document.getElementById('t-modal').style.display = 'flex'; }
-    async function saveTimer() {
-      showLoad(true);
-      const name = document.getElementById('tm-name').value;
-      const date = document.getElementById('tm-date').value;
-      const memo = document.getElementById('tm-memo').value;
-      await fetch(API_URL, { method:"POST", body:JSON.stringify({action:"saveTimer", eventName:name, date:date, memo:memo}) });
-      alert("完了");
-      location.reload();
+      try {
+        await fetch(API_URL, { 
+          method:"POST", 
+          body:JSON.stringify({
+            action: "save", 
+            name: curPerson.name, 
+            memo: memo,
+            eventDate: eDate,
+            eventName: eName,
+            tags: tags,
+            prevSection: prevSec,
+            age: pAge,
+            childAge: pChildAge
+          }) 
+        });
+        alert("保存しました");
+        location.reload();
+      } catch(e) {
+        alert("保存に失敗しました。");
+        showLoad(false);
+      }
     }
 
     /* その他 */
