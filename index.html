@@ -28,7 +28,7 @@
     .p-sub-detail { font-size: 11px; color: #888; margin-top: 2px; }
     .p-tags { font-size: 11px; color: #007bff; margin-top: 6px; }
     .bell { color: #f4b400; font-size: 14px; margin-left: 5px; }
-    .error-msg { color: #d32f2f; background: #ffebee; padding: 10px; border-radius: 8px; font-size: 14px; }
+    .error-msg { color: #d32f2f; background: #ffebee; padding: 10px; border-radius: 8px; font-size: 14px; margin-bottom: 15px; }
 
     /* モーダル */
     .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: flex-end; justify-content: center; z-index: 1000; }
@@ -65,8 +65,6 @@
     .btn-close { background: #eee; color: #555; }
     
     #loading { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8); align-items:center; justify-content:center; font-weight:bold; color:#333; z-index:2000; }
-    
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
   </style>
 </head>
 <body>
@@ -84,7 +82,7 @@
 
   <div id="view-list" class="view-content active">
     <input type="text" id="search-box" placeholder="名前・ひらがな・タグで検索 (例: や)..." onkeyup="filterList()">
-    <div id="person-list">読み込み中...</div>
+    <div id="person-list">データの読み込み中...</div>
   </div>
 
   <div id="p-modal" class="modal" onclick="if(event.target===this)closePerson()">
@@ -143,8 +141,8 @@
   <div id="loading">処理中...</div>
 
   <script>
-    // ★GASのURL
-    const API_URL = "https://script.google.com/macros/s/AKfycbzE1sTfgCuDMqxKVFUOLNzpi4wIoa6F4YFBikBIKdpK4HrUgjjfG3xM_CGbAXO5zIXbRg/exec";
+    // ★新しく作成していただいたGASのURL
+    const API_URL = "https://script.google.com/macros/s/AKfycbxmCm2RDGbcPCrAzGvW-MzlVyuURtLeTCPfXa8ipQ_u5Fh0mqWev3q9RjC5Xk50Ij-bmA/exec";
 
     /* 伊予鉄道 平日 完全時刻表 */
     const SCHEDULE = {
@@ -167,29 +165,29 @@
 
       try {
         const res = await fetch(API_URL);
-        
-        // GASからのレスポンスを一旦テキストとして取得（エラー原因特定のため）
         const textData = await res.text();
 
         try {
-          // テキストをJSONに変換
           allData = JSON.parse(textData);
-          renderList(allData);
+          if (allData.error) {
+             listBox.innerHTML = `<div class="error-msg"><b>エラー:</b> ${allData.error}</div>`;
+          } else {
+             renderList(allData);
+          }
         } catch(jsonErr) {
-          // JSONパースに失敗した場合（GASがHTMLやエラー画面を返している場合）
           console.error("データ解析エラー:", textData);
-          listBox.innerHTML = `<div class="error-msg"><b>データの読み込みに失敗しました。</b><br>GASのスクリプトエラー、または権限設定（「アクセスできるユーザー」が「全員」になっていない等）が原因の可能性があります。</div>`;
+          listBox.innerHTML = `<div class="error-msg"><b>データの読み込みに失敗しました。</b><br>スプレッドシートへのアクセス権限等を確認してください。</div>`;
         }
       } catch(e) { 
         console.error("通信エラー:", e);
-        listBox.innerHTML = `<div class="error-msg"><b>通信エラーが発生しました。</b><br>API_URLが間違っているか、ネットワークが切断されています。</div>`;
+        listBox.innerHTML = `<div class="error-msg"><b>通信エラーが発生しました。</b><br>ネットワーク状態を確認してください。</div>`;
       }
     };
 
     /* 人物リスト表示 */
     function renderList(list) {
       const box = document.getElementById('person-list');
-      if(!Array.isArray(list) || list.length === 0) { box.innerHTML = "データがありません"; return; }
+      if(!Array.isArray(list) || list.length === 0) { box.innerHTML = "スプレッドシートにデータがありません。"; return; }
       
       box.innerHTML = list.map(p => 
         `<div class="card person-card ${p.isPinned?'pinned':''}" onclick='openPerson(${JSON.stringify(p)})'>
@@ -203,7 +201,7 @@
       ).join('');
     }
 
-    /* 検索処理（ひらがな対応） */
+    /* 検索処理（ひらがな・タグ対応） */
     function filterList() {
       const v = document.getElementById('search-box').value.toLowerCase();
       renderList(allData.filter(p => {
@@ -223,7 +221,11 @@
       document.getElementById('pm-child-age').value = p.childAge || "";
       
       document.getElementById('pm-memo').value = p.memo || "";
-      document.getElementById('pm-date').value = p.eventDate || "";
+      
+      // 日付のフォーマット調整（T以降の時刻データが入る場合への対応）
+      let eDate = p.eventDate || "";
+      if(eDate && eDate.includes("T")) eDate = eDate.split("T")[0];
+      document.getElementById('pm-date').value = eDate;
       document.getElementById('pm-event').value = p.eventName || "";
 
       document.getElementById('p-modal').style.display = 'flex';
@@ -252,7 +254,7 @@
       }
 
       try {
-        await fetch(API_URL, { 
+        const res = await fetch(API_URL, { 
           method:"POST", 
           body:JSON.stringify({
             action: "save", 
@@ -266,10 +268,17 @@
             childAge: pChildAge
           }) 
         });
-        alert("保存しました");
-        location.reload();
+        const result = await res.json();
+        
+        if(result.status === "success") {
+          alert("保存しました");
+          location.reload();
+        } else {
+          alert("保存エラー: " + (result.error || "不明なエラー"));
+          showLoad(false);
+        }
       } catch(e) {
-        alert("保存に失敗しました。");
+        alert("通信に失敗しました。");
         showLoad(false);
       }
     }
