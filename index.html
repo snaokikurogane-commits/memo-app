@@ -16,10 +16,8 @@
 
     .view-content { display: block; animation: fadeIn 0.3s ease; }
 
-    /* 共通カードスタイル */
+    /* リスト画面・カード */
     .card { background: white; border-radius: 10px; padding: 15px; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); cursor: pointer; }
-    
-    /* リスト画面 */
     #search-box { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 15px; box-sizing: border-box; font-size: 16px; }
     .person-card { display: flex; justify-content: space-between; align-items: center; position: relative; border-left: 5px solid transparent; }
     .person-card.pinned { border-left-color: #f4b400; }
@@ -34,11 +32,17 @@
     .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: flex-end; justify-content: center; z-index: 1000; }
     .modal-content { background: white; width: 100%; max-width: 600px; padding: 20px; border-radius: 15px 15px 0 0; max-height: 90vh; overflow-y: auto; box-sizing: border-box; display: flex; flex-direction: column; }
     
-    /* 詳細画面の要素 */
     .m-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
     .m-name { font-size: 20px; font-weight: bold; }
     
-    /* 追加情報入力エリア */
+    /* 経歴表示エリア */
+    .career-box { background: #fff; padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #ddd; }
+    .career-title { font-size: 12px; font-weight: bold; color: #555; margin-bottom: 5px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+    .career-item { font-size: 13px; margin-bottom: 4px; display: flex; gap: 8px; }
+    .career-year { font-weight: bold; color: #007bff; width: 35px; flex-shrink: 0; }
+    .career-detail { color: #333; }
+
+    /* 追加情報・タグ・イベント */
     .info-box { background: #f9f9f9; padding: 12px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #ddd; font-size: 13px; }
     .info-row { display: flex; align-items: center; margin-bottom: 8px; gap: 5px; }
     .info-row:last-child { margin-bottom: 0; }
@@ -48,11 +52,9 @@
 
     textarea { width: 100%; height: 80px; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; resize: none; background: #fafafa; box-sizing: border-box; margin-bottom: 10px; }
     
-    /* タグボタン */
     .tag-area { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 15px; }
     .tag-btn { background: white; border: 1px solid #007bff; color: #007bff; padding: 5px 10px; border-radius: 15px; font-size: 12px; cursor: pointer; }
     
-    /* イベント入力欄 */
     .event-box { background: #f0f8ff; padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #d0e0ff; }
     .event-label { font-size: 12px; font-weight: bold; color: #007bff; margin-bottom: 5px; }
     .input-row { display: flex; gap: 10px; }
@@ -92,6 +94,11 @@
         <div style="font-size:12px; color:#666;" id="pm-detail">詳細</div>
       </div>
       
+      <div class="career-box">
+        <div class="career-title">🏢 部署・役職の履歴</div>
+        <div id="pm-career-history"></div>
+      </div>
+
       <div class="info-box">
         <div class="info-row">
           <span class="info-label">前部署:</span>
@@ -141,21 +148,16 @@
   <div id="loading">処理中...</div>
 
   <script>
-    // ★新しく作成していただいたGASのURL
-    const API_URL = "https://script.google.com/macros/s/AKfycbz8Q6v-ID0f5KaWGWtv0r8QQZ-v6AxYOQlkKOENbHrJR0U6xLsDCoF9cLIo8XoWi134_Q/exec";
+    // ★★★★ 必ず先ほど新しく発行したデプロイURLに書き換えてください ★★★★
+    const API_URL = "https://script.google.com/macros/s/AKfycbxQ3AS0Z5pe0WwUHqVhDF7ZFrE_f8CFANHlVWVo6QXFVtDiuQiGs0dJn2-zRJ2oimSTHg/exec";
 
-    /* 伊予鉄道 平日 完全時刻表 */
     const SCHEDULE = {
-      toWork: { // 山西 -> 衣山方面
-        6: [23, 55], 7: [18, 44], 8: [7, 21, 35, 48], 9: [6, 21, 36, 51], 10: [6, 21, 36, 51], 11: [6, 21, 36, 51], 12: [6, 21, 36, 51], 13: [6, 21, 36, 51], 14: [6, 21, 36, 51], 15: [6, 21, 36, 51], 16: [6, 21, 36, 51], 17: [6, 21, 36, 51], 18: [6, 21, 36, 51], 19: [6, 21, 36, 51], 20: [6, 21, 36, 51], 21: [11, 31, 51], 22: [11, 31, 51], 23: [11]
-      },
-      toHome: { // 衣山 -> 山西方面
-        6: [47], 7: [2, 17, 30, 42, 52], 8: [6, 19, 28, 52], 9: [7, 22, 37, 52], 10: [7, 22, 37, 52], 11: [7, 22, 37, 52], 12: [7, 22, 37, 52], 13: [7, 22, 37, 52], 14: [7, 22, 37, 52], 15: [7, 22, 37, 52], 16: [7, 22, 37, 52], 17: [7, 22, 37, 52], 18: [7, 22, 37, 52], 19: [7, 22, 37, 52], 20: [7, 22, 37], 21: [7, 37], 22: [7, 37], 23: [7, 30]
-      }
+      toWork: { 6: [23, 55], 7: [18, 44], 8: [7, 21, 35, 48], 9: [6, 21, 36, 51], 10: [6, 21, 36, 51], 11: [6, 21, 36, 51], 12: [6, 21, 36, 51], 13: [6, 21, 36, 51], 14: [6, 21, 36, 51], 15: [6, 21, 36, 51], 16: [6, 21, 36, 51], 17: [6, 21, 36, 51], 18: [6, 21, 36, 51], 19: [6, 21, 36, 51], 20: [6, 21, 36, 51], 21: [11, 31, 51], 22: [11, 31, 51], 23: [11] },
+      toHome: { 6: [47], 7: [2, 17, 30, 42, 52], 8: [6, 19, 28, 52], 9: [7, 22, 37, 52], 10: [7, 22, 37, 52], 11: [7, 22, 37, 52], 12: [7, 22, 37, 52], 13: [7, 22, 37, 52], 14: [7, 22, 37, 52], 15: [7, 22, 37, 52], 16: [7, 22, 37, 52], 17: [7, 22, 37, 52], 18: [7, 22, 37, 52], 19: [7, 22, 37, 52], 20: [7, 22, 37], 21: [7, 37], 22: [7, 37], 23: [7, 30] }
     };
 
-    let allData = [];
-    let curPerson = null;
+    let groupedData = []; 
+    let curPersonGroup = null; 
 
     window.onload = async () => {
       const savedRoute = localStorage.getItem("trainRoute");
@@ -168,65 +170,97 @@
         const textData = await res.text();
 
         try {
-          allData = JSON.parse(textData);
-          if (allData.error) {
-             listBox.innerHTML = `<div class="error-msg"><b>エラー:</b> ${allData.error}</div>`;
-          } else {
-             renderList(allData);
+          const rawData = JSON.parse(textData);
+          if (rawData.error) {
+             listBox.innerHTML = `<div class="error-msg"><b>エラー:</b> ${rawData.error}</div>`;
+             return;
           }
+          
+          const personMap = new Map();
+          rawData.forEach(row => {
+            if (!row.name) return; 
+            if (!personMap.has(row.name)) {
+              personMap.set(row.name, {
+                name: row.name,
+                kana: row.kana || "",
+                records: [] 
+              });
+            }
+            personMap.get(row.name).records.push(row);
+          });
+
+          // 年度(A列)の文字列で降順ソート (例: R8 -> R7)
+          groupedData = Array.from(personMap.values()).map(person => {
+            person.records.sort((a, b) => (b.year || "").localeCompare(a.year || ""));
+            person.latest = person.records[0]; // 最新年度を代表とする
+            return person;
+          });
+
+          renderList(groupedData);
+          
         } catch(jsonErr) {
           console.error("データ解析エラー:", textData);
-          listBox.innerHTML = `<div class="error-msg"><b>データの読み込みに失敗しました。</b><br>スプレッドシートへのアクセス権限等を確認してください。</div>`;
+          listBox.innerHTML = `<div class="error-msg"><b>データの読み込みに失敗しました。</b></div>`;
         }
       } catch(e) { 
         console.error("通信エラー:", e);
-        listBox.innerHTML = `<div class="error-msg"><b>通信エラーが発生しました。</b><br>ネットワーク状態を確認してください。</div>`;
+        listBox.innerHTML = `<div class="error-msg"><b>通信エラーが発生しました。</b></div>`;
       }
     };
 
-    /* 人物リスト表示 */
+    /* リスト表示 */
     function renderList(list) {
       const box = document.getElementById('person-list');
-      if(!Array.isArray(list) || list.length === 0) { box.innerHTML = "スプレッドシートにデータがありません。"; return; }
+      if(list.length === 0) { box.innerHTML = "データがありません。"; return; }
       
-      box.innerHTML = list.map(p => 
-        `<div class="card person-card ${p.isPinned?'pinned':''}" onclick='openPerson(${JSON.stringify(p)})'>
+      box.innerHTML = list.map(p => {
+        const latest = p.latest;
+        return `<div class="card person-card ${latest.isPinned?'pinned':''}" onclick='openPerson(${JSON.stringify(p)})'>
            <div style="width: 100%;">
-             <div class="p-name">${p.name || "名称未設定"} <span class="bell">${p.eventDate ? "🔔" : ""}</span></div>
-             <div class="p-detail">🏢現行: ${p.section||"-"} / ${p.role||"-"}</div>
-             <div class="p-sub-detail">🔙前部署: ${p.prevSection || "未登録"} | 年齢: ${p.age || "-"} | 子: ${p.childAge || "-"}</div>
-             <div class="p-tags">${p.tags||""}</div>
+             <div class="p-name">${p.name} <span class="bell">${latest.eventDate ? "🔔" : ""}</span></div>
+             <div class="p-detail">🏢現行(${latest.year}): ${latest.section||"-"} / ${latest.role||"-"}</div>
+             <div class="p-sub-detail">🔙前部署: ${latest.prevSection || "未登録"} | 年齢: ${latest.age || "-"}</div>
+             <div class="p-tags">${latest.tags||""}</div>
            </div>
-         </div>`
-      ).join('');
+         </div>`;
+      }).join('');
     }
 
-    /* 検索処理（ひらがな・タグ対応） */
+    /* 検索処理 */
     function filterList() {
       const v = document.getElementById('search-box').value.toLowerCase();
-      renderList(allData.filter(p => {
-        const targetString = ((p.name||"") + (p.kana || "") + (p.tags || "")).toLowerCase();
+      renderList(groupedData.filter(p => {
+        const targetString = ((p.name) + (p.kana) + (p.latest.tags || "")).toLowerCase();
         return targetString.includes(v);
       }));
     }
 
-    /* 詳細モーダルを開く */
-    function openPerson(p) {
-      curPerson = p;
-      document.getElementById('pm-name').innerText = p.name || "名称未設定";
-      document.getElementById('pm-detail').innerText = `${p.section||"-"} / ${p.role||"-"}`;
+    /* 詳細モーダル表示 */
+    function openPerson(personGroup) {
+      curPersonGroup = personGroup;
+      const latest = personGroup.latest; 
+
+      document.getElementById('pm-name').innerText = personGroup.name;
+      document.getElementById('pm-detail').innerText = `🏢現行(${latest.year}): ${latest.section||"-"} / ${latest.role||"-"}`;
       
-      document.getElementById('pm-prev-section').value = p.prevSection || "";
-      document.getElementById('pm-age').value = p.age || "";
-      document.getElementById('pm-child-age').value = p.childAge || "";
+      // 経歴エリアの生成
+      const historyHtml = personGroup.records.map(r => 
+        `<div class="career-item">
+           <div class="career-year">${r.year||"-"}</div>
+           <div class="career-detail">${r.section||"-"} / ${r.role||"-"}</div>
+         </div>`
+      ).join('');
+      document.getElementById('pm-career-history').innerHTML = historyHtml;
+
+      document.getElementById('pm-prev-section').value = latest.prevSection || "";
+      document.getElementById('pm-age').value = latest.age || "";
+      document.getElementById('pm-child-age').value = latest.childAge || "";
+      document.getElementById('pm-memo').value = latest.memo || "";
       
-      document.getElementById('pm-memo').value = p.memo || "";
-      
-      // 日付のフォーマット調整（T以降の時刻データが入る場合への対応）
-      let eDate = p.eventDate || "";
+      let eDate = latest.eventDate || "";
       if(eDate && eDate.includes("T")) eDate = eDate.split("T")[0];
       document.getElementById('pm-date').value = eDate;
-      document.getElementById('pm-event').value = p.eventName || "";
+      document.getElementById('pm-event').value = latest.eventName || "";
 
       document.getElementById('p-modal').style.display = 'flex';
     }
@@ -234,13 +268,14 @@
     function closePerson() { document.getElementById('p-modal').style.display = 'none'; }
     function addTag(t) { document.getElementById('pm-memo').value += " #" + t; }
 
-    /* データの保存処理 */
+    /* データ保存 */
     async function savePerson() {
       showLoad(true);
+      const latest = curPersonGroup.latest; 
+      
       const memo = document.getElementById('pm-memo').value;
       const eDate = document.getElementById('pm-date').value;
       const eName = document.getElementById('pm-event').value;
-      
       const prevSec = document.getElementById('pm-prev-section').value;
       const pAge = document.getElementById('pm-age').value;
       const pChildAge = document.getElementById('pm-child-age').value;
@@ -250,7 +285,7 @@
         const matches = memo.match(/#[^\s]+/g);
         if(matches) tags = matches.join(" ");
       } else {
-        tags = curPerson.tags || ""; 
+        tags = latest.tags || ""; 
       }
 
       try {
@@ -258,7 +293,8 @@
           method:"POST", 
           body:JSON.stringify({
             action: "save", 
-            name: curPerson.name, 
+            name: latest.name, 
+            year: latest.year, 
             memo: memo,
             eventDate: eDate,
             eventName: eName,
@@ -283,11 +319,9 @@
       }
     }
 
-    /* その他 */
     function changeRoute() { localStorage.setItem("trainRoute", document.getElementById("route-select").value); }
     function showLoad(b) { document.getElementById('loading').style.display = b ? 'flex' : 'none'; }
     
-    // 電車タイマー
     setInterval(() => {
       const route = document.getElementById("route-select").value;
       const now = new Date();
