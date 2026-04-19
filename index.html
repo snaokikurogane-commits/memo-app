@@ -3,22 +3,29 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>業務支援シンプル - 人物リスト</title>
+  <title>業務支援 ＆ 内示検索システム</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #f2f2f2; margin: 0; padding: 10px; color: #333; }
+    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #eef2f5; margin: 0; padding: 10px; color: #333; }
     
-    /* 電車ウィジェット */
     .train-widget { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 15px; border-radius: 12px; margin-bottom: 15px; color: white; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
     .train-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
     .train-select { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.5); padding: 5px; border-radius: 15px; color: white; font-size: 12px; }
     .train-select option { color: #333; }
     .countdown-big { font-size: 32px; font-weight: bold; text-align: center; text-shadow: 1px 1px 2px rgba(0,0,0,0.2); }
 
-    .view-content { display: block; animation: fadeIn 0.3s ease; }
+    .main-tabs { display: flex; gap: 8px; margin-bottom: 15px; }
+    .main-tab-btn { flex: 1; padding: 10px; background: white; border-radius: 8px; text-align: center; font-weight: bold; font-size: 13px; color: #666; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .main-tab-btn.active { background: #333; color: white; }
+    
+    .view-content { display: none; }
+    .view-content.active { display: block; animation: fadeIn 0.3s ease; }
 
-    /* リスト画面・カード */
-    .card { background: white; border-radius: 10px; padding: 15px; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); cursor: pointer; }
-    #search-box { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 15px; box-sizing: border-box; font-size: 16px; }
+    .card { background: white; border-radius: 10px; padding: 15px; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .clickable { cursor: pointer; }
+    
+    .search-box { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 15px; box-sizing: border-box; font-size: 16px; transition: border-color 0.3s; }
+    .search-box:focus { border-color: #007bff; outline: none; }
+
     .person-card { display: flex; justify-content: space-between; align-items: center; position: relative; border-left: 5px solid transparent; }
     .person-card.pinned { border-left-color: #f4b400; }
     .p-name { font-weight: bold; font-size: 17px; }
@@ -26,23 +33,35 @@
     .p-sub-detail { font-size: 11px; color: #888; margin-top: 2px; }
     .p-tags { font-size: 11px; color: #007bff; margin-top: 6px; }
     .bell { color: #f4b400; font-size: 14px; margin-left: 5px; }
-    .error-msg { color: #d32f2f; background: #ffebee; padding: 10px; border-radius: 8px; font-size: 14px; margin-bottom: 15px; }
 
-    /* モーダル */
+    .naiji-card { border-left: 5px solid #d4145a; }
+    .n-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 8px; margin-bottom: 10px; }
+    .n-name { font-weight: bold; font-size: 19px; color: #111; }
+    .n-badge { background: #666; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; }
+    .n-badge.idou { background: #007bff; }
+    .n-badge.shonin { background: #28a745; }
+    .n-badge.taishoku { background: #dc3545; }
+    .n-detail-row { display: flex; font-size: 14px; margin-bottom: 5px; line-height: 1.4; }
+    .n-label { color: #888; width: 45px; flex-shrink: 0; font-size: 12px; margin-top: 2px; }
+    .n-value { color: #555; }
+    .n-value.new-pos { font-weight: bold; color: #d4145a; font-size: 15px; }
+    .n-arrow { margin: 5px 0 5px 45px; color: #ccc; font-size: 14px; }
+    .n-date { font-size: 11px; color: #aaa; text-align: right; margin-top: 5px; }
+
+    .timer-add-btn { width: 100%; padding: 15px; background: #007bff; color: white; border: none; border-radius: 8px; font-weight: bold; margin-bottom: 15px; cursor: pointer; }
+    .timer-date { font-size: 12px; color: #999; }
+    .timer-diff { font-size: 20px; font-weight: bold; color: #333; }
+
     .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: flex-end; justify-content: center; z-index: 1000; }
     .modal-content { background: white; width: 100%; max-width: 600px; padding: 20px; border-radius: 15px 15px 0 0; max-height: 90vh; overflow-y: auto; box-sizing: border-box; display: flex; flex-direction: column; }
     
-    .m-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 2px solid #eee; padding-bottom: 10px; }
-    .m-name { font-size: 20px; font-weight: bold; }
-    
-    /* 経歴表示エリア */
-    .career-box { background: #fff; padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #ddd; }
-    .career-title { font-size: 12px; font-weight: bold; color: #555; margin-bottom: 5px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
-    .career-item { font-size: 13px; margin-bottom: 4px; display: flex; gap: 8px; }
-    .career-year { font-weight: bold; color: #007bff; width: 35px; flex-shrink: 0; }
-    .career-detail { color: #333; }
+    /* ★マスタ直接編集エリアのスタイル */
+    .edit-header-box { background: #f0f7ff; padding: 12px; border-radius: 8px; margin-bottom: 15px; border: 1px dashed #007bff; }
+    .edit-header-label { font-size: 11px; font-weight: bold; color: #007bff; margin-bottom: 8px; display: block; }
+    .m-name-input { font-size: 18px; font-weight: bold; width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; margin-bottom: 8px; }
+    .m-org-input-row { display: flex; gap: 8px; }
+    .m-org-input { flex: 1; padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
 
-    /* 追加情報・タグ・イベント */
     .info-box { background: #f9f9f9; padding: 12px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #ddd; font-size: 13px; }
     .info-row { display: flex; align-items: center; margin-bottom: 8px; gap: 5px; }
     .info-row:last-child { margin-bottom: 0; }
@@ -61,12 +80,18 @@
     .input-date { flex: 1; padding: 8px; border-radius: 5px; border: 1px solid #ccc; font-size: 14px; }
     .input-text { flex: 2; padding: 8px; border-radius: 5px; border: 1px solid #ccc; font-size: 14px; }
 
+    .history-box { background: #f9f9f9; padding: 10px; border-radius: 8px; border: 1px solid #eee; max-height: 200px; overflow-y: auto; margin-top: 10px; }
+    .h-item { border-bottom: 1px solid #eee; padding: 8px 0; font-size: 13px; }
+    .h-date { color: #00b900; font-weight: bold; font-size: 11px; margin-bottom: 2px; }
+
     .btn-group { display: flex; gap: 10px; margin-top: 15px; }
     button.action-btn { padding: 12px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; flex: 1; }
     .btn-save { background: #333; color: white; }
     .btn-close { background: #eee; color: #555; }
     
     #loading { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8); align-items:center; justify-content:center; font-weight:bold; color:#333; z-index:2000; }
+    
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
   </style>
 </head>
 <body>
@@ -82,23 +107,39 @@
     <div id="countdown-text" class="countdown-big">--:--</div>
   </div>
 
+  <div class="main-tabs">
+    <div id="tab-list" class="main-tab-btn active" onclick="switchMainTab('list')">👥 人物リスト</div>
+    <div id="tab-naiji" class="main-tab-btn" onclick="switchMainTab('naiji')">🌸 内示検索</div>
+    <div id="tab-timer" class="main-tab-btn" onclick="switchMainTab('timer')">⏳ 経過管理</div>
+  </div>
+
   <div id="view-list" class="view-content active">
-    <input type="text" id="search-box" placeholder="名前・ひらがな・タグで検索 (例: や)..." onkeyup="filterList()">
-    <div id="person-list">データの読み込み中...</div>
+    <input type="text" id="search-box-list" class="search-box" placeholder="名前・ひらがな・タグで検索..." onkeyup="filterList()">
+    <div id="person-list">読み込み中...</div>
+  </div>
+
+  <div id="view-naiji" class="view-content">
+    <input type="text" id="search-box-naiji" class="search-box" style="border-color: #d4145a;" placeholder="名前やひらがなで内示を検索..." onkeyup="filterNaiji()">
+    <div id="naiji-list"></div>
+  </div>
+
+  <div id="view-timer" class="view-content">
+    <button class="timer-add-btn" onclick="openTimerModal()">＋ 記録追加</button>
+    <div id="timer-list"></div>
   </div>
 
   <div id="p-modal" class="modal" onclick="if(event.target===this)closePerson()">
     <div class="modal-content">
-      <div class="m-header">
-        <div class="m-name" id="pm-name">名前</div>
-        <div style="font-size:12px; color:#666;" id="pm-detail">詳細</div>
+      
+      <div class="edit-header-box">
+        <span class="edit-header-label">✏️ マスタ情報 (直接修正できます)</span>
+        <input type="text" id="pm-edit-name" class="m-name-input" placeholder="名前">
+        <div class="m-org-input-row">
+          <input type="text" id="pm-edit-section" class="m-org-input" placeholder="現所属">
+          <input type="text" id="pm-edit-role" class="m-org-input" placeholder="現役職">
+        </div>
       </div>
       
-      <div class="career-box">
-        <div class="career-title">🏢 部署・役職の履歴</div>
-        <div id="pm-career-history"></div>
-      </div>
-
       <div class="info-box">
         <div class="info-row">
           <span class="info-label">前部署:</span>
@@ -138,6 +179,9 @@
         </div>
       </div>
 
+      <div style="font-size:12px; font-weight:bold; color:#555;">▼ 過去のメモ履歴</div>
+      <div id="pm-history" class="history-box">読み込み中...</div>
+
       <div class="btn-group">
         <button class="action-btn btn-close" onclick="closePerson()">閉じる</button>
         <button class="action-btn btn-save" onclick="savePerson()">保存</button>
@@ -145,134 +189,119 @@
     </div>
   </div>
   
+  <div id="t-modal" class="modal" onclick="if(event.target===this)this.style.display='none'">
+    <div class="modal-content">
+      <h3>記録追加</h3>
+      <input type="text" id="tm-name" class="input-text" placeholder="項目名(美容院など)" style="width:100%; margin-bottom:10px;">
+      <input type="date" id="tm-date" class="input-date" style="width:100%; margin-bottom:10px;">
+      <textarea id="tm-memo" placeholder="メモ" style="height:60px;"></textarea>
+      <div class="btn-group">
+        <button class="action-btn btn-close" onclick="document.getElementById('t-modal').style.display='none'">閉じる</button>
+        <button class="action-btn btn-save" onclick="saveTimer()">保存</button>
+      </div>
+    </div>
+  </div>
+
   <div id="loading">処理中...</div>
 
   <script>
-    // ★★★★ 必ず先ほど新しく発行したデプロイURLに書き換えてください ★★★★
-    const API_URL = "https://script.google.com/macros/s/AKfycbyXwX4QDuiKpVAWLtVPZfUZsLBzZbahIfCrkhigmlk6PHJ17LDJ2MThESo3w4FD0VN0xg/exec";
+    // ★GASでデプロイし直した場合はURLを更新してください
+    const API_URL = "https://script.google.com/macros/s/AKfycbzggaXyKA3YZwohs1IPOmRwyEMGMirN_jaSJtXdwKN6L70LD5KG6Fv-1l_MrabsS0YawA/exec";
 
     const SCHEDULE = {
       toWork: { 6: [23, 55], 7: [18, 44], 8: [7, 21, 35, 48], 9: [6, 21, 36, 51], 10: [6, 21, 36, 51], 11: [6, 21, 36, 51], 12: [6, 21, 36, 51], 13: [6, 21, 36, 51], 14: [6, 21, 36, 51], 15: [6, 21, 36, 51], 16: [6, 21, 36, 51], 17: [6, 21, 36, 51], 18: [6, 21, 36, 51], 19: [6, 21, 36, 51], 20: [6, 21, 36, 51], 21: [11, 31, 51], 22: [11, 31, 51], 23: [11] },
       toHome: { 6: [47], 7: [2, 17, 30, 42, 52], 8: [6, 19, 28, 52], 9: [7, 22, 37, 52], 10: [7, 22, 37, 52], 11: [7, 22, 37, 52], 12: [7, 22, 37, 52], 13: [7, 22, 37, 52], 14: [7, 22, 37, 52], 15: [7, 22, 37, 52], 16: [7, 22, 37, 52], 17: [7, 22, 37, 52], 18: [7, 22, 37, 52], 19: [7, 22, 37, 52], 20: [7, 22, 37], 21: [7, 37], 22: [7, 37], 23: [7, 30] }
     };
 
-    let groupedData = []; 
-    let curPersonGroup = null; 
+    let allData = [];
+    let naijiData = [];
+    let curPerson = null;
 
     window.onload = async () => {
       const savedRoute = localStorage.getItem("trainRoute");
       if(savedRoute) document.getElementById("route-select").value = savedRoute;
 
-      const listBox = document.getElementById('person-list');
-
       try {
-        const res = await fetch(API_URL);
-        const textData = await res.text();
-
-        try {
-          const rawData = JSON.parse(textData);
-          if (rawData.error) {
-             listBox.innerHTML = `<div class="error-msg"><b>エラー:</b> ${rawData.error}</div>`;
-             return;
-          }
-          
-          const personMap = new Map();
-          rawData.forEach(row => {
-            if (!row.name) return; 
-            if (!personMap.has(row.name)) {
-              personMap.set(row.name, {
-                name: row.name,
-                kana: row.kana || "",
-                records: [] 
-              });
-            }
-            personMap.get(row.name).records.push(row);
-          });
-
-          // 年度(A列)の文字列で降順ソート (例: R8 -> R7)
-          groupedData = Array.from(personMap.values()).map(person => {
-            person.records.sort((a, b) => (b.year || "").localeCompare(a.year || ""));
-            person.latest = person.records[0]; // 最新年度を代表とする
-            return person;
-          });
-
-          renderList(groupedData);
-          
-        } catch(jsonErr) {
-          console.error("データ解析エラー:", textData);
-          listBox.innerHTML = `<div class="error-msg"><b>データの読み込みに失敗しました。</b></div>`;
-        }
-      } catch(e) { 
-        console.error("通信エラー:", e);
-        listBox.innerHTML = `<div class="error-msg"><b>通信エラーが発生しました。</b></div>`;
-      }
+        const [resMaster, resNaiji] = await Promise.all([
+          fetch(API_URL), fetch(API_URL + "?action=getNaiji")
+        ]);
+        allData = await resMaster.json();
+        naijiData = await resNaiji.json();
+        renderList(allData);
+        renderNaijiList(naijiData);
+      } catch(e) { console.log(e); }
+      loadTimer();
     };
 
-    /* リスト表示 */
-    function renderList(list) {
-      const box = document.getElementById('person-list');
-      if(list.length === 0) { box.innerHTML = "データがありません。"; return; }
-      
-      box.innerHTML = list.map(p => {
-        const latest = p.latest;
-        return `<div class="card person-card ${latest.isPinned?'pinned':''}" onclick='openPerson(${JSON.stringify(p)})'>
-           <div style="width: 100%;">
-             <div class="p-name">${p.name} <span class="bell">${latest.eventDate ? "🔔" : ""}</span></div>
-             <div class="p-detail">🏢現行(${latest.year}): ${latest.section||"-"} / ${latest.role||"-"}</div>
-             <div class="p-sub-detail">🔙前部署: ${latest.prevSection || "未登録"} | 年齢: ${latest.age || "-"}</div>
-             <div class="p-tags">${latest.tags||""}</div>
-           </div>
-         </div>`;
-      }).join('');
+    function switchMainTab(id) {
+      document.querySelectorAll('.view-content').forEach(e => e.classList.remove('active'));
+      document.querySelectorAll('.main-tab-btn').forEach(e => e.classList.remove('active'));
+      document.getElementById('view-' + id).classList.add('active');
+      document.getElementById('tab-' + id).classList.add('active');
     }
 
-    /* 検索処理 */
+    /* ====== 人物マスタ機能 ====== */
+    function renderList(list) {
+      const box = document.getElementById('person-list');
+      if(list.length === 0) { box.innerHTML = "データなし"; return; }
+      box.innerHTML = list.map(p => 
+        `<div class="card person-card clickable ${p.isPinned?'pinned':''}" onclick='openPerson(${JSON.stringify(p)})'>
+           <div style="width: 100%;">
+             <div class="p-name">${p.name} <span class="bell">${p.eventDate ? "🔔" : ""}</span></div>
+             <div class="p-detail">🏢現行(${p.year}): ${p.section||"-"} / ${p.role||"-"}</div>
+             <div class="p-sub-detail">🔙前部署: ${p.prevSection || "未登録"} | 年齢: ${p.age || "-"} | 子: ${p.childAge || "-"}</div>
+             <div class="p-tags">${p.tags||""}</div>
+           </div>
+         </div>`
+      ).join('');
+    }
+
+    /* ★スペースを削除して検索する処理 */
     function filterList() {
-      const v = document.getElementById('search-box').value.toLowerCase();
-      renderList(groupedData.filter(p => {
-        const targetString = ((p.name) + (p.kana) + (p.latest.tags || "")).toLowerCase();
+      const v = document.getElementById('search-box-list').value.toLowerCase().replace(/[\s　]+/g, '');
+      renderList(allData.filter(p => {
+        const targetString = (p.name + (p.kana || "") + (p.tags || "")).toLowerCase().replace(/[\s　]+/g, '');
         return targetString.includes(v);
       }));
     }
 
-    /* 詳細モーダル表示 */
-    function openPerson(personGroup) {
-      curPersonGroup = personGroup;
-      const latest = personGroup.latest; 
-
-      document.getElementById('pm-name').innerText = personGroup.name;
-      document.getElementById('pm-detail').innerText = `🏢現行(${latest.year}): ${latest.section||"-"} / ${latest.role||"-"}`;
+    async function openPerson(p) {
+      curPerson = p;
       
-      // 経歴エリアの生成
-      const historyHtml = personGroup.records.map(r => 
-        `<div class="career-item">
-           <div class="career-year">${r.year||"-"}</div>
-           <div class="career-detail">${r.section||"-"} / ${r.role||"-"}</div>
-         </div>`
-      ).join('');
-      document.getElementById('pm-career-history').innerHTML = historyHtml;
-
-      document.getElementById('pm-prev-section').value = latest.prevSection || "";
-      document.getElementById('pm-age').value = latest.age || "";
-      document.getElementById('pm-child-age').value = latest.childAge || "";
-      document.getElementById('pm-memo').value = latest.memo || "";
+      // ★マスタ情報編集エリアへのセット
+      document.getElementById('pm-edit-name').value = p.name;
+      document.getElementById('pm-edit-section').value = p.section || "";
+      document.getElementById('pm-edit-role').value = p.role || "";
       
-      let eDate = latest.eventDate || "";
-      if(eDate && eDate.includes("T")) eDate = eDate.split("T")[0];
-      document.getElementById('pm-date').value = eDate;
-      document.getElementById('pm-event').value = latest.eventName || "";
+      document.getElementById('pm-prev-section').value = p.prevSection || "";
+      document.getElementById('pm-age').value = p.age || "";
+      document.getElementById('pm-child-age').value = p.childAge || "";
+      document.getElementById('pm-memo').value = "";
+      document.getElementById('pm-date').value = p.eventDate || "";
+      document.getElementById('pm-event').value = p.eventName || "";
 
       document.getElementById('p-modal').style.display = 'flex';
+      
+      const histBox = document.getElementById('pm-history');
+      histBox.innerHTML = "読み込み中...";
+      try {
+        const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "getHistory", name: p.name }) });
+        const history = await res.json();
+        if(history.length === 0) {
+          histBox.innerHTML = "履歴なし";
+        } else {
+          histBox.innerHTML = history.map(h => 
+            `<div class="h-item"><div class="h-date">${h.date}</div><div>${h.memo}</div></div>`
+          ).join('');
+        }
+      } catch(e) { histBox.innerHTML = "エラーが発生しました"; }
     }
 
     function closePerson() { document.getElementById('p-modal').style.display = 'none'; }
     function addTag(t) { document.getElementById('pm-memo').value += " #" + t; }
 
-    /* データ保存 */
     async function savePerson() {
       showLoad(true);
-      const latest = curPersonGroup.latest; 
-      
       const memo = document.getElementById('pm-memo').value;
       const eDate = document.getElementById('pm-date').value;
       const eName = document.getElementById('pm-event').value;
@@ -280,45 +309,94 @@
       const pAge = document.getElementById('pm-age').value;
       const pChildAge = document.getElementById('pm-child-age').value;
       
+      // ★編集されたマスタ情報の取得
+      const editName = document.getElementById('pm-edit-name').value;
+      const editSection = document.getElementById('pm-edit-section').value;
+      const editRole = document.getElementById('pm-edit-role').value;
+      
       let tags = "";
-      if (memo.includes("#")) {
-        const matches = memo.match(/#[^\s]+/g);
-        if(matches) tags = matches.join(" ");
-      } else {
-        tags = latest.tags || ""; 
-      }
+      if (memo.includes("#")) { tags = memo.match(/#[^\s]+/g).join(" "); } else { tags = curPerson.tags || ""; }
 
-      try {
-        const res = await fetch(API_URL, { 
-          method:"POST", 
-          body:JSON.stringify({
-            action: "save", 
-            name: latest.name, 
-            year: latest.year, 
-            memo: memo,
-            eventDate: eDate,
-            eventName: eName,
-            tags: tags,
-            prevSection: prevSec,
-            age: pAge,
-            childAge: pChildAge
-          }) 
-        });
-        const result = await res.json();
-        
-        if(result.status === "success") {
-          alert("保存しました");
-          location.reload();
-        } else {
-          alert("保存エラー: " + (result.error || "不明なエラー"));
-          showLoad(false);
-        }
-      } catch(e) {
-        alert("通信に失敗しました。");
-        showLoad(false);
-      }
+      await fetch(API_URL, { 
+        method:"POST", 
+        body:JSON.stringify({
+          action: "save",
+          year: curPerson.year, // ★どの年度のデータかをGASに伝える
+          originalName: curPerson.name, // ★書き換える前の名前
+          name: editName, // ★新しい名前
+          section: editSection, // ★新しい所属
+          role: editRole, // ★新しい役職
+          memo: memo, eventDate: eDate, eventName: eName,
+          tags: tags, prevSection: prevSec, age: pAge, childAge: pChildAge
+        }) 
+      });
+      alert("保存しました");
+      location.reload();
     }
 
+    /* ====== 内示検索機能 ====== */
+    function getNBadgeClass(category) {
+      if (!category) return 'n-badge';
+      if (category.includes('昇任')) return 'n-badge shonin';
+      if (category.includes('退職')) return 'n-badge taishoku';
+      if (category.includes('異動')) return 'n-badge idou';
+      return 'n-badge';
+    }
+
+    function renderNaijiList(list) {
+      const box = document.getElementById('naiji-list');
+      if(list.length === 0) { box.innerHTML = "<div style='text-align:center; color:#999;'>見つかりませんでした</div>"; return; }
+      box.innerHTML = list.map(p => 
+        `<div class="card naiji-card">
+           <div class="n-header">
+             <div class="n-name">${p.name}</div>
+             ${p.category ? `<div class="${getNBadgeClass(p.category)}">${p.category}</div>` : ""}
+           </div>
+           <div class="n-detail-row"><span class="n-label">現職:</span><span class="n-value">${p.currentSection}</span></div>
+           <div class="n-arrow">⬇️</div>
+           <div class="n-detail-row"><span class="n-label">新職:</span><span class="n-value new-pos">${p.newSection}</span></div>
+           <div class="n-date">内示日: ${p.date || "-"}</div>
+         </div>`
+      ).join('');
+    }
+
+    /* ★スペースを削除して検索する処理 */
+    function filterNaiji() {
+      const v = document.getElementById('search-box-naiji').value.toLowerCase().replace(/[\s　]+/g, '');
+      renderNaijiList(naijiData.filter(p => {
+        const targetString = (p.name + (p.kana || "") + p.currentSection + p.newSection).toLowerCase().replace(/[\s　]+/g, '');
+        return targetString.includes(v);
+      }));
+    }
+
+    /* ====== 経過管理機能 ====== */
+    async function loadTimer() {
+      const res = await fetch(API_URL + "?action=getTimer");
+      const data = await res.json();
+      const grouped = {};
+      data.forEach(t => { if(!grouped[t.name]) grouped[t.name]=t; });
+      document.getElementById('timer-list').innerHTML = Object.values(grouped).map(t => {
+        const diff = Math.floor((new Date() - new Date(t.date))/(86400000));
+        return `<div class="card">
+                  <div>${t.name}</div>
+                  <div class="timer-date">最終: ${t.date}</div>
+                  <div class="timer-diff">${diff}日前</div>
+                  <div style="font-size:12px; color:#666;">${t.memo||""}</div>
+                </div>`;
+      }).join('');
+    }
+    function openTimerModal() { document.getElementById('t-modal').style.display = 'flex'; }
+    async function saveTimer() {
+      showLoad(true);
+      const name = document.getElementById('tm-name').value;
+      const date = document.getElementById('tm-date').value;
+      const memo = document.getElementById('tm-memo').value;
+      await fetch(API_URL, { method:"POST", body:JSON.stringify({action:"saveTimer", eventName:name, date:date, memo:memo}) });
+      alert("完了");
+      location.reload();
+    }
+
+    /* ====== その他 ====== */
     function changeRoute() { localStorage.setItem("trainRoute", document.getElementById("route-select").value); }
     function showLoad(b) { document.getElementById('loading').style.display = b ? 'flex' : 'none'; }
     
@@ -335,7 +413,6 @@
           if(m < min) { next = new Date(now); next.setMinutes(min); next.setSeconds(0); break; }
         }
       }
-      
       if(!next) {
         for(let nextH = h + 1; nextH < 24; nextH++) {
            if(currentSchedule[nextH] && currentSchedule[nextH].length > 0) {
@@ -343,7 +420,6 @@
            }
         }
       }
-
       if(!next) { document.getElementById('countdown-text').innerText = "運行終了"; return; }
       const diff = Math.floor((next - now) / 1000);
       document.getElementById('countdown-text').innerText = `${Math.floor(diff/60)}分${('0'+diff%60).slice(-2)}秒`;
