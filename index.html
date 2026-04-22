@@ -52,49 +52,72 @@
     .timer-date { font-size: 12px; color: #999; }
     .timer-diff { font-size: 20px; font-weight: bold; color: #333; }
 
+    /* ★モーダルのスクロール設定 */
     .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: flex-end; justify-content: center; z-index: 1000; }
-    .modal-content { background: white; width: 100%; max-width: 600px; padding: 20px; border-radius: 15px 15px 0 0; max-height: 90vh; overflow-y: auto; box-sizing: border-box; display: flex; flex-direction: column; }
+    .modal-content { 
+      background: white; width: 100%; max-width: 600px; padding: 20px; 
+      border-radius: 15px 15px 0 0; max-height: 90vh; overflow-y: auto; 
+      box-sizing: border-box; display: flex; flex-direction: column; 
+    }
     
-    /* ★マスタ直接編集エリアのスタイル */
-    .edit-header-box { background: #f0f7ff; padding: 12px; border-radius: 8px; margin-bottom: 15px; border: 1px dashed #007bff; }
+    /* ★各要素が潰れないように flex-shrink: 0 を徹底＆はみ出し防止 */
+    .m-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 2px solid #eee; padding-bottom: 10px; flex-shrink: 0; }
+    .m-name { font-size: 20px; font-weight: bold; }
+    
+    .edit-header-box { background: #f0f7ff; padding: 12px; border-radius: 8px; margin-bottom: 15px; border: 1px dashed #007bff; box-sizing: border-box; width: 100%; flex-shrink: 0; }
     .edit-header-label { font-size: 11px; font-weight: bold; color: #007bff; margin-bottom: 8px; display: block; }
-    .m-name-input { font-size: 18px; font-weight: bold; width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; margin-bottom: 8px; }
-    .m-org-input-row { display: flex; gap: 8px; }
-    .m-org-input { flex: 1; padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
+    .m-name-input { font-size: 18px; font-weight: bold; width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; margin-bottom: 8px; min-width: 0; }
+    .m-org-input-row { display: flex; gap: 8px; width: 100%; box-sizing: border-box; }
+    .m-org-input { flex: 1; padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; box-sizing: border-box; min-width: 0; }
 
-    .info-box { background: #f9f9f9; padding: 12px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #ddd; font-size: 13px; }
-    .info-row { display: flex; align-items: center; margin-bottom: 8px; gap: 5px; }
+    .info-box { background: #f9f9f9; padding: 12px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #ddd; font-size: 13px; box-sizing: border-box; width: 100%; flex-shrink: 0; }
+    .info-row { display: flex; align-items: center; margin-bottom: 8px; gap: 5px; width: 100%; box-sizing: border-box; }
     .info-row:last-child { margin-bottom: 0; }
-    .info-label { font-weight: bold; color: #555; width: 70px; flex-shrink: 0; }
-    .info-input { flex: 1; padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
+    .info-label { font-weight: bold; color: #555; width: 60px; flex-shrink: 0; }
+    .info-input { flex: 1; padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; box-sizing: border-box; min-width: 0; }
     .info-input.short { width: 60px; flex: none; }
 
-    textarea { width: 100%; height: 80px; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; resize: none; background: #fafafa; box-sizing: border-box; margin-bottom: 10px; }
+    /* ★メモ欄が潰れて消えないように固定 */
+    textarea { width: 100%; height: 80px; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; resize: none; background: #fafafa; box-sizing: border-box; margin-bottom: 10px; flex-shrink: 0; }
     
-    .tag-area { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 15px; }
-    .tag-btn { background: white; border: 1px solid #007bff; color: #007bff; padding: 5px 10px; border-radius: 15px; font-size: 12px; cursor: pointer; }
+    /* ★タグをコンパクト化 */
+    .tag-area { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 15px; flex-shrink: 0; }
+    .tag-btn { background: white; border: 1px solid #007bff; color: #007bff; padding: 4px 8px; border-radius: 12px; font-size: 11px; cursor: pointer; white-space: nowrap; }
     
-    .event-box { background: #f0f8ff; padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #d0e0ff; }
+    .event-box { background: #f0f8ff; padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #d0e0ff; flex-shrink: 0; box-sizing: border-box; width: 100%; }
     .event-label { font-size: 12px; font-weight: bold; color: #007bff; margin-bottom: 5px; }
     .input-row { display: flex; gap: 10px; }
-    .input-date { flex: 1; padding: 8px; border-radius: 5px; border: 1px solid #ccc; font-size: 14px; }
-    .input-text { flex: 2; padding: 8px; border-radius: 5px; border: 1px solid #ccc; font-size: 14px; }
+    .input-date { flex: 1; padding: 8px; border-radius: 5px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box; min-width: 0; }
+    .input-text { flex: 2; padding: 8px; border-radius: 5px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box; min-width: 0; }
 
-    .history-box { background: #f9f9f9; padding: 10px; border-radius: 8px; border: 1px solid #eee; max-height: 200px; overflow-y: auto; margin-top: 10px; }
-    .h-item { border-bottom: 1px solid #eee; padding: 8px 0; font-size: 13px; }
+    /* ★履歴ボックスを大きく広げる */
+    .history-title { font-size: 12px; font-weight: bold; color: #555; margin-top: 5px; margin-bottom: 5px; flex-shrink: 0; }
+    .history-box { 
+      background: #f9f9f9; padding: 10px; border-radius: 8px; border: 1px solid #eee; 
+      min-height: 250px; /* 最低250pxの大きなスペースを確保 */
+      overflow-y: visible; margin-bottom: 15px; flex-shrink: 0; box-sizing: border-box; width: 100%;
+    }
+    .h-item { border-bottom: 1px solid #eee; padding: 8px 0; font-size: 13px; line-height: 1.4; }
     .h-date { color: #00b900; font-weight: bold; font-size: 11px; margin-bottom: 2px; }
 
-    .btn-group { display: flex; gap: 10px; margin-top: 15px; }
+    .btn-group { display: flex; gap: 10px; margin-top: 5px; flex-shrink: 0; }
     button.action-btn { padding: 12px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; flex: 1; }
     .btn-save { background: #333; color: white; }
     .btn-close { background: #eee; color: #555; }
     
-    #loading { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8); align-items:center; justify-content:center; font-weight:bold; color:#333; z-index:2000; }
+    #loading { display:flex; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.9); align-items:center; justify-content:center; font-weight:bold; color:#333; z-index:2000; flex-direction:column; }
+    .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #333; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin-bottom: 10px; }
     
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
   </style>
 </head>
 <body>
+
+  <div id="loading">
+    <div class="spinner"></div>
+    <div id="loading-text">データを読み込み中...</div>
+  </div>
 
   <div class="train-widget">
     <div class="train-header">
@@ -115,7 +138,7 @@
 
   <div id="view-list" class="view-content active">
     <input type="text" id="search-box-list" class="search-box" placeholder="名前・ひらがな・タグで検索..." onkeyup="filterList()">
-    <div id="person-list">読み込み中...</div>
+    <div id="person-list"></div>
   </div>
 
   <div id="view-naiji" class="view-content">
@@ -149,7 +172,7 @@
           <span class="info-label">年齢:</span>
           <input type="text" id="pm-age" class="info-input short" placeholder="例: 35"> 歳
           <span class="info-label" style="margin-left: 10px; width: auto;">子供:</span>
-          <input type="text" id="pm-child-age" class="info-input short" placeholder="例: 5歳, 中2">
+          <input type="text" id="pm-child-age" class="info-input" placeholder="例: 5歳, 中2">
         </div>
       </div>
 
@@ -179,8 +202,8 @@
         </div>
       </div>
 
-      <div style="font-size:12px; font-weight:bold; color:#555;">▼ 過去のメモ履歴</div>
-      <div id="pm-history" class="history-box">読み込み中...</div>
+      <div class="history-title">▼ 過去のメモ履歴</div>
+      <div id="pm-history" class="history-box"></div>
 
       <div class="btn-group">
         <button class="action-btn btn-close" onclick="closePerson()">閉じる</button>
@@ -190,11 +213,11 @@
   </div>
   
   <div id="t-modal" class="modal" onclick="if(event.target===this)this.style.display='none'">
-    <div class="modal-content">
+    <div class="modal-content" style="height: auto;">
       <h3>記録追加</h3>
-      <input type="text" id="tm-name" class="input-text" placeholder="項目名(美容院など)" style="width:100%; margin-bottom:10px;">
-      <input type="date" id="tm-date" class="input-date" style="width:100%; margin-bottom:10px;">
-      <textarea id="tm-memo" placeholder="メモ" style="height:60px;"></textarea>
+      <input type="text" id="tm-name" class="input-text" placeholder="項目名(美容院など)" style="width:100%; margin-bottom:10px; box-sizing: border-box;">
+      <input type="date" id="tm-date" class="input-date" style="width:100%; margin-bottom:10px; box-sizing: border-box;">
+      <textarea id="tm-memo" placeholder="メモ" style="height:60px; margin-bottom: 10px;"></textarea>
       <div class="btn-group">
         <button class="action-btn btn-close" onclick="document.getElementById('t-modal').style.display='none'">閉じる</button>
         <button class="action-btn btn-save" onclick="saveTimer()">保存</button>
@@ -202,10 +225,7 @@
     </div>
   </div>
 
-  <div id="loading">処理中...</div>
-
   <script>
-    // ★GASでデプロイし直した場合はURLを更新してください
     const API_URL = "https://script.google.com/macros/s/AKfycbzUtS5ZzNRwgQzzE7IYiE7Bcy3eB9u5TcJaBcPy8QPo0nOynj0wx6eZvtv1UHU3DtwmPw/exec";
 
     const SCHEDULE = {
@@ -221,16 +241,42 @@
       const savedRoute = localStorage.getItem("trainRoute");
       if(savedRoute) document.getElementById("route-select").value = savedRoute;
 
+      const cachedMaster = localStorage.getItem("cache_allData");
+      const cachedNaiji = localStorage.getItem("cache_naijiData");
+      
+      if (cachedMaster) {
+        allData = JSON.parse(cachedMaster);
+        renderList(allData);
+        document.getElementById('loading').style.display = 'none';
+      }
+      if (cachedNaiji) {
+        naijiData = JSON.parse(cachedNaiji);
+        renderNaijiList(naijiData);
+      }
+      loadTimer(true);
+
       try {
         const [resMaster, resNaiji] = await Promise.all([
           fetch(API_URL), fetch(API_URL + "?action=getNaiji")
         ]);
+        
         allData = await resMaster.json();
         naijiData = await resNaiji.json();
+
+        localStorage.setItem("cache_allData", JSON.stringify(allData));
+        localStorage.setItem("cache_naijiData", JSON.stringify(naijiData));
+        
         renderList(allData);
         renderNaijiList(naijiData);
-      } catch(e) { console.log(e); }
-      loadTimer();
+        document.getElementById('loading').style.display = 'none';
+
+      } catch(e) { 
+        console.log("最新データの取得エラー", e); 
+        document.getElementById('loading-text').innerText = "通信エラー: キャッシュを表示します";
+        setTimeout(() => { document.getElementById('loading').style.display = 'none'; }, 1500);
+      }
+      
+      loadTimer(false);
     };
 
     function switchMainTab(id) {
@@ -240,7 +286,6 @@
       document.getElementById('tab-' + id).classList.add('active');
     }
 
-    /* ====== 人物マスタ機能 ====== */
     function renderList(list) {
       const box = document.getElementById('person-list');
       if(list.length === 0) { box.innerHTML = "データなし"; return; }
@@ -256,7 +301,6 @@
       ).join('');
     }
 
-    /* ★スペースを削除して検索する処理 */
     function filterList() {
       const v = document.getElementById('search-box-list').value.toLowerCase().replace(/[\s　]+/g, '');
       renderList(allData.filter(p => {
@@ -268,7 +312,6 @@
     async function openPerson(p) {
       curPerson = p;
       
-      // ★マスタ情報編集エリアへのセット
       document.getElementById('pm-edit-name').value = p.name;
       document.getElementById('pm-edit-section').value = p.section || "";
       document.getElementById('pm-edit-role').value = p.role || "";
@@ -288,7 +331,7 @@
         const res = await fetch(API_URL, { method: "POST", body: JSON.stringify({ action: "getHistory", name: p.name }) });
         const history = await res.json();
         if(history.length === 0) {
-          histBox.innerHTML = "履歴なし";
+          histBox.innerHTML = "<div style='color:#999; font-size:12px;'>履歴なし</div>";
         } else {
           histBox.innerHTML = history.map(h => 
             `<div class="h-item"><div class="h-date">${h.date}</div><div>${h.memo}</div></div>`
@@ -301,7 +344,9 @@
     function addTag(t) { document.getElementById('pm-memo').value += " #" + t; }
 
     async function savePerson() {
-      showLoad(true);
+      document.getElementById('loading').style.display = 'flex';
+      document.getElementById('loading-text').innerText = "保存中...";
+      
       const memo = document.getElementById('pm-memo').value;
       const eDate = document.getElementById('pm-date').value;
       const eName = document.getElementById('pm-event').value;
@@ -309,7 +354,6 @@
       const pAge = document.getElementById('pm-age').value;
       const pChildAge = document.getElementById('pm-child-age').value;
       
-      // ★編集されたマスタ情報の取得
       const editName = document.getElementById('pm-edit-name').value;
       const editSection = document.getElementById('pm-edit-section').value;
       const editRole = document.getElementById('pm-edit-role').value;
@@ -321,20 +365,19 @@
         method:"POST", 
         body:JSON.stringify({
           action: "save",
-          year: curPerson.year, // ★どの年度のデータかをGASに伝える
-          originalName: curPerson.name, // ★書き換える前の名前
-          name: editName, // ★新しい名前
-          section: editSection, // ★新しい所属
-          role: editRole, // ★新しい役職
+          year: curPerson.year, 
+          originalName: curPerson.name, 
+          name: editName, section: editSection, role: editRole, 
           memo: memo, eventDate: eDate, eventName: eName,
           tags: tags, prevSection: prevSec, age: pAge, childAge: pChildAge
         }) 
       });
+      
+      localStorage.removeItem("cache_allData");
       alert("保存しました");
       location.reload();
     }
 
-    /* ====== 内示検索機能 ====== */
     function getNBadgeClass(category) {
       if (!category) return 'n-badge';
       if (category.includes('昇任')) return 'n-badge shonin';
@@ -345,7 +388,7 @@
 
     function renderNaijiList(list) {
       const box = document.getElementById('naiji-list');
-      if(list.length === 0) { box.innerHTML = "<div style='text-align:center; color:#999;'>見つかりませんでした</div>"; return; }
+      if(list.length === 0) { box.innerHTML = "<div style='text-align:center; color:#999; margin-top:20px;'>見つかりませんでした</div>"; return; }
       box.innerHTML = list.map(p => 
         `<div class="card naiji-card">
            <div class="n-header">
@@ -360,7 +403,6 @@
       ).join('');
     }
 
-    /* ★スペースを削除して検索する処理 */
     function filterNaiji() {
       const v = document.getElementById('search-box-naiji').value.toLowerCase().replace(/[\s　]+/g, '');
       renderNaijiList(naijiData.filter(p => {
@@ -369,10 +411,21 @@
       }));
     }
 
-    /* ====== 経過管理機能 ====== */
-    async function loadTimer() {
-      const res = await fetch(API_URL + "?action=getTimer");
-      const data = await res.json();
+    async function loadTimer(isCache = false) {
+      if (isCache) {
+        const cachedTimer = localStorage.getItem("cache_timerData");
+        if (cachedTimer) renderTimer(JSON.parse(cachedTimer));
+        return;
+      }
+      try {
+        const res = await fetch(API_URL + "?action=getTimer");
+        const data = await res.json();
+        localStorage.setItem("cache_timerData", JSON.stringify(data));
+        renderTimer(data);
+      } catch(e) { console.log(e); }
+    }
+
+    function renderTimer(data) {
       const grouped = {};
       data.forEach(t => { if(!grouped[t.name]) grouped[t.name]=t; });
       document.getElementById('timer-list').innerHTML = Object.values(grouped).map(t => {
@@ -385,20 +438,20 @@
                 </div>`;
       }).join('');
     }
+
     function openTimerModal() { document.getElementById('t-modal').style.display = 'flex'; }
     async function saveTimer() {
-      showLoad(true);
+      document.getElementById('loading').style.display = 'flex';
       const name = document.getElementById('tm-name').value;
       const date = document.getElementById('tm-date').value;
       const memo = document.getElementById('tm-memo').value;
       await fetch(API_URL, { method:"POST", body:JSON.stringify({action:"saveTimer", eventName:name, date:date, memo:memo}) });
+      localStorage.removeItem("cache_timerData");
       alert("完了");
       location.reload();
     }
 
-    /* ====== その他 ====== */
     function changeRoute() { localStorage.setItem("trainRoute", document.getElementById("route-select").value); }
-    function showLoad(b) { document.getElementById('loading').style.display = b ? 'flex' : 'none'; }
     
     setInterval(() => {
       const route = document.getElementById("route-select").value;
