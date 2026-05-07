@@ -52,17 +52,8 @@
     .timer-date { font-size: 12px; color: #999; }
     .timer-diff { font-size: 20px; font-weight: bold; color: #333; }
 
-    /* ★モーダルのスクロール設定 */
     .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: flex-end; justify-content: center; z-index: 1000; }
-    .modal-content { 
-      background: white; width: 100%; max-width: 600px; padding: 20px; 
-      border-radius: 15px 15px 0 0; max-height: 90vh; overflow-y: auto; 
-      box-sizing: border-box; display: flex; flex-direction: column; 
-    }
-    
-    /* ★各要素が潰れないように flex-shrink: 0 を徹底＆はみ出し防止 */
-    .m-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 2px solid #eee; padding-bottom: 10px; flex-shrink: 0; }
-    .m-name { font-size: 20px; font-weight: bold; }
+    .modal-content { background: white; width: 100%; max-width: 600px; padding: 20px; border-radius: 15px 15px 0 0; max-height: 90vh; overflow-y: auto; box-sizing: border-box; display: flex; flex-direction: column; }
     
     .edit-header-box { background: #f0f7ff; padding: 12px; border-radius: 8px; margin-bottom: 15px; border: 1px dashed #007bff; box-sizing: border-box; width: 100%; flex-shrink: 0; }
     .edit-header-label { font-size: 11px; font-weight: bold; color: #007bff; margin-bottom: 8px; display: block; }
@@ -74,13 +65,14 @@
     .info-row { display: flex; align-items: center; margin-bottom: 8px; gap: 5px; width: 100%; box-sizing: border-box; }
     .info-row:last-child { margin-bottom: 0; }
     .info-label { font-weight: bold; color: #555; width: 60px; flex-shrink: 0; }
+    
+    /* 入力フォームの調整 */
     .info-input { flex: 1; padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; box-sizing: border-box; min-width: 0; }
-    .info-input.short { width: 60px; flex: none; }
+    .info-input.short { width: 50px; flex: none; text-align: center; }
+    .history-select { padding: 5px; border-radius: 4px; border: 1px solid #ccc; font-size: 13px; background: white; }
 
-    /* ★メモ欄が潰れて消えないように固定 */
     textarea { width: 100%; height: 80px; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; resize: none; background: #fafafa; box-sizing: border-box; margin-bottom: 10px; flex-shrink: 0; }
     
-    /* ★タグをコンパクト化 */
     .tag-area { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 15px; flex-shrink: 0; }
     .tag-btn { background: white; border: 1px solid #007bff; color: #007bff; padding: 4px 8px; border-radius: 12px; font-size: 11px; cursor: pointer; white-space: nowrap; }
     
@@ -90,13 +82,8 @@
     .input-date { flex: 1; padding: 8px; border-radius: 5px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box; min-width: 0; }
     .input-text { flex: 2; padding: 8px; border-radius: 5px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box; min-width: 0; }
 
-    /* ★履歴ボックスを大きく広げる */
     .history-title { font-size: 12px; font-weight: bold; color: #555; margin-top: 5px; margin-bottom: 5px; flex-shrink: 0; }
-    .history-box { 
-      background: #f9f9f9; padding: 10px; border-radius: 8px; border: 1px solid #eee; 
-      min-height: 250px; /* 最低250pxの大きなスペースを確保 */
-      overflow-y: visible; margin-bottom: 15px; flex-shrink: 0; box-sizing: border-box; width: 100%;
-    }
+    .history-box { background: #f9f9f9; padding: 10px; border-radius: 8px; border: 1px solid #eee; min-height: 250px; overflow-y: visible; margin-bottom: 15px; flex-shrink: 0; box-sizing: border-box; width: 100%; }
     .h-item { border-bottom: 1px solid #eee; padding: 8px 0; font-size: 13px; line-height: 1.4; }
     .h-date { color: #00b900; font-weight: bold; font-size: 11px; margin-bottom: 2px; }
 
@@ -105,17 +92,17 @@
     .btn-save { background: #333; color: white; }
     .btn-close { background: #eee; color: #555; }
     
-    #loading { display:flex; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.9); align-items:center; justify-content:center; font-weight:bold; color:#333; z-index:2000; flex-direction:column; }
+    #loading { display:flex; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.9); align-items:center; justify-content:center; font-weight:bold; color:#333; z-index:2000; flex-direction:column; transition: opacity 0.3s; }
     .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #333; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin-bottom: 10px; }
+    #loading-text { font-size: 16px; color: #333; transition: color 0.3s, font-size 0.3s; }
     
     @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
   </style>
 </head>
 <body>
 
   <div id="loading">
-    <div class="spinner"></div>
+    <div class="spinner" id="loading-spinner"></div>
     <div id="loading-text">データを読み込み中...</div>
   </div>
 
@@ -165,8 +152,16 @@
       
       <div class="info-box">
         <div class="info-row">
-          <span class="info-label">前部署:</span>
-          <input type="text" id="pm-prev-section" class="info-input" placeholder="例: R6 総務課">
+          <span class="info-label">部署履歴:</span>
+          <select id="pm-history-year" class="history-select" onchange="changeHistoryYear()">
+            <option value="令和6年度">R6</option>
+            <option value="令和5年度">R5</option>
+            <option value="令和4年度">R4</option>
+            <option value="令和3年度">R3</option>
+            <option value="令和2年度">R2</option>
+            <option value="令和元年度">R1</option>
+          </select>
+          <input type="text" id="pm-prev-section" class="info-input" placeholder="この年度の部署を入力" onkeyup="updateHistorySection()">
         </div>
         <div class="info-row">
           <span class="info-label">年齢:</span>
@@ -226,6 +221,7 @@
   </div>
 
   <script>
+    // ★現在のGASのURLに変更してください
     const API_URL = "https://script.google.com/macros/s/AKfycbzUtS5ZzNRwgQzzE7IYiE7Bcy3eB9u5TcJaBcPy8QPo0nOynj0wx6eZvtv1UHU3DtwmPw/exec";
 
     const SCHEDULE = {
@@ -236,6 +232,38 @@
     let allData = [];
     let naijiData = [];
     let curPerson = null;
+    let currentDeptHistory = {}; // ★部署履歴を裏側で記憶しておく箱
+
+    // 年齢自動計算 (1/1起算)
+    function calcAge(rawStr) {
+      if (!rawStr) return "";
+      const parts = String(rawStr).split('@@');
+      let text = parts[0];
+      if (parts.length > 1) {
+        const baseYear = parseInt(parts[1]);
+        const currentYear = new Date().getFullYear(); 
+        const diff = currentYear - baseYear;
+        if (diff > 0) {
+          text = text.replace(/\d+/g, (match) => parseInt(match) + diff);
+        }
+      }
+      return text;
+    }
+
+    // ★リスト画面で表示するための最新の「前部署」を取得する関数
+    function getLatestHistory(jsonStr) {
+      if (!jsonStr) return "未登録";
+      try {
+        const obj = JSON.parse(jsonStr);
+        const years = ["令和6年度", "令和5年度", "令和4年度", "令和3年度", "令和2年度", "令和元年度"];
+        for (let y of years) {
+          if (obj[y]) return `${y.replace("年度","").replace("令和","R")}: ${obj[y]}`;
+        }
+        return "未登録";
+      } catch(e) {
+        return jsonStr; // 昔のそのままの文字だった場合の保険
+      }
+    }
 
     window.onload = async () => {
       const savedRoute = localStorage.getItem("trainRoute");
@@ -259,7 +287,6 @@
         const [resMaster, resNaiji] = await Promise.all([
           fetch(API_URL), fetch(API_URL + "?action=getNaiji")
         ]);
-        
         allData = await resMaster.json();
         naijiData = await resNaiji.json();
 
@@ -269,13 +296,10 @@
         renderList(allData);
         renderNaijiList(naijiData);
         document.getElementById('loading').style.display = 'none';
-
       } catch(e) { 
-        console.log("最新データの取得エラー", e); 
         document.getElementById('loading-text').innerText = "通信エラー: キャッシュを表示します";
         setTimeout(() => { document.getElementById('loading').style.display = 'none'; }, 1500);
       }
-      
       loadTimer(false);
     };
 
@@ -294,7 +318,7 @@
            <div style="width: 100%;">
              <div class="p-name">${p.name} <span class="bell">${p.eventDate ? "🔔" : ""}</span></div>
              <div class="p-detail">🏢現行(${p.year}): ${p.section||"-"} / ${p.role||"-"}</div>
-             <div class="p-sub-detail">🔙前部署: ${p.prevSection || "未登録"} | 年齢: ${p.age || "-"} | 子: ${p.childAge || "-"}</div>
+             <div class="p-sub-detail">🔙前部署: ${getLatestHistory(p.prevSection)} | 年齢: ${calcAge(p.age) || "-"} | 子: ${calcAge(p.childAge) || "-"}</div>
              <div class="p-tags">${p.tags||""}</div>
            </div>
          </div>`
@@ -309,6 +333,7 @@
       }));
     }
 
+    // ★モーダルを開いたときの処理
     async function openPerson(p) {
       curPerson = p;
       
@@ -316,9 +341,18 @@
       document.getElementById('pm-edit-section').value = p.section || "";
       document.getElementById('pm-edit-role').value = p.role || "";
       
-      document.getElementById('pm-prev-section').value = p.prevSection || "";
-      document.getElementById('pm-age').value = p.age || "";
-      document.getElementById('pm-child-age').value = p.childAge || "";
+      // 部署履歴の復元
+      try {
+        currentDeptHistory = JSON.parse(p.prevSection || "{}");
+      } catch(e) {
+        currentDeptHistory = {"令和6年度": p.prevSection || ""};
+      }
+      document.getElementById('pm-history-year').value = "令和6年度"; // 初期表示はR6
+      document.getElementById('pm-prev-section').value = currentDeptHistory["令和6年度"] || "";
+      
+      document.getElementById('pm-age').value = calcAge(p.age);
+      document.getElementById('pm-child-age').value = calcAge(p.childAge);
+      
       document.getElementById('pm-memo').value = "";
       document.getElementById('pm-date').value = p.eventDate || "";
       document.getElementById('pm-event').value = p.eventName || "";
@@ -340,19 +374,52 @@
       } catch(e) { histBox.innerHTML = "エラーが発生しました"; }
     }
 
+    // ★年度ドロップダウンを変更したときの処理
+    function changeHistoryYear() {
+      const selectedYear = document.getElementById('pm-history-year').value;
+      document.getElementById('pm-prev-section').value = currentDeptHistory[selectedYear] || "";
+    }
+
+    // ★入力欄で文字を打ったときの処理
+    function updateHistorySection() {
+      const selectedYear = document.getElementById('pm-history-year').value;
+      currentDeptHistory[selectedYear] = document.getElementById('pm-prev-section').value;
+    }
+
     function closePerson() { document.getElementById('p-modal').style.display = 'none'; }
     function addTag(t) { document.getElementById('pm-memo').value += " #" + t; }
 
+    function showSuccessAndReload() {
+      const spinner = document.getElementById('loading-spinner');
+      const text = document.getElementById('loading-text');
+      spinner.style.display = 'none'; 
+      text.innerText = "✅ 保存しました！";
+      text.style.color = "#28a745"; 
+      text.style.fontSize = "20px";
+      text.style.fontWeight = "bold";
+      setTimeout(() => { location.reload(); }, 800);
+    }
+
     async function savePerson() {
       document.getElementById('loading').style.display = 'flex';
+      document.getElementById('loading-spinner').style.display = 'block';
       document.getElementById('loading-text').innerText = "保存中...";
+      document.getElementById('loading-text').style.color = "#333";
+      document.getElementById('loading-text').style.fontSize = "16px";
       
       const memo = document.getElementById('pm-memo').value;
       const eDate = document.getElementById('pm-date').value;
       const eName = document.getElementById('pm-event').value;
-      const prevSec = document.getElementById('pm-prev-section').value;
-      const pAge = document.getElementById('pm-age').value;
-      const pChildAge = document.getElementById('pm-child-age').value;
+      
+      // ★履歴データをJSON文字列に変換して送信準備
+      const prevSecJSON = JSON.stringify(currentDeptHistory);
+      
+      const currentYear = new Date().getFullYear();
+      let pAge = document.getElementById('pm-age').value.trim();
+      if (pAge && !pAge.includes('@@')) pAge += "@@" + currentYear;
+      
+      let pChildAge = document.getElementById('pm-child-age').value.trim();
+      if (pChildAge && !pChildAge.includes('@@')) pChildAge += "@@" + currentYear;
       
       const editName = document.getElementById('pm-edit-name').value;
       const editSection = document.getElementById('pm-edit-section').value;
@@ -364,18 +431,16 @@
       await fetch(API_URL, { 
         method:"POST", 
         body:JSON.stringify({
-          action: "save",
-          year: curPerson.year, 
-          originalName: curPerson.name, 
+          action: "save", year: curPerson.year, originalName: curPerson.name, 
           name: editName, section: editSection, role: editRole, 
-          memo: memo, eventDate: eDate, eventName: eName,
-          tags: tags, prevSection: prevSec, age: pAge, childAge: pChildAge
+          memo: memo, eventDate: eDate, eventName: eName, tags: tags, 
+          prevSection: prevSecJSON, // ★JSONとして送信
+          age: pAge, childAge: pChildAge
         }) 
       });
       
       localStorage.removeItem("cache_allData");
-      alert("保存しました");
-      location.reload();
+      showSuccessAndReload();
     }
 
     function getNBadgeClass(category) {
@@ -442,13 +507,17 @@
     function openTimerModal() { document.getElementById('t-modal').style.display = 'flex'; }
     async function saveTimer() {
       document.getElementById('loading').style.display = 'flex';
+      document.getElementById('loading-spinner').style.display = 'block';
+      document.getElementById('loading-text').innerText = "保存中...";
+      document.getElementById('loading-text').style.color = "#333";
+      document.getElementById('loading-text').style.fontSize = "16px";
+
       const name = document.getElementById('tm-name').value;
       const date = document.getElementById('tm-date').value;
       const memo = document.getElementById('tm-memo').value;
       await fetch(API_URL, { method:"POST", body:JSON.stringify({action:"saveTimer", eventName:name, date:date, memo:memo}) });
       localStorage.removeItem("cache_timerData");
-      alert("完了");
-      location.reload();
+      showSuccessAndReload();
     }
 
     function changeRoute() { localStorage.setItem("trainRoute", document.getElementById("route-select").value); }
