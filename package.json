@@ -1,0 +1,11 @@
+{
+  "name": "people-notebook-v2",
+  "version": "2.0.0",
+  "private": true,
+  "scripts": {
+    "test:js": "node --test tests/*.test.cjs",
+    "test:py": "python -m unittest discover -s tests -p test_*.py",
+    "test": "npm run test:js && npm run test:py",
+    "preview": "python -m http.server 4173 -d apps-script"
+  }
+}
