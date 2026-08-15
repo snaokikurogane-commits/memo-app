@@ -34,11 +34,24 @@ test('name identity rules normalize variants but keep ambiguity visible', () => 
 });
 
 test('legacy migration recognizes the actual workbook headers', () => {
-  const context = vm.createContext({});
+  const scriptProperties = new Map();
+  const context = vm.createContext({
+    PropertiesService: {
+      getScriptProperties() {
+        return {
+          getProperty(key) { return scriptProperties.get(key) || ''; }
+        };
+      }
+    }
+  });
   vm.runInContext(fs.readFileSync(path.join(appDir, 'Migration.gs'), 'utf8'), context);
   const headers = ['登録日時', '名前', 'メモ内容（話題・キーワード）', '年度'];
   assert.equal(context.findHeaderIndex_(headers, ['登録日時']), 0);
   assert.equal(context.findHeaderIndex_(headers, ['氏名', '名前']), 1);
   assert.equal(context.findHeaderIndex_(headers, ['メモ内容（話題・キーワード）']), 2);
   assert.equal(context.findHeaderIndex_(headers, ['年度']), 3);
+  assert.equal(context.getLegacySourceKind_('人物マスタ'), 'master');
+  assert.equal(context.getLegacySourceKind_('メモ履歴'), 'conversation');
+  assert.equal(context.getLegacySourceKind_('R8内示'), '');
+  assert.equal(context.getLegacySourceKind_('SinceTimer'), '');
 });

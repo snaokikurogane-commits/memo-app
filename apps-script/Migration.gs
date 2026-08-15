@@ -29,6 +29,22 @@ function fiscalYearFromSheetName_(name) {
 
 function valueAt_(row, index) { return index >= 0 ? row[index] : ''; }
 
+function parseLegacySheetNames_(propertyName, fallback) {
+  const configured = PropertiesService.getScriptProperties().getProperty(propertyName);
+  return String(configured || fallback)
+    .split(',')
+    .map(function (value) { return value.trim(); })
+    .filter(Boolean);
+}
+
+function getLegacySourceKind_(sheetName) {
+  const masterSheets = parseLegacySheetNames_('LEGACY_MASTER_SHEETS', '人物マスタ');
+  const conversationSheets = parseLegacySheetNames_('LEGACY_CONVERSATION_SHEETS', 'メモ履歴');
+  if (masterSheets.indexOf(sheetName) !== -1) return 'master';
+  if (conversationSheets.indexOf(sheetName) !== -1) return 'conversation';
+  return '';
+}
+
 function migrateLegacyData() {
   authorize_();
   setupV2Schema();
@@ -43,6 +59,8 @@ function migrateLegacyData() {
     const archive = [];
     spreadsheet.getSheets().forEach(function (sheet) {
       if (reserved.indexOf(sheet.getName()) !== -1) return;
+      const sourceKind = getLegacySourceKind_(sheet.getName());
+      if (!sourceKind) return;
       const grid = readLegacyGrid_(sheet);
       if (!grid) return;
       const nameIndex = findHeaderIndex_(grid.headers, ['氏名', '名前', '人物名']);
@@ -66,7 +84,7 @@ function migrateLegacyData() {
         grid.headers.forEach(function (header, column) { payload[header || 'column_' + (column + 1)] = serializeForClient_(row[column]); });
         const base = { sourceSheet: sheet.getName(), sourceRow: grid.firstDataRow + index, name: name, payload: payload };
         const rowFiscalYear = String(valueAt_(row, fiscalYearIndex) || fiscalYear || '').trim();
-        const isMemoSheet = /メモ|会話|履歴/.test(sheet.getName()) || (!rowFiscalYear && memoIndex !== -1 && dateIndex !== -1);
+        const isMemoSheet = sourceKind === 'conversation';
         if (!name) {
           if (isMemoSheet && String(valueAt_(row, memoIndex) || '').trim()) {
             archive.push({ archive_id: newId_('arc'), source_sheet: sheet.getName(), source_row: grid.firstDataRow + index, kind: 'conversation',
@@ -79,7 +97,7 @@ function migrateLegacyData() {
             occurredAt: valueAt_(row, dateIndex), note: String(valueAt_(row, memoIndex) || ''), nextTopic: String(valueAt_(row, nextIndex) || ''),
             followUpAt: valueAt_(row, followIndex), tags: String(valueAt_(row, tagsIndex) || '').split(/[,、\s]+/).filter(Boolean)
           }));
-        } else if (rowFiscalYear) {
+        } else if (sourceKind === 'master' && rowFiscalYear) {
           masterEntries.push(Object.assign(base, {
             fiscalYear: rowFiscalYear, kana: String(valueAt_(row, kanaIndex) || ''), organization: String(valueAt_(row, organizationIndex) || ''),
             department: String(valueAt_(row, departmentIndex) || ''), role: String(valueAt_(row, roleIndex) || ''),
@@ -167,4 +185,31 @@ function migrateLegacyData() {
     appendAudit_('migrate', 'LegacyData', 'legacy-migration', report);
     return report;
   });
+}
+
+function resetV2MigrationForRepair() {
+  authorize_();
+  const properties = PropertiesService.getScriptProperties();
+  if (properties.getProperty('ALLOW_V2_MIGRATION_REPAIR') !== 'true') {
+    throw new Error('修復用リセットは無効です。Script Property ALLOW_V2_MIGRATION_REPAIR=true を一時設定してください。');
+  }
+  setupV2Schema();
+  try {
+    return withScriptLock_(function () {
+      const tableNames = ['People', 'Assignments', 'Conversations', 'Events', 'ImportStaging', 'LegacyArchive', 'AuditLog'];
+      const clearedRows = {};
+      tableNames.forEach(function (name) {
+        const sheet = getSheetRequired_(name);
+        const dataRows = Math.max(0, sheet.getLastRow() - 1);
+        if (dataRows) sheet.getRange(2, 1, dataRows, tableSchemas_()[name].length).clearContent();
+        clearedRows[name] = dataRows;
+      });
+      upsertSetting_('legacy_migrated_at', '');
+      bumpDataVersion_();
+      appendAudit_('repair_reset', 'LegacyData', 'legacy-migration', { clearedRows: clearedRows });
+      return { ok: true, clearedRows: clearedRows };
+    });
+  } finally {
+    properties.deleteProperty('ALLOW_V2_MIGRATION_REPAIR');
+  }
 }
