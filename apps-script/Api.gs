@@ -197,6 +197,10 @@ function commitRosterImport(input) {
         action = 'link';
         personId = String(row.candidate_person_id);
       }
+      if (action === 'defer') {
+        updates.push({ row: row, status: 'pending', note: String(requested.note || '') });
+        return;
+      }
       if (action === 'skip') {
         updates.push({ row: row, status: 'skipped', note: String(requested.note || '') });
         return;
@@ -233,7 +237,9 @@ function commitRosterImport(input) {
     appendRecords_('Assignments', newAssignments);
     updates.forEach(function (item) { updateRecordRow_('ImportStaging', item.row._row, { review_status: item.status, resolution_note: item.note }); });
     bumpDataVersion_();
-    appendAudit_('commit', 'RosterImport', batchId, { peopleCreated: newPeople.length, assignmentsCreated: newAssignments.length, skipped: updates.filter(function (item) { return item.status === 'skipped'; }).length });
-    return { ok: true, batchId: batchId, peopleCreated: newPeople.length, assignmentsCreated: newAssignments.length, skipped: updates.filter(function (item) { return item.status === 'skipped'; }).length };
+    const skipped = updates.filter(function (item) { return item.status === 'skipped'; }).length;
+    const deferred = updates.filter(function (item) { return item.status === 'pending'; }).length;
+    appendAudit_('commit', 'RosterImport', batchId, { peopleCreated: newPeople.length, assignmentsCreated: newAssignments.length, skipped: skipped, deferred: deferred });
+    return { ok: true, batchId: batchId, peopleCreated: newPeople.length, assignmentsCreated: newAssignments.length, skipped: skipped, deferred: deferred };
   });
 }
