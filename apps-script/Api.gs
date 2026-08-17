@@ -8,8 +8,10 @@ function getBootstrap(syncToken) {
   const conversations = readTable_('Conversations');
   const currentByPerson = {};
   assignments.forEach(function (row) {
+    if (String(row.verified_status || '') === 'superseded') return;
     if (String(row.fiscal_year) !== config.currentFiscalYear) return;
-    currentByPerson[String(row.person_id)] = row;
+    const key = String(row.person_id);
+    if (!currentByPerson[key] || assignmentQuality_(row) > assignmentQuality_(currentByPerson[key])) currentByPerson[key] = row;
   });
   const conversationsByPerson = {};
   conversations.forEach(function (row) {
@@ -55,12 +57,71 @@ function getPerson(personId) {
   const id = String(personId || '');
   const person = readTable_('People').find(function (row) { return String(row.person_id) === id; });
   if (!person) throw new Error('人物が見つかりません。');
-  const assignments = readTable_('Assignments').filter(function (row) { return String(row.person_id) === id; })
+  const assignments = readTable_('Assignments').filter(function (row) { return String(row.person_id) === id && String(row.verified_status || '') !== 'superseded'; })
     .sort(function (a, b) { return String(b.fiscal_year).localeCompare(String(a.fiscal_year)); });
   const conversations = readTable_('Conversations').filter(function (row) { return String(row.person_id) === id; })
     .sort(function (a, b) { return String(b.occurred_at).localeCompare(String(a.occurred_at)); });
   const events = readTable_('Events').filter(function (row) { return String(row.person_id) === id; });
-  return serializeForClient_({ person: person, assignments: assignments, conversations: conversations, events: events });
+  const familyMembers = readTable_('FamilyMembers').filter(function (row) { return String(row.person_id) === id; })
+    .map(function (row) { return Object.assign({}, row, { current_age: familyMemberAge_(row) }); });
+  return serializeForClient_({ person: person, assignments: collapseAssignmentHistory_(assignments), conversations: conversations, events: events, familyMembers: familyMembers });
+}
+
+function getRoster(fiscalYear, filters) {
+  authorize_();
+  const filter = filters || {};
+  const year = String(fiscalYear || getConfig_().currentFiscalYear);
+  const people = readTable_('People');
+  const peopleById = {};
+  people.forEach(function (person) { peopleById[String(person.person_id)] = person; });
+  const query = normalizeName_(filter.query || '');
+  const organization = String(filter.organization || '').trim();
+  const department = String(filter.department || '').trim();
+  const role = String(filter.role || '').trim();
+  const rows = collapseAssignmentHistory_(readTable_('Assignments').filter(function (row) {
+    return String(row.fiscal_year) === year && String(row.verified_status || '') !== 'superseded';
+  })).map(function (assignment) {
+    const person = peopleById[String(assignment.person_id)] || {};
+    return Object.assign({}, assignment, { name: String(person.canonical_name || ''), kana: String(person.name_kana || '') });
+  }).filter(function (row) {
+    const haystack = normalizeName_([row.name, row.kana, row.organization, row.department, row.role].join(' '));
+    return (!query || haystack.indexOf(query) !== -1) &&
+      (!organization || String(row.organization).indexOf(organization) !== -1) &&
+      (!department || String(row.department).indexOf(department) !== -1) &&
+      (!role || String(row.role).indexOf(role) !== -1);
+  }).sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'ja'); });
+  const source = readTable_('Assignments').filter(function (row) { return String(row.fiscal_year) === year && String(row.verified_status || '') !== 'superseded'; });
+  return serializeForClient_({ fiscalYear: year, rows: rows, filters: {
+    organizations: distinctStrings_(source.map(function (row) { return row.organization; })),
+    departments: distinctStrings_(source.map(function (row) { return row.department; })),
+    roles: distinctStrings_(source.map(function (row) { return row.role; }))
+  } });
+}
+
+function saveFamilyMember(input) {
+  authorize_();
+  const data = input || {};
+  const personId = String(data.personId || '');
+  if (!personId || !readTable_('People').some(function (person) { return String(person.person_id) === personId; })) throw new Error('人物が見つかりません。');
+  const birthDate = String(data.birthDate || '');
+  const observedAge = String(data.observedAge === undefined ? '' : data.observedAge).trim();
+  const observedOn = String(data.observedOn || '');
+  if (!birthDate && (!observedAge || !observedOn)) throw new Error('生年月日、または確認日と年齢を入力してください。');
+  return withScriptLock_(function () {
+    const timestamp = nowIso_();
+    const existing = String(data.familyMemberId || '');
+    const record = {
+      family_member_id: existing || newId_('fam'), person_id: personId, relationship: String(data.relationship || 'child'),
+      display_name: String(data.displayName || '').trim(), birth_date: birthDate, observed_age: observedAge, observed_on: observedOn,
+      notes: String(data.notes || '').trim(), created_at: timestamp, updated_at: timestamp
+    };
+    const old = existing && readTable_('FamilyMembers').find(function (row) { return String(row.family_member_id) === existing; });
+    if (old) updateRecordRow_('FamilyMembers', old._row, Object.assign({}, record, { created_at: old.created_at }));
+    else appendRecords_('FamilyMembers', [record]);
+    bumpDataVersion_();
+    appendAudit_(old ? 'update' : 'create', 'FamilyMember', record.family_member_id, { personId: personId });
+    return serializeForClient_(Object.assign({}, record, { current_age: familyMemberAge_(record) }));
+  });
 }
 
 function saveConversation(input) {
@@ -241,5 +302,99 @@ function commitRosterImport(input) {
     const deferred = updates.filter(function (item) { return item.status === 'pending'; }).length;
     appendAudit_('commit', 'RosterImport', batchId, { peopleCreated: newPeople.length, assignmentsCreated: newAssignments.length, skipped: skipped, deferred: deferred });
     return { ok: true, batchId: batchId, peopleCreated: newPeople.length, assignmentsCreated: newAssignments.length, skipped: skipped, deferred: deferred };
+  });
+}
+
+function assignmentQuality_(row) {
+  let score = 0;
+  if (String(row.role || '').trim()) score += 8;
+  if (String(row.department || '').trim()) score += 4;
+  if (String(row.source_pdf || '').trim()) score += 2;
+  if (String(row.verified_status || '') === 'verified') score += 1;
+  return score;
+}
+
+function assignmentBaseKey_(row) {
+  return [row.person_id, row.fiscal_year, row.organization, row.department].map(function (value) {
+    return String(value || '').normalize('NFKC').replace(/[\s\u3000]/g, '').toLowerCase();
+  }).join('\u001f');
+}
+
+function collapseAssignmentHistory_(rows) {
+  const selected = {};
+  rows.forEach(function (row) {
+    const key = assignmentBaseKey_(row);
+    if (!selected[key] || assignmentQuality_(row) > assignmentQuality_(selected[key])) selected[key] = row;
+  });
+  return Object.keys(selected).map(function (key) { return selected[key]; }).sort(function (a, b) {
+    const year = String(b.fiscal_year).localeCompare(String(a.fiscal_year));
+    return year || String(a.organization).localeCompare(String(b.organization), 'ja');
+  });
+}
+
+function distinctStrings_(values) {
+  return values.map(function (value) { return String(value || '').trim(); }).filter(Boolean)
+    .filter(function (value, index, all) { return all.indexOf(value) === index; }).sort(function (a, b) { return a.localeCompare(b, 'ja'); });
+}
+
+function familyMemberAge_(member) {
+  const today = new Date();
+  const birth = String(member.birth_date || '');
+  if (birth) {
+    const date = new Date(birth + 'T00:00:00');
+    if (!isNaN(date.getTime())) {
+      let age = today.getFullYear() - date.getFullYear();
+      const monthDelta = today.getMonth() - date.getMonth();
+      if (monthDelta < 0 || (monthDelta === 0 && today.getDate() < date.getDate())) age -= 1;
+      return { value: Math.max(0, age), estimated: false };
+    }
+  }
+  const observedAge = Number(member.observed_age);
+  const observed = new Date(String(member.observed_on || '') + 'T00:00:00');
+  if (Number.isFinite(observedAge) && !isNaN(observed.getTime())) {
+    let age = observedAge + today.getFullYear() - observed.getFullYear();
+    const monthDelta = today.getMonth() - observed.getMonth();
+    if (monthDelta < 0 || (monthDelta === 0 && today.getDate() < observed.getDate())) age -= 1;
+    return { value: Math.max(0, age), estimated: true };
+  }
+  return null;
+}
+
+function previewAssignmentCleanup() {
+  authorize_();
+  const groups = {};
+  readTable_('Assignments').forEach(function (row) {
+    const key = assignmentBaseKey_(row);
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(row);
+  });
+  const candidates = Object.keys(groups).map(function (key) {
+    const rows = groups[key];
+    if (rows.length < 2) return null;
+    const winner = rows.slice().sort(function (a, b) { return assignmentQuality_(b) - assignmentQuality_(a); })[0];
+    const duplicates = rows.filter(function (row) { return String(row.assignment_id) !== String(winner.assignment_id); });
+    return { key: key, winner: serializeForClient_(winner), duplicates: duplicates.map(serializeForClient_) };
+  }).filter(Boolean);
+  return { candidates: candidates, count: candidates.length };
+}
+
+function commitAssignmentCleanup(resolutions) {
+  authorize_();
+  const requested = Array.isArray(resolutions) ? resolutions : [];
+  const hideIds = {};
+  requested.forEach(function (item) { (item.hideAssignmentIds || []).forEach(function (id) { hideIds[String(id)] = true; }); });
+  return withScriptLock_(function () {
+    const rows = readTable_('Assignments');
+    let hidden = 0;
+    rows.forEach(function (row) {
+      if (!hideIds[String(row.assignment_id)]) return;
+      updateRecordRow_('Assignments', row._row, { verified_status: 'superseded', updated_at: nowIso_() });
+      hidden += 1;
+    });
+    if (hidden) {
+      bumpDataVersion_();
+      appendAudit_('cleanup', 'Assignment', 'duplicate_assignments', { hidden: hidden });
+    }
+    return { ok: true, hidden: hidden };
   });
 }

@@ -1,4 +1,4 @@
-function schemaVersion_() { return 2; }
+function schemaVersion_() { return 3; }
 
 function tableSchemas_() {
   return {
@@ -6,6 +6,7 @@ function tableSchemas_() {
     Assignments: ['assignment_id', 'person_id', 'fiscal_year', 'organization', 'department', 'role', 'employment_type', 'source_pdf', 'source_page', 'source_raw_name', 'verified_status', 'created_at', 'updated_at'],
     Conversations: ['conversation_id', 'person_id', 'occurred_at', 'note', 'next_topic', 'follow_up_at', 'tags_json', 'created_at', 'updated_at'],
     Events: ['event_id', 'person_id', 'event_type', 'event_date', 'label', 'repeat_yearly', 'created_at', 'updated_at'],
+    FamilyMembers: ['family_member_id', 'person_id', 'relationship', 'display_name', 'birth_date', 'observed_age', 'observed_on', 'notes', 'created_at', 'updated_at'],
     ImportStaging: ['import_row_id', 'batch_id', 'fiscal_year', 'organization', 'department', 'role', 'printed_name', 'normalized_name', 'source_pdf', 'source_page', 'source_raw', 'candidate_person_id', 'match_type', 'confidence', 'review_status', 'resolution_note', 'created_at'],
     Settings: ['key', 'value', 'updated_at'],
     AuditLog: ['audit_id', 'actor_email', 'action', 'entity_type', 'entity_id', 'details_json', 'created_at'],

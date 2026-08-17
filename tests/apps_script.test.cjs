@@ -55,3 +55,12 @@ test('legacy migration recognizes the actual workbook headers', () => {
   assert.equal(context.getLegacySourceKind_('R8内示'), '');
   assert.equal(context.getLegacySourceKind_('SinceTimer'), '');
 });
+
+test('v3 schema includes family members and roster APIs', () => {
+  const schema = fs.readFileSync(path.join(appDir, 'Schema.gs'), 'utf8');
+  const api = fs.readFileSync(path.join(appDir, 'Api.gs'), 'utf8');
+  assert.match(schema, /FamilyMembers/);
+  assert.match(api, /function getRoster\(/);
+  assert.match(api, /function saveFamilyMember\(/);
+  assert.match(api, /function previewAssignmentCleanup\(/);
+});
