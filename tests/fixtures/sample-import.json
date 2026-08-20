@@ -1,0 +1,20 @@
+{
+  "schema_version": 2,
+  "kind": "roster_import_preview",
+  "rows": [
+    {
+      "import_row_id": "sample-1",
+      "fiscal_year": "令和8年度",
+      "organization": "サンプル所属",
+      "department": "サンプル部門",
+      "role": "サンプル係",
+      "printed_name": "試験太郎",
+      "normalized_name": "試験太郎",
+      "source_pdf": "sample.pdf",
+      "source_page": 1,
+      "source_raw": "",
+      "confidence": 0.99,
+      "review_status": "auto_candidate"
+    }
+  ]
+}
