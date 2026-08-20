@@ -20,6 +20,15 @@ test('inline application script parses as JavaScript', () => {
   assert.doesNotThrow(() => new vm.Script(scripts[0], { filename: 'Index.inline.js' }));
 });
 
+test('mobile detail keeps conversation history separate from the memo composer', () => {
+  const html = fs.readFileSync(path.join(appDir, 'Index.html'), 'utf8');
+  assert.match(html, /id="compose-open"/);
+  assert.match(html, /id="compose-sheet" hidden/);
+  assert.match(html, /function openComposer\(\)/);
+  assert.match(html, /function closeComposer\(clearInput\)/);
+  assert.doesNotMatch(html, /\.composer\{position:fixed/);
+});
+
 test('name identity rules normalize variants but keep ambiguity visible', () => {
   const context = vm.createContext({});
   vm.runInContext(fs.readFileSync(path.join(appDir, 'Repository.gs'), 'utf8'), context);
