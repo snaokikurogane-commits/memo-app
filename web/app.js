@@ -455,7 +455,10 @@ async function signIn() {
   byId('auth-message').textContent = 'Googleログインへ移動します…';
   const { error } = await state.client.auth.signInWithOAuth({
     provider: 'google',
-    options: { redirectTo: window.location.href }
+    options: {
+      // OAuth callback must never include a previous access-token fragment.
+      redirectTo: `${window.location.origin}${window.location.pathname}`
+    }
   });
   if (error) byId('auth-message').textContent = message(error);
 }
@@ -540,6 +543,11 @@ async function boot() {
     return;
   }
   await handleSession(data.session);
+  // Do not leave access_token/refresh_token in the address bar. Leaving the
+  // fragment there causes a later sign-in attempt to append another fragment.
+  if (window.location.hash || new URL(window.location.href).searchParams.has('code')) {
+    window.history.replaceState({}, document.title, `${window.location.origin}${window.location.pathname}`);
+  }
   state.client.auth.onAuthStateChange((_event, session) => { handleSession(session); });
 }
 
