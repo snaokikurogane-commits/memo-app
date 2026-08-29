@@ -504,3 +504,10 @@ input:focus {
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.2);
   }
 }
+
+
+.next {
+  white-space: pre-wrap !important;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
