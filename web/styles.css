@@ -282,12 +282,6 @@ input:focus {
   border-radius: 0 12px 12px 0;
   margin: 9px 0;
 }
-.conversation-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
 .conversation time {
   color: var(--brand);
   font-size: 12px;
@@ -295,10 +289,16 @@ input:focus {
 }
 .conversation p {
   white-space: pre-wrap;
-  line-height: 1.55;
-  margin: 6px 0;
   overflow-wrap: anywhere;
   word-break: break-word;
+  line-height: 1.65;
+  margin: 6px 0;
+}
+.conversation-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }
 .follow-up-item {
   display: flex;
@@ -327,16 +327,16 @@ input:focus {
 }
 .follow-up-body {
   white-space: pre-wrap;
-  line-height: 1.5;
-  font-weight: 700;
   overflow-wrap: anywhere;
   word-break: break-word;
+  line-height: 1.55;
+  font-weight: 700;
 }
 .item-actions {
   display: flex;
   flex: 0 0 auto;
-  gap: 7px;
   align-items: center;
+  gap: 7px;
 }
 .complete-button,
 .delete-button {
@@ -476,6 +476,19 @@ input:focus {
   white-space: nowrap;
   border: 0;
 }
+@media (max-width: 480px) {
+  .follow-up-item {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .item-actions {
+    width: 100%;
+  }
+  .complete-button,
+  .delete-button {
+    flex: 1;
+  }
+}
 @media (min-width: 700px) {
   .filters {
     grid-template-columns: repeat(4, 1fr);
@@ -503,11 +516,4 @@ input:focus {
     border-radius: 0 0 20px 20px;
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.2);
   }
-}
-
-
-.next {
-  white-space: pre-wrap !important;
-  overflow-wrap: anywhere;
-  word-break: break-word;
 }

@@ -1,84 +1,197 @@
 <!doctype html>
 <html lang="ja">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="robots" content="noindex, nofollow, noarchive">
-  <meta name="referrer" content="same-origin">
-  <meta name="color-scheme" content="light">
-  <title>人物ネタ帳</title>
-  <link rel="stylesheet" href="./styles.css">
-</head>
-<body>
-  <main class="shell">
-    <section id="setup-screen" class="gate card" hidden>
-      <p class="eyebrow">SETUP REQUIRED</p>
-      <h1>人物ネタ帳を接続します</h1>
-      <p>Supabaseの接続情報が未設定です。GitHub Pages上には人物情報を保存しません。</p>
-      <p class="hint">リポジトリの <code>web/config.js</code> にProject URLと anon public key を設定してから再読み込みしてください。</p>
-    </section>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow, noarchive" />
+    <meta name="referrer" content="same-origin" />
+    <meta name="color-scheme" content="light" />
+    <title>人物ネタ帳</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section id="setup-screen" class="gate card" hidden>
+        <p class="eyebrow">SETUP REQUIRED</p>
+        <h1>人物ネタ帳を接続します</h1>
+        <p>
+          Supabaseの接続情報が未設定です。GitHub
+          Pages上には人物情報を保存しません。
+        </p>
+        <p class="hint">
+          リポジトリの <code>web/config.js</code> にProject URLと anon public
+          key を設定してから再読み込みしてください。
+        </p>
+      </section>
 
-    <section id="auth-screen" class="gate card" hidden>
-      <p class="eyebrow">PEOPLE NOTEBOOK</p>
-      <h1>人物ネタ帳</h1>
-      <p>人物情報はSupabaseで保護されています。許可されたGoogleアカウントでログインしてください。</p>
-      <button id="sign-in" class="primary" type="button">Googleでログイン</button>
-      <p id="auth-message" class="hint" role="status"></p>
-    </section>
+      <section id="auth-screen" class="gate card" hidden>
+        <p class="eyebrow">PEOPLE NOTEBOOK</p>
+        <h1>人物ネタ帳</h1>
+        <p>
+          人物情報はSupabaseで保護されています。許可されたGoogleアカウントでログインしてください。
+        </p>
+        <button id="sign-in" class="primary" type="button">
+          Googleでログイン
+        </button>
+        <p id="auth-message" class="hint" role="status"></p>
+      </section>
 
-    <section id="denied-screen" class="gate card" hidden>
-      <p class="eyebrow">ACCESS NOT GRANTED</p>
-      <h1>利用権限がありません</h1>
-      <p>ログイン済みですが、人物ネタ帳の利用者として登録されていません。</p>
-      <button id="denied-sign-out" class="secondary" type="button">ログアウト</button>
-    </section>
+      <section id="denied-screen" class="gate card" hidden>
+        <p class="eyebrow">ACCESS NOT GRANTED</p>
+        <h1>利用権限がありません</h1>
+        <p>ログイン済みですが、人物ネタ帳の利用者として登録されていません。</p>
+        <button id="denied-sign-out" class="secondary" type="button">
+          ログアウト
+        </button>
+      </section>
 
-    <section id="app-screen" hidden>
-      <header class="topbar">
-        <div><p class="eyebrow">PEOPLE NOTEBOOK</p><h1>人物ネタ帳</h1></div>
-        <div class="account"><span id="sync-state">読み込み中…</span><button id="sign-out" class="text-button" type="button">ログアウト</button></div>
+      <section id="app-screen" hidden>
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">PEOPLE NOTEBOOK</p>
+            <h1>人物ネタ帳</h1>
+          </div>
+          <div class="account">
+            <span id="sync-state">読み込み中…</span
+            ><button id="sign-out" class="text-button" type="button">
+              ログアウト
+            </button>
+          </div>
+        </header>
+
+        <section id="view-people" class="view">
+          <section class="card">
+            <label class="sr-only" for="search">人物を検索</label
+            ><input
+              id="search"
+              class="search"
+              type="search"
+              autocomplete="off"
+              placeholder="名前・ふりがな・所属で検索"
+            />
+          </section>
+          <section class="card">
+            <h2>人物 <span id="people-count" class="muted"></span></h2>
+            <div id="people-list" class="stack"></div>
+            <button id="load-more" class="secondary full" type="button" hidden>
+              さらに表示
+            </button>
+          </section>
+        </section>
+
+        <section id="view-follow-ups" class="view" hidden>
+          <section class="card">
+            <h2>次に聞くこと</h2>
+            <p class="muted">
+              聞いたら「聞いた」を押すと、この一覧から消えます。
+            </p>
+            <div id="follow-up-list" class="stack"></div>
+          </section>
+        </section>
+        <section id="view-recent" class="view" hidden>
+          <section class="card">
+            <h2>最近話した</h2>
+            <div id="recent-list" class="stack"></div>
+          </section>
+        </section>
+        <section id="view-roster" class="view" hidden>
+          <section class="card">
+            <h2>年度名簿</h2>
+            <div class="filters">
+              <label>年度<select id="roster-year"></select></label
+              ><label>所属<select id="roster-organization"></select></label
+              ><label>部門<select id="roster-department"></select></label
+              ><label>役職<select id="roster-role"></select></label
+              ><label class="wide"
+                >絞り込み<input
+                  id="roster-query"
+                  type="search"
+                  placeholder="氏名・所属・部門・役職で検索"
+              /></label>
+            </div>
+          </section>
+          <section class="card">
+            <p id="roster-count" class="muted"></p>
+            <div id="roster-list" class="stack"></div>
+          </section>
+        </section>
+
+        <nav id="navigation" class="navigation" aria-label="主な操作">
+          <button class="active" data-view="people" type="button">
+            <span aria-hidden="true">⌕</span>人物検索
+          </button>
+          <button data-view="follow-ups" type="button">
+            <span aria-hidden="true">✓</span>次に話す
+          </button>
+          <button data-view="recent" type="button">
+            <span aria-hidden="true">◷</span>最近
+          </button>
+          <button data-view="roster" type="button">
+            <span aria-hidden="true">▤</span>名簿
+          </button>
+        </nav>
+      </section>
+    </main>
+
+    <section id="person-detail" class="overlay" aria-label="人物詳細" hidden>
+      <header class="overlay-head">
+        <button
+          id="detail-close"
+          class="icon-button"
+          type="button"
+          aria-label="詳細を閉じる"
+        >
+          ‹</button
+        ><strong id="detail-title">人物詳細</strong>
       </header>
-
-      <section id="view-people" class="view">
-        <section class="card"><label class="sr-only" for="search">人物を検索</label><input id="search" class="search" type="search" autocomplete="off" placeholder="名前・ふりがな・所属で検索"></section>
-        <section class="card"><h2>人物 <span id="people-count" class="muted"></span></h2><div id="people-list" class="stack"></div><button id="load-more" class="secondary full" type="button" hidden>さらに表示</button></section>
-      </section>
-
-      <section id="view-follow-ups" class="view" hidden><section class="card"><h2>次に聞くこと</h2><p class="muted">フォロー予定日を過ぎたメモです。</p><div id="follow-up-list" class="stack"></div></section></section>
-      <section id="view-recent" class="view" hidden><section class="card"><h2>最近話した</h2><div id="recent-list" class="stack"></div></section></section>
-      <section id="view-roster" class="view" hidden>
-        <section class="card"><h2>年度名簿</h2><div class="filters"><label>年度<select id="roster-year"></select></label><label>所属<select id="roster-organization"></select></label><label>部門<select id="roster-department"></select></label><label>役職<select id="roster-role"></select></label><label class="wide">絞り込み<input id="roster-query" type="search" placeholder="氏名・所属・部門・役職で検索"></label></div></section>
-        <section class="card"><p id="roster-count" class="muted"></p><div id="roster-list" class="stack"></div></section>
-      </section>
-
-      <nav id="navigation" class="navigation" aria-label="主な操作">
-        <button class="active" data-view="people" type="button"><span aria-hidden="true">⌕</span>人物検索</button>
-        <button data-view="follow-ups" type="button"><span aria-hidden="true">✓</span>次に話す</button>
-        <button data-view="recent" type="button"><span aria-hidden="true">◷</span>最近</button>
-        <button data-view="roster" type="button"><span aria-hidden="true">▤</span>名簿</button>
-      </nav>
+      <div id="detail-body" class="detail-body"></div>
+      <div class="detail-actions">
+        <button id="composer-open" class="primary full" type="button">
+          ＋ 会話メモを追加
+        </button>
+      </div>
     </section>
-  </main>
 
-  <section id="person-detail" class="overlay" aria-label="人物詳細" hidden>
-    <header class="overlay-head"><button id="detail-close" class="icon-button" type="button" aria-label="詳細を閉じる">‹</button><strong id="detail-title">人物詳細</strong></header>
-    <div id="detail-body" class="detail-body"></div>
-    <div class="detail-actions"><button id="composer-open" class="primary full" type="button">＋ 会話メモを追加</button></div>
-  </section>
+    <section id="composer" class="composer" aria-label="会話メモを追加" hidden>
+      <header class="overlay-head">
+        <h2>会話メモを追加</h2>
+        <button
+          id="composer-close"
+          class="icon-button"
+          type="button"
+          aria-label="入力を閉じる"
+        >
+          ×
+        </button>
+      </header>
+      <form id="conversation-form" class="composer-form">
+        <div id="tag-list" class="tag-list" aria-label="タグ"></div>
+        <label
+          >今日話したこと<textarea
+            id="conversation-note"
+            maxlength="5000"
+            placeholder="今回話した内容。会話履歴として残ります"
+          ></textarea>
+        </label>
+        <label
+          >次に聞くこと<textarea
+            id="next-topics"
+            maxlength="5000"
+            placeholder="1行に1件ずつ入力&#10;例：海華ちゃんは今何歳？&#10;例：福井への帰省はどうだった？"
+          ></textarea
+          ><span class="field-hint"
+            >聞いたら質問ごとに「聞いた」を押して消せます。</span
+          ></label
+        >
+        <label>次回目安<input id="follow-up-at" type="date" /></label>
+        <button id="save-conversation" class="primary" type="submit">
+          保存して履歴に戻る
+        </button>
+      </form>
+    </section>
 
-  <section id="composer" class="composer" aria-label="会話メモを追加" hidden>
-    <header class="overlay-head"><h2>会話メモを追加</h2><button id="composer-close" class="icon-button" type="button" aria-label="入力を閉じる">×</button></header>
-    <form id="conversation-form" class="composer-form">
-      <div id="tag-list" class="tag-list" aria-label="タグ"></div>
-      <label>今日のメモ<textarea id="conversation-note" maxlength="5000" placeholder="話したことを短く"></textarea></label>
-      <label>次に聞くこと<textarea id="next-topic" maxlength="1000" placeholder="次の会話の入口"></textarea></label>
-      <label>次回目安<input id="follow-up-at" type="date"></label>
-      <button id="save-conversation" class="primary" type="submit">保存して履歴に戻る</button>
-    </form>
-  </section>
-
-  <div id="toast" class="toast" role="status" hidden></div>
-  <script src="./config.js"></script>
-  <script type="module" src="./app.js"></script>
-</body>
+    <div id="toast" class="toast" role="status" hidden></div>
+    <script src="./config.js"></script>
+    <script type="module" src="./app.js"></script>
+  </body>
 </html>
