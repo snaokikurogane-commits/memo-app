@@ -190,7 +190,96 @@
       </form>
     </section>
 
-    <div id="toast" class="toast" role="status" hidden></div>
+    <section
+      id="topic-picker"
+      class="topic-picker"
+      aria-label="話題を選ぶ"
+      hidden
+    >
+      <header class="overlay-head topic-picker-head">
+        <button
+          id="topic-picker-close"
+          class="icon-button"
+          type="button"
+          aria-label="話題選択を閉じる"
+        >
+          ×
+        </button>
+        <div>
+          <h2>話題を選ぶ</h2>
+          <p id="topic-person-name" class="topic-person-name"></p>
+        </div>
+      </header>
+      <div class="topic-picker-body">
+        <nav id="topic-tabs" class="topic-tabs" aria-label="話題の選び方">
+          <button
+            class="active"
+            data-topic-tab="recommended"
+            type="button"
+            role="tab"
+            aria-selected="true"
+          >
+            おすすめ
+          </button>
+          <button
+            data-topic-tab="initial"
+            type="button"
+            role="tab"
+            aria-selected="false"
+          >
+            初対面
+          </button>
+          <button
+            data-topic-tab="category"
+            type="button"
+            role="tab"
+            aria-selected="false"
+          >
+            カテゴリ
+          </button>
+        </nav>
+
+        <label class="topic-search-label" for="topic-search">
+          <span class="sr-only">話題を検索</span>
+          <input
+            id="topic-search"
+            type="search"
+            autocomplete="off"
+            placeholder="質問やカテゴリを検索"
+          />
+        </label>
+
+        <div
+          id="topic-relationship-filters"
+          class="topic-filter-row"
+          aria-label="相手との関係"
+          hidden
+        ></div>
+        <div
+          id="topic-category-filters"
+          class="topic-filter-row"
+          aria-label="話題カテゴリ"
+          hidden
+        ></div>
+
+        <div class="topic-list-heading">
+          <strong id="topic-result-summary">話題</strong>
+          <span>必要なものだけ選べます</span>
+        </div>
+        <div id="topic-list" class="topic-list"></div>
+      </div>
+      <div class="topic-picker-actions">
+        <div>
+          <strong id="topic-selected-count">0件を選択中</strong>
+          <span>追加後も編集・削除できます</span>
+        </div>
+        <button id="topic-add-selected" class="primary" type="button" disabled>
+          次に聞くことへ追加
+        </button>
+      </div>
+    </section>
+
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
     <script src="./config.js"></script>
     <script type="module" src="./app.js"></script>
   </body>

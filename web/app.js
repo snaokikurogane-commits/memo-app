@@ -9,6 +9,102 @@ const tags = [
   "雇用保険",
   "給付経験あり",
 ];
+const standardTopics = [
+  {
+    id: "standard-work-start",
+    category: "仕事",
+    question: "今の仕事を始めたきっかけは何ですか？",
+    opening: "そういえば、今のお仕事を始めたきっかけって…",
+    recommended: true,
+    relationships: ["work", "friend", "community", "other"],
+  },
+  {
+    id: "standard-work-fun",
+    category: "仕事",
+    question: "今の仕事で、面白いと感じるのはどんな時ですか？",
+    opening: "最近、お仕事はどうですか？",
+    recommended: true,
+    relationships: ["work", "friend"],
+  },
+  {
+    id: "standard-work-change",
+    category: "仕事",
+    question: "仕事で今、変えたいと思っていることはありますか？",
+    opening: "今の仕事で、もう少しこうなったらいいなと思うことって…",
+    relationships: ["work"],
+    sensitivity: "personal",
+  },
+  {
+    id: "standard-weekend",
+    category: "休日",
+    question: "休日はどう過ごすことが多いですか？",
+    opening: "最近、少しゆっくりできていますか？",
+    recommended: true,
+    relationships: ["work", "friend", "community", "other"],
+  },
+  {
+    id: "standard-looking-forward",
+    category: "近況",
+    question: "最近、楽しみにしていることはありますか？",
+    opening: "最近、何か楽しみにしていることってありますか？",
+    recommended: true,
+    relationships: ["work", "friend", "community", "other"],
+  },
+  {
+    id: "standard-local-reason",
+    category: "地元",
+    question: "この地域に来たきっかけは何ですか？",
+    opening: "こちらには長いんですか？",
+    relationships: ["work", "friend", "community", "other"],
+  },
+  {
+    id: "standard-local-food",
+    category: "地元",
+    question: "地元に帰ると、つい食べたくなるものはありますか？",
+    opening: "ご出身の地域では、どんな食べ物が有名ですか？",
+    recommended: true,
+    relationships: ["work", "friend", "community"],
+  },
+  {
+    id: "standard-hobby",
+    category: "趣味",
+    question: "最近、時間を忘れて楽しめることはありますか？",
+    opening: "お休みの日は、何をしている時が一番楽しいですか？",
+    recommended: true,
+    relationships: ["work", "friend", "community", "other"],
+  },
+  {
+    id: "standard-golf",
+    category: "趣味",
+    question: "最近もゴルフに行っていますか？",
+    opening: "前にゴルフのお話をしていましたよね。",
+    recommended: true,
+    relationships: ["work", "friend"],
+    requiredTags: ["ゴルフ"],
+  },
+  {
+    id: "standard-food",
+    category: "食べ物",
+    question: "最近、また行きたいと思ったお店はありますか？",
+    opening: "最近どこかで、おいしいものを食べましたか？",
+    relationships: ["work", "friend", "community", "other"],
+  },
+  {
+    id: "standard-travel",
+    category: "旅行",
+    question: "最近行ってよかった場所はありますか？",
+    opening: "最近どこかへ出かけましたか？",
+    recommended: true,
+    relationships: ["work", "friend", "community", "other"],
+  },
+  {
+    id: "standard-future",
+    category: "これから",
+    question: "これからやってみたいことはありますか？",
+    opening: "今後、やってみたいと思っていることってありますか？",
+    relationships: ["friend", "community", "other"],
+  },
+];
 const pageSize = 1000;
 const state = {
   client: null,
@@ -21,6 +117,14 @@ const state = {
   directory: [],
   person: null,
   selectedTags: new Set(),
+  selectedFollowUpIds: new Set(),
+  followUpSelectionMode: false,
+  selectedTopicIds: new Set(),
+  expandedTopicIds: new Set(),
+  topicPickerTab: "recommended",
+  topicRelationship: "work",
+  topicCategory: "all",
+  topicQuery: "",
   peopleLimit: 50,
   handlingSession: false,
 };
@@ -59,15 +163,27 @@ function message(error) {
   return error.message || String(error);
 }
 
-function toast(text, error = false) {
+function toast(text, error = false, action = null) {
   const node = byId("toast");
-  node.textContent = text;
+  node.replaceChildren(el("span", "toast-message", text));
   node.classList.toggle("error", error);
+  node.classList.toggle("has-action", Boolean(action));
+  if (action) {
+    const button = el("button", "toast-action", action.label || "元に戻す");
+    button.type = "button";
+    button.addEventListener("click", async () => {
+      clearTimeout(toast.timer);
+      button.disabled = true;
+      node.hidden = true;
+      await action.onClick();
+    });
+    node.append(button);
+  }
   node.hidden = false;
   clearTimeout(toast.timer);
   toast.timer = setTimeout(() => {
     node.hidden = true;
-  }, 3600);
+  }, action ? 6500 : 3600);
 }
 
 function normalize(value) {
@@ -98,6 +214,71 @@ function dateText(value) {
     month: "short",
     day: "numeric",
   }).format(date);
+}
+
+function topicText(value) {
+  return String(value || "").trim();
+}
+
+function normalizeTopic(topic, index) {
+  const question = topicText(
+    topic.question ?? topic.secondPhrase ?? topic.second ?? topic.title,
+  );
+  if (!question) return null;
+  const category = topicText(topic.category ?? topic.tag) || "その他";
+  const context = topicText(topic.context);
+  return {
+    id: topicText(topic.id) || `external-topic-${index}`,
+    category,
+    question,
+    opening: topicText(
+      topic.opening ?? topic.firstPhrase ?? topic.first ?? topic.origin,
+    ),
+    recommended: topic.recommended !== false,
+    relationships: Array.isArray(topic.relationships)
+      ? topic.relationships
+      : context === "work"
+        ? ["work"]
+        : ["work", "friend", "community", "other"],
+    sensitivity: topicText(topic.sensitivity) || "low",
+    requiredTags: Array.isArray(topic.requiredTags) ? topic.requiredTags : [],
+  };
+}
+
+function topicLibrary() {
+  const supplied = Array.isArray(window.PEOPLE_NOTEBOOK_TOPICS)
+    ? window.PEOPLE_NOTEBOOK_TOPICS
+    : [];
+  const topics = [...standardTopics, ...supplied]
+    .map(normalizeTopic)
+    .filter(Boolean)
+    .filter((topic) => topic.sensitivity !== "high");
+  const unique = new Map();
+  topics.forEach((topic) => {
+    const key = normalize(topic.question);
+    if (key && !unique.has(key)) unique.set(key, topic);
+  });
+  return [...unique.values()];
+}
+
+function profileTagSet() {
+  return new Set(
+    Array.isArray(state.person?.person?.profile_tags)
+      ? state.person.person.profile_tags
+      : [],
+  );
+}
+
+function topicMatchesProfile(topic) {
+  if (!topic.requiredTags.length) return true;
+  const profileTags = profileTagSet();
+  return topic.requiredTags.some((tag) => profileTags.has(tag));
+}
+
+function topicSearchText(topic) {
+  return normalize(
+    [topic.category, topic.question, topic.opening].filter(Boolean).join(" "),
+  );
 }
 
 function assignmentText(assignment) {
@@ -259,8 +440,11 @@ function followUpSort(left, right) {
   );
 }
 
-function followUpCard(item, showPerson = false) {
-  const card = el("article", "follow-up-item");
+function followUpCard(item, showPerson = false, selectable = false) {
+  const card = el(
+    "article",
+    `follow-up-item${selectable ? " selectable" : ""}`,
+  );
   const copy = el("div", "follow-up-copy");
   if (showPerson) {
     const person = personById(item.person_id);
@@ -276,13 +460,27 @@ function followUpCard(item, showPerson = false) {
     copy.append(personButton);
   }
   copy.append(el("div", "follow-up-body", item.body));
-  copy.append(
-    el(
-      "div",
-      "muted",
-      item.due_at ? `次回目安：${dateText(item.due_at)}` : "次の機会に確認",
-    ),
-  );
+  if (item.due_at) {
+    copy.append(
+      el("div", "follow-up-date", `次回目安：${dateText(item.due_at)}`),
+    );
+  }
+
+  if (selectable) {
+    const select = document.createElement("input");
+    select.type = "checkbox";
+    select.className = "follow-up-select";
+    select.checked = state.selectedFollowUpIds.has(item.follow_up_id);
+    select.setAttribute("aria-label", `「${item.body}」を選択`);
+    select.addEventListener("change", () => {
+      if (select.checked) state.selectedFollowUpIds.add(item.follow_up_id);
+      else state.selectedFollowUpIds.delete(item.follow_up_id);
+      renderDetail();
+    });
+    card.append(select, copy);
+    return card;
+  }
+
   const actions = el("div", "item-actions");
   const done = el("button", "complete-button", "聞いた");
   done.type = "button";
@@ -451,12 +649,121 @@ function renderDetail() {
   const target = byId("detail-body");
   clear(target);
   byId("detail-title").textContent = detail.person.canonical_name;
-  const identity = el("section", "card");
-  identity.append(
-    el("h1", "", detail.person.canonical_name),
-    el("p", "muted", detail.person.name_kana || "ふりがな未登録"),
+  const identity = el("section", "card identity-card");
+  const identityMain = el("div", "identity-main");
+  const monogram = el(
+    "div",
+    "identity-monogram",
+    detail.person.canonical_name.slice(0, 1),
   );
+  const identityCopy = el("div", "identity-copy");
+  identityCopy.append(el("h1", "", detail.person.canonical_name));
+  if (detail.person.name_kana) {
+    identityCopy.append(el("p", "identity-kana", detail.person.name_kana));
+  }
+  const latestAssignment = currentAssignment(detail.assignments);
+  identityCopy.append(
+    el(
+      "div",
+      "identity-assignment",
+      latestAssignment
+        ? [
+            latestAssignment.organization,
+            latestAssignment.department,
+            latestAssignment.role,
+          ]
+            .filter(Boolean)
+            .join(" / ")
+        : "所属未登録",
+    ),
+  );
+  identityMain.append(monogram, identityCopy);
+  identity.append(identityMain);
+  const profileTags = Array.isArray(detail.person.profile_tags)
+    ? detail.person.profile_tags.slice(0, 4)
+    : [];
+  if (profileTags.length) {
+    const tagRow = el("div", "identity-tags");
+    profileTags.forEach((tag) => tagRow.append(el("span", "identity-tag", tag)));
+    identity.append(tagRow);
+  }
   target.append(identity);
+
+  const followUps = el("section", "card follow-up-section");
+  const openFollowUps = detail.followUps
+    .filter((item) => item.status === "open")
+    .sort(followUpSort);
+  const followUpHead = el("div", "section-heading");
+  const followUpTitle = el("div", "section-title-with-count");
+  followUpTitle.append(
+    el("h2", "", "次に聞くこと"),
+    el("span", "count-pill", `${openFollowUps.length}件`),
+  );
+  followUpHead.append(followUpTitle);
+  if (openFollowUps.length && !state.followUpSelectionMode) {
+    const manage = el(
+      "button",
+      "text-button bulk-select-button",
+      "まとめて選択",
+    );
+    manage.type = "button";
+    manage.addEventListener("click", () => {
+      state.followUpSelectionMode = true;
+      state.selectedFollowUpIds.clear();
+      renderDetail();
+    });
+    followUpHead.append(manage);
+  }
+  followUps.append(followUpHead);
+  followUps.append(
+    el(
+      "p",
+      "section-help",
+      "会う前に見返す話題だけを、ここにまとめます。",
+    ),
+  );
+
+  if (!state.followUpSelectionMode) {
+    const addActions = el("div", "follow-up-add-actions");
+    const chooseTopic = el("button", "primary topic-library-button", "話題から選ぶ");
+    chooseTopic.type = "button";
+    chooseTopic.addEventListener("click", openTopicPicker);
+    const addDirectly = el("button", "secondary", "＋ 自分で追加");
+    addDirectly.type = "button";
+    addDirectly.addEventListener("click", () => openComposer("next-topics"));
+    addActions.append(chooseTopic, addDirectly);
+    followUps.append(addActions);
+  }
+
+  if (state.followUpSelectionMode && openFollowUps.length) {
+    followUps.append(renderFollowUpBulkToolbar(openFollowUps));
+  }
+  openFollowUps.forEach((item) =>
+    followUps.append(followUpCard(item, false, state.followUpSelectionMode)),
+  );
+  if (!openFollowUps.length)
+    followUps.append(el("div", "empty", "次に聞くことはありません"));
+  target.append(followUps);
+
+  const conversations = el("section", "card");
+  conversations.append(el("h2", "", "会話履歴"));
+  const notedConversations = detail.conversations.filter((conversation) =>
+    conversation.note.trim(),
+  );
+  notedConversations.forEach((conversation) => {
+    const card = el("article", "conversation");
+    const head = el("div", "conversation-head");
+    head.append(el("time", "", dateText(conversation.occurred_at)));
+    const remove = el("button", "delete-button", "削除");
+    remove.type = "button";
+    remove.addEventListener("click", () => deleteConversation(conversation));
+    head.append(remove);
+    card.append(head, el("p", "", conversation.note));
+    conversations.append(card);
+  });
+  if (!notedConversations.length)
+    conversations.append(el("div", "empty", "最初の会話メモを残しましょう"));
+  target.append(conversations);
 
   const assignmentCard = el("section", "card");
   assignmentCard.append(el("h2", "", "所属履歴"));
@@ -484,36 +791,6 @@ function renderDetail() {
     timeline.append(el("div", "empty", "所属履歴がありません"));
   assignmentCard.append(timeline);
   target.append(assignmentCard);
-
-  const followUps = el("section", "card");
-  followUps.append(el("h2", "", "次に聞くこと"));
-  const openFollowUps = detail.followUps
-    .filter((item) => item.status === "open")
-    .sort(followUpSort);
-  openFollowUps.forEach((item) => followUps.append(followUpCard(item)));
-  if (!openFollowUps.length)
-    followUps.append(el("div", "empty", "次に聞くことはありません"));
-  target.append(followUps);
-
-  const conversations = el("section", "card");
-  conversations.append(el("h2", "", "会話履歴"));
-  const notedConversations = detail.conversations.filter((conversation) =>
-    conversation.note.trim(),
-  );
-  notedConversations.forEach((conversation) => {
-    const card = el("article", "conversation");
-    const head = el("div", "conversation-head");
-    head.append(el("time", "", dateText(conversation.occurred_at)));
-    const remove = el("button", "delete-button", "削除");
-    remove.type = "button";
-    remove.addEventListener("click", () => deleteConversation(conversation));
-    head.append(remove);
-    card.append(head, el("p", "", conversation.note));
-    conversations.append(card);
-  });
-  if (!notedConversations.length)
-    conversations.append(el("div", "empty", "最初の会話メモを残しましょう"));
-  target.append(conversations);
 
   const family = el("section", "card");
   family.append(el("h2", "", "家族・子ども"));
@@ -572,6 +849,8 @@ function renderDetail() {
 }
 
 async function openPerson(personId) {
+  state.followUpSelectionMode = false;
+  state.selectedFollowUpIds.clear();
   byId("person-detail").hidden = false;
   document.body.style.overflow = "hidden";
   byId("detail-body").replaceChildren(el("div", "empty", "読み込み中…"));
@@ -650,8 +929,13 @@ async function openPerson(personId) {
 function closeDetail() {
   byId("person-detail").hidden = true;
   byId("composer").hidden = true;
+  byId("topic-picker").hidden = true;
   document.body.style.overflow = "";
   state.person = null;
+  state.followUpSelectionMode = false;
+  state.selectedFollowUpIds.clear();
+  state.selectedTopicIds.clear();
+  state.expandedTopicIds.clear();
   resetComposer();
 }
 
@@ -681,17 +965,234 @@ function resetComposer() {
   renderTags();
 }
 
-function openComposer() {
+function openComposer(focusId = "conversation-note") {
   if (!state.person) return;
   byId("composer").hidden = false;
   setTimeout(() => {
-    byId("conversation-note").focus();
+    byId(focusId)?.focus();
   }, 0);
 }
 
 function closeComposer() {
   byId("composer").hidden = true;
   resetComposer();
+}
+
+function relationshipLabel(value) {
+  return (
+    {
+      work: "仕事で会う",
+      friend: "知人・友人",
+      community: "地域の集まり",
+      other: "その他",
+    }[value] || value
+  );
+}
+
+function visibleTopics() {
+  const query = normalize(state.topicQuery);
+  return topicLibrary()
+    .filter(topicMatchesProfile)
+    .filter((topic) => !query || topicSearchText(topic).includes(query))
+    .filter((topic) => {
+      if (state.topicPickerTab === "initial") {
+        return topic.relationships.includes(state.topicRelationship);
+      }
+      if (state.topicPickerTab === "category") {
+        return (
+          state.topicCategory === "all" ||
+          topic.category === state.topicCategory
+        );
+      }
+      return topic.recommended;
+    });
+}
+
+function renderTopicFilters() {
+  const relationshipFilters = byId("topic-relationship-filters");
+  const categoryFilters = byId("topic-category-filters");
+  relationshipFilters.hidden = state.topicPickerTab !== "initial";
+  categoryFilters.hidden = state.topicPickerTab !== "category";
+  clear(relationshipFilters);
+  clear(categoryFilters);
+
+  if (!relationshipFilters.hidden) {
+    ["work", "friend", "community", "other"].forEach((relationship) => {
+      const button = el(
+        "button",
+        `filter-chip${state.topicRelationship === relationship ? " active" : ""}`,
+        relationshipLabel(relationship),
+      );
+      button.type = "button";
+      button.addEventListener("click", () => {
+        state.topicRelationship = relationship;
+        state.selectedTopicIds.clear();
+        renderTopicPicker();
+      });
+      relationshipFilters.append(button);
+    });
+  }
+
+  if (!categoryFilters.hidden) {
+    const categories = [
+      "all",
+      ...new Set(topicLibrary().map((topic) => topic.category)),
+    ];
+    categories.forEach((category) => {
+      const button = el(
+        "button",
+        `filter-chip${state.topicCategory === category ? " active" : ""}`,
+        category === "all" ? "すべて" : category,
+      );
+      button.type = "button";
+      button.addEventListener("click", () => {
+        state.topicCategory = category;
+        renderTopicPicker();
+      });
+      categoryFilters.append(button);
+    });
+  }
+}
+
+function topicOptionCard(topic) {
+  const selected = state.selectedTopicIds.has(topic.id);
+  const expanded = state.expandedTopicIds.has(topic.id);
+  const card = el(
+    "article",
+    `topic-option${selected ? " selected" : ""}${expanded ? " expanded" : ""}`,
+  );
+  const copy = el("div", "topic-option-copy");
+  copy.append(el("span", "topic-category", topic.category));
+  copy.append(el("div", "topic-question", topic.question));
+  if (topic.opening) {
+    const opening = el("div", "topic-opening", `入り方：${topic.opening}`);
+    copy.append(opening);
+    const details = el(
+      "button",
+      "topic-details-button",
+      expanded ? "閉じる" : "入り方を表示",
+    );
+    details.type = "button";
+    details.setAttribute("aria-expanded", String(expanded));
+    details.addEventListener("click", () => {
+      if (expanded) state.expandedTopicIds.delete(topic.id);
+      else state.expandedTopicIds.add(topic.id);
+      renderTopicPicker();
+    });
+    copy.append(details);
+  }
+  const toggle = el(
+    "button",
+    `topic-toggle${selected ? " selected" : ""}`,
+    selected ? "✓" : "＋",
+  );
+  toggle.type = "button";
+  toggle.setAttribute(
+    "aria-label",
+    selected ? `「${topic.question}」の選択を解除` : `「${topic.question}」を選択`,
+  );
+  toggle.addEventListener("click", () => {
+    if (selected) state.selectedTopicIds.delete(topic.id);
+    else state.selectedTopicIds.add(topic.id);
+    renderTopicPicker();
+  });
+  card.append(copy, toggle);
+  return card;
+}
+
+function renderTopicPicker() {
+  if (!state.person) return;
+  byId("topic-person-name").textContent =
+    `${state.person.person.canonical_name}さんに聞く話題`;
+  byId("topic-search").value = state.topicQuery;
+  document.querySelectorAll("#topic-tabs [data-topic-tab]").forEach((button) => {
+    const active = button.dataset.topicTab === state.topicPickerTab;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", String(active));
+  });
+  renderTopicFilters();
+  const topics = visibleTopics();
+  byId("topic-result-summary").textContent =
+    state.topicPickerTab === "initial"
+      ? `${relationshipLabel(state.topicRelationship)}向け・${topics.length}件`
+      : `${topics.length}件の話題`;
+  const list = byId("topic-list");
+  clear(list);
+  topics.forEach((topic) => list.append(topicOptionCard(topic)));
+  if (!topics.length) {
+    list.append(el("div", "empty", "条件に合う話題がありません"));
+  }
+  const count = state.selectedTopicIds.size;
+  byId("topic-selected-count").textContent = `${count}件を選択中`;
+  byId("topic-add-selected").disabled = !count;
+}
+
+function openTopicPicker() {
+  if (!state.person) return;
+  state.selectedTopicIds.clear();
+  state.expandedTopicIds.clear();
+  state.topicPickerTab = "recommended";
+  state.topicRelationship = "work";
+  state.topicCategory = "all";
+  state.topicQuery = "";
+  byId("topic-picker").hidden = false;
+  renderTopicPicker();
+}
+
+function closeTopicPicker() {
+  byId("topic-picker").hidden = true;
+  state.selectedTopicIds.clear();
+  state.expandedTopicIds.clear();
+}
+
+async function addSelectedTopics() {
+  if (!state.person || !state.selectedTopicIds.size) return;
+  const existing = new Set(
+    state.person.followUps
+      .filter((item) => item.status === "open")
+      .map((item) => normalize(item.body)),
+  );
+  const selected = topicLibrary().filter(
+    (topic) =>
+      state.selectedTopicIds.has(topic.id) &&
+      !existing.has(normalize(topic.question)),
+  );
+  const skipped = state.selectedTopicIds.size - selected.length;
+  if (!selected.length) {
+    toast("選んだ話題はすでに追加されています。", true);
+    return;
+  }
+  const button = byId("topic-add-selected");
+  button.disabled = true;
+  button.textContent = "追加中…";
+  try {
+    const { data, error } = await state.client
+      .from("follow_up_items")
+      .insert(
+        selected.map((topic) => ({
+          person_id: state.person.person.person_id,
+          body: topic.question,
+          due_at: null,
+        })),
+      )
+      .select();
+    if (error) throw error;
+    state.person.followUps.unshift(...data);
+    state.followUps.unshift(...data);
+    closeTopicPicker();
+    renderAll();
+    renderDetail();
+    toast(
+      skipped
+        ? `${data.length}件を追加しました（重複${skipped}件は除外）`
+        : `${data.length}件を「次に聞くこと」へ追加しました`,
+    );
+  } catch (error) {
+    toast(message(error), true);
+  } finally {
+    button.disabled = false;
+    button.textContent = "次に聞くことへ追加";
+  }
 }
 
 async function completeFollowUp(item) {
@@ -707,10 +1208,155 @@ async function completeFollowUp(item) {
     if (state.person)
       state.person.followUps = state.person.followUps.filter(
         (row) => row.follow_up_id !== item.follow_up_id,
-      );
+    );
     renderAll();
     if (state.person) renderDetail();
-    toast("「次に聞くこと」を完了にしました");
+    toast(`「${item.body}」を聞いたことにしました`, false, {
+      label: "元に戻す",
+      onClick: () => undoCompletedFollowUps([item]),
+    });
+  } catch (error) {
+    toast(message(error), true);
+  }
+}
+
+async function undoCompletedFollowUps(items) {
+  const ids = items.map((item) => item.follow_up_id);
+  try {
+    const { error } = await state.client
+      .from("follow_up_items")
+      .update({ status: "open", completed_at: null })
+      .in("follow_up_id", ids);
+    if (error) throw error;
+    const knownIds = new Set(state.followUps.map((item) => item.follow_up_id));
+    items.forEach((item) => {
+      item.status = "open";
+      item.completed_at = null;
+      if (!knownIds.has(item.follow_up_id)) state.followUps.unshift(item);
+    });
+    if (state.person) {
+      const personIds = new Set(
+        state.person.followUps.map((item) => item.follow_up_id),
+      );
+      items
+        .filter((item) => item.person_id === state.person.person.person_id)
+        .forEach((item) => {
+          if (!personIds.has(item.follow_up_id)) {
+            state.person.followUps.unshift(item);
+          }
+        });
+    }
+    renderAll();
+    if (state.person) renderDetail();
+    toast(items.length === 1 ? "元に戻しました" : `${items.length}件を元に戻しました`);
+  } catch (error) {
+    toast(`元に戻せませんでした。${message(error)}`, true);
+  }
+}
+
+function renderFollowUpBulkToolbar(openFollowUps) {
+  const selectedIds = openFollowUps
+    .filter((item) => state.selectedFollowUpIds.has(item.follow_up_id))
+    .map((item) => item.follow_up_id);
+  const toolbar = el("div", "bulk-toolbar");
+  toolbar.append(el("div", "bulk-summary", `選択中 ${selectedIds.length}件`));
+
+  const selectAll = el(
+    "button",
+    "secondary compact-button",
+    selectedIds.length === openFollowUps.length ? "選択解除" : "すべて選択",
+  );
+  selectAll.type = "button";
+  selectAll.addEventListener("click", () => {
+    if (selectedIds.length === openFollowUps.length) {
+      state.selectedFollowUpIds.clear();
+    } else {
+      state.selectedFollowUpIds = new Set(
+        openFollowUps.map((item) => item.follow_up_id),
+      );
+    }
+    renderDetail();
+  });
+
+  const complete = el("button", "complete-button", "選択分を聞いた");
+  complete.type = "button";
+  complete.disabled = !selectedIds.length;
+  complete.addEventListener("click", () =>
+    completeSelectedFollowUps(selectedIds),
+  );
+
+  const remove = el("button", "delete-button", "選択分を削除");
+  remove.type = "button";
+  remove.disabled = !selectedIds.length;
+  remove.addEventListener("click", () => deleteSelectedFollowUps(selectedIds));
+
+  const cancel = el("button", "text-button compact-button", "戻る");
+  cancel.type = "button";
+  cancel.addEventListener("click", () => {
+    state.followUpSelectionMode = false;
+    state.selectedFollowUpIds.clear();
+    renderDetail();
+  });
+  toolbar.append(selectAll, complete, remove, cancel);
+  return toolbar;
+}
+
+function removeFollowUpsFromState(ids) {
+  const idSet = new Set(ids);
+  state.followUps = state.followUps.filter(
+    (row) => !idSet.has(row.follow_up_id),
+  );
+  if (state.person) {
+    state.person.followUps = state.person.followUps.filter(
+      (row) => !idSet.has(row.follow_up_id),
+    );
+  }
+  ids.forEach((id) => state.selectedFollowUpIds.delete(id));
+}
+
+async function completeSelectedFollowUps(ids) {
+  if (!ids.length) return;
+  const completedItems = (state.person?.followUps || state.followUps).filter(
+    (item) => ids.includes(item.follow_up_id),
+  );
+  try {
+    const { error } = await state.client
+      .from("follow_up_items")
+      .update({ status: "completed", completed_at: new Date().toISOString() })
+      .in("follow_up_id", ids);
+    if (error) throw error;
+    removeFollowUpsFromState(ids);
+    state.followUpSelectionMode = false;
+    renderAll();
+    if (state.person) renderDetail();
+    toast(`${ids.length}件を「聞いた」にしました`, false, {
+      label: "元に戻す",
+      onClick: () => undoCompletedFollowUps(completedItems),
+    });
+  } catch (error) {
+    toast(message(error), true);
+  }
+}
+
+async function deleteSelectedFollowUps(ids) {
+  if (!ids.length) return;
+  if (
+    !window.confirm(
+      `選んだ${ids.length}件を削除しますか？削除後は元に戻せません。`,
+    )
+  )
+    return;
+  try {
+    const { error } = await state.client
+      .from("follow_up_items")
+      .delete()
+      .in("follow_up_id", ids);
+    if (error) throw error;
+    removeFollowUpsFromState(ids);
+    state.followUpSelectionMode = false;
+    renderAll();
+    if (state.person) renderDetail();
+    toast(`${ids.length}件を削除しました`);
   } catch (error) {
     toast(message(error), true);
   }
@@ -917,9 +1563,23 @@ function bindEvents() {
     );
   });
   byId("detail-close").addEventListener("click", closeDetail);
-  byId("composer-open").addEventListener("click", openComposer);
+  byId("composer-open").addEventListener("click", () => openComposer());
   byId("composer-close").addEventListener("click", closeComposer);
   byId("conversation-form").addEventListener("submit", saveConversation);
+  byId("topic-picker-close").addEventListener("click", closeTopicPicker);
+  byId("topic-tabs").addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-topic-tab]");
+    if (!button) return;
+    state.topicPickerTab = button.dataset.topicTab;
+    state.selectedTopicIds.clear();
+    state.expandedTopicIds.clear();
+    renderTopicPicker();
+  });
+  byId("topic-search").addEventListener("input", (event) => {
+    state.topicQuery = event.target.value;
+    renderTopicPicker();
+  });
+  byId("topic-add-selected").addEventListener("click", addSelectedTopics);
 }
 
 async function boot() {
