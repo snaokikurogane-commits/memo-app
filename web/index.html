@@ -71,7 +71,12 @@
             />
           </section>
           <section class="card">
-            <h2>人物 <span id="people-count" class="muted"></span></h2>
+            <div class="section-heading people-heading">
+              <h2>人物 <span id="people-count" class="muted"></span></h2>
+              <button id="person-add" class="quiet-button" type="button">
+                ＋ 人物を追加
+              </button>
+            </div>
             <div id="people-list" class="stack"></div>
             <button id="load-more" class="secondary full" type="button" hidden>
               さらに表示
@@ -134,7 +139,7 @@
     </main>
 
     <section id="person-detail" class="overlay" aria-label="人物詳細" hidden>
-      <header class="overlay-head">
+      <header class="overlay-head detail-head">
         <button
           id="detail-close"
           class="icon-button"
@@ -142,7 +147,10 @@
           aria-label="詳細を閉じる"
         >
           ‹</button
-        ><strong id="detail-title">人物詳細</strong>
+        ><strong id="detail-title">人物詳細</strong
+        ><button id="person-edit" class="quiet-button" type="button">
+          編集
+        </button>
       </header>
       <div id="detail-body" class="detail-body"></div>
       <div class="detail-actions">
@@ -150,6 +158,105 @@
           ＋ 会話メモを追加
         </button>
       </div>
+    </section>
+
+    <section
+      id="person-editor"
+      class="editor-sheet"
+      aria-label="人物情報を編集"
+      hidden
+    >
+      <header class="overlay-head">
+        <button
+          id="person-editor-close"
+          class="icon-button"
+          type="button"
+          aria-label="人物編集を閉じる"
+        >
+          ×
+        </button>
+        <div>
+          <h2 id="person-editor-title">人物を追加</h2>
+          <p class="editor-subtitle">スマホから基本情報とカード表紙を設定できます</p>
+        </div>
+      </header>
+      <form id="person-form" class="person-form">
+        <section class="form-section">
+          <h3>基本情報</h3>
+          <div class="form-grid">
+            <label class="wide"
+              >氏名 <span class="required">必須</span
+              ><input
+                id="person-name"
+                type="text"
+                maxlength="120"
+                autocomplete="name"
+                required
+            /></label>
+            <label
+              >ふりがな<input
+                id="person-kana"
+                type="text"
+                maxlength="160"
+                inputmode="kana"
+            /></label>
+            <label
+              >タグ<input
+                id="person-tags"
+                type="text"
+                maxlength="500"
+                placeholder="同期、ゴルフ、LINE"
+            /></label>
+          </div>
+        </section>
+
+        <section class="form-section">
+          <h3>現在の所属</h3>
+          <p class="form-help">
+            同じ年度は更新し、別年度を入力すると履歴として追加します。
+          </p>
+          <div class="form-grid">
+            <label
+              >年度<input
+                id="person-fiscal-year"
+                type="text"
+                maxlength="40"
+                placeholder="令和8年度"
+            /></label>
+            <label
+              >組織<input id="person-organization" type="text" maxlength="180"
+            /></label>
+            <label
+              >部門<input id="person-department" type="text" maxlength="180"
+            /></label>
+            <label
+              >役職<input id="person-role" type="text" maxlength="180"
+            /></label>
+          </div>
+        </section>
+
+        <details class="form-section card-customize" open>
+          <summary>
+            <span>人物カードの表紙</span>
+            <small>背景とアイコンは後から変更できます</small>
+          </summary>
+          <div id="card-live-preview" class="editor-card-preview"></div>
+          <div id="card-style-options" class="style-options"></div>
+          <div class="customize-subsection">
+            <strong>アイコン</strong>
+            <p class="form-help">なしが標準です。必要な人物だけ選べます。</p>
+            <div id="icon-style-options" class="icon-options"></div>
+          </div>
+          <div class="customize-subsection">
+            <strong>アイコンの質感</strong>
+            <div id="icon-frame-options" class="frame-options"></div>
+          </div>
+        </details>
+
+        <button id="person-save" class="primary full" type="submit">
+          保存する
+        </button>
+      </form>
     </section>
 
     <section id="composer" class="composer" aria-label="会話メモを追加" hidden>
@@ -267,6 +374,9 @@
           <span>必要なものだけ選べます</span>
         </div>
         <div id="topic-list" class="topic-list"></div>
+        <button id="topic-load-more" class="secondary full" type="button" hidden>
+          さらに話題を見る
+        </button>
       </div>
       <div class="topic-picker-actions">
         <div>
@@ -281,6 +391,7 @@
 
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
     <script src="./config.js"></script>
+    <script src="./topics-data.js"></script>
     <script type="module" src="./app.js"></script>
   </body>
 </html>

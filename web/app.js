@@ -106,6 +106,34 @@ const standardTopics = [
   },
 ];
 const pageSize = 1000;
+const topicPageSize = 24;
+const cardStyles = [
+  { id: "mist", label: "朝もや" },
+  { id: "watercolor", label: "にじみ水彩" },
+  { id: "sunset", label: "夕暮れシティ" },
+  { id: "orb", label: "くすみオーブ" },
+  { id: "spring", label: "春霞" },
+  { id: "summer", label: "夏空" },
+  { id: "autumn", label: "秋の余白" },
+  { id: "winter", label: "冬明かり" },
+  { id: "plain", label: "無地" },
+];
+const iconStyles = [
+  { id: "none", label: "なし" },
+  { id: "person", label: "人物" },
+  { id: "coffee", label: "コーヒー" },
+  { id: "book", label: "本" },
+  { id: "music", label: "音楽" },
+  { id: "walk", label: "散歩" },
+  { id: "work", label: "仕事" },
+  { id: "home", label: "家族" },
+  { id: "car", label: "車" },
+];
+const iconFrames = [
+  { id: "paper", label: "紙ラベル" },
+  { id: "glass", label: "すりガラス" },
+];
+let topicLibraryCache = null;
 const state = {
   client: null,
   session: null,
@@ -125,7 +153,17 @@ const state = {
   topicRelationship: "work",
   topicCategory: "all",
   topicQuery: "",
+  topicLimit: topicPageSize,
   peopleLimit: 50,
+  expandedFollowUps: false,
+  expandedConversations: false,
+  followUpAddOpen: false,
+  cardFieldsAvailable: true,
+  editorMode: "create",
+  editorPersonId: null,
+  selectedCardStyle: "mist",
+  selectedIconStyle: "none",
+  selectedIconFrame: "paper",
   handlingSession: false,
 };
 
@@ -143,6 +181,56 @@ function el(tagName, className, text) {
   if (className) node.className = className;
   if (text !== undefined) node.textContent = text;
   return node;
+}
+
+function canEditPeople() {
+  return state.role === "owner" || state.role === "editor";
+}
+
+function svgIcon(name, className = "") {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+  if (className) svg.setAttribute("class", className);
+  const definitions = {
+    person: ["circle:12,8,3", "path:M6 20c.7-4 3-6 6-6s5.3 2 6 6"],
+    coffee: ["path:M5 8h11v6a5 5 0 0 1-5 5H10a5 5 0 0 1-5-5z", "path:M16 10h2a2 2 0 0 1 0 4h-2", "path:M8 5c0-1 1-1 1-2", "path:M12 5c0-1 1-1 1-2"],
+    book: ["path:M4 5.5A3.5 3.5 0 0 1 7.5 2H11v17H7.5A3.5 3.5 0 0 0 4 22z", "path:M20 5.5A3.5 3.5 0 0 0 16.5 2H13v17h3.5A3.5 3.5 0 0 1 20 22z"],
+    music: ["path:M9 18V5l10-2v13", "circle:6,18,3", "circle:16,16,3"],
+    walk: ["circle:13,4,2", "path:M11 8l-2 5 4 2 2 6", "path:M11 9l4 3 3-1", "path:M9 13l-4 6"],
+    work: ["rect:4,7,16,13,2", "path:M9 7V4h6v3", "path:M4 12h16", "path:M10 12v2h4v-2"],
+    home: ["path:M3 11l9-8 9 8", "path:M5 10v11h14V10", "path:M9 21v-7h6v7"],
+    car: ["path:M4 16l1-6 3-4h8l3 4 1 6v3h-2v-2H6v2H4z", "path:M6 10h12", "circle:8,15,1", "circle:16,15,1"],
+  };
+  (definitions[name] || definitions.person).forEach((item) => {
+    const [kind, value] = item.split(":");
+    let node;
+    if (kind === "circle") {
+      const [cx, cy, r] = value.split(",");
+      node = document.createElementNS(svg.namespaceURI, "circle");
+      node.setAttribute("cx", cx);
+      node.setAttribute("cy", cy);
+      node.setAttribute("r", r);
+    } else if (kind === "rect") {
+      const [x, y, width, height, rx] = value.split(",");
+      node = document.createElementNS(svg.namespaceURI, "rect");
+      node.setAttribute("x", x);
+      node.setAttribute("y", y);
+      node.setAttribute("width", width);
+      node.setAttribute("height", height);
+      node.setAttribute("rx", rx);
+    } else {
+      node = document.createElementNS(svg.namespaceURI, "path");
+      node.setAttribute("d", value);
+    }
+    node.setAttribute("fill", "none");
+    node.setAttribute("stroke", "currentColor");
+    node.setAttribute("stroke-width", "1.8");
+    node.setAttribute("stroke-linecap", "round");
+    node.setAttribute("stroke-linejoin", "round");
+    svg.append(node);
+  });
+  return svg;
 }
 
 function clear(node) {
@@ -221,31 +309,58 @@ function topicText(value) {
 }
 
 function normalizeTopic(topic, index) {
+  const builtIn = String(topic.id || "").startsWith("standard-");
   const question = topicText(
-    topic.question ?? topic.secondPhrase ?? topic.second ?? topic.title,
+    topic.question ?? topic.firstPhrase ?? topic.first ?? topic.title,
   );
   if (!question) return null;
-  const category = topicText(topic.category ?? topic.tag) || "その他";
+  const sourceTag = topicText(topic.category ?? topic.tag) || "その他";
   const context = topicText(topic.context);
   return {
     id: topicText(topic.id) || `external-topic-${index}`,
-    category,
+    category: topicGroup(sourceTag),
+    sourceTag,
+    month: topicText(topic.month) || "日常",
+    title: topicText(topic.title) || question,
     question,
     opening: topicText(
-      topic.opening ?? topic.firstPhrase ?? topic.first ?? topic.origin,
+      topic.opening ?? topic.secondPhrase ?? topic.second ?? topic.origin,
     ),
-    recommended: topic.recommended !== false,
+    exitPhrase: topicText(topic.exitPhrase),
+    keywords: Array.isArray(topic.keywords) ? topic.keywords : [],
+    recommended: builtIn || topic.recommended === true,
+    builtIn,
     relationships: Array.isArray(topic.relationships)
       ? topic.relationships
       : context === "work"
         ? ["work"]
-        : ["work", "friend", "community", "other"],
+        : context === "social"
+          ? ["friend", "community", "other"]
+          : context === "close"
+            ? ["friend", "other"]
+            : ["work", "friend", "community", "other"],
     sensitivity: topicText(topic.sensitivity) || "low",
     requiredTags: Array.isArray(topic.requiredTags) ? topic.requiredTags : [],
   };
 }
 
+function topicGroup(value) {
+  const tag = topicText(value);
+  if (/職場|仕事|キャリア/.test(tag)) return "仕事";
+  if (/食|グルメ|料理/.test(tag)) return "食べ物";
+  if (/ノスタルジ|学生|青春|思い出|世代|あの頃|\d+代/.test(tag))
+    return "思い出";
+  if (/恋愛|友人|知人|ママ友|地域|地元|家族/.test(tag))
+    return "人間関係";
+  if (/究極|二択|If|ゲーム/.test(tag)) return "遊び";
+  if (/旅行|おでかけ|自然|季節/.test(tag)) return "おでかけ";
+  if (/趣味|音楽|映画|本|スポーツ/.test(tag)) return "趣味";
+  if (/共通|日常|ライフ|近況|休日|これから/.test(tag)) return "日常";
+  return tag || "その他";
+}
+
 function topicLibrary() {
+  if (topicLibraryCache) return topicLibraryCache;
   const supplied = Array.isArray(window.PEOPLE_NOTEBOOK_TOPICS)
     ? window.PEOPLE_NOTEBOOK_TOPICS
     : [];
@@ -258,7 +373,8 @@ function topicLibrary() {
     const key = normalize(topic.question);
     if (key && !unique.has(key)) unique.set(key, topic);
   });
-  return [...unique.values()];
+  topicLibraryCache = [...unique.values()];
+  return topicLibraryCache;
 }
 
 function profileTagSet() {
@@ -277,8 +393,34 @@ function topicMatchesProfile(topic) {
 
 function topicSearchText(topic) {
   return normalize(
-    [topic.category, topic.question, topic.opening].filter(Boolean).join(" "),
+    [
+      topic.category,
+      topic.sourceTag,
+      topic.month,
+      topic.title,
+      topic.question,
+      topic.opening,
+      topic.exitPhrase,
+      ...topic.keywords,
+    ]
+      .filter(Boolean)
+      .join(" "),
   );
+}
+
+function cardStyleId(person) {
+  const value = String(person?.card_style || "mist");
+  return cardStyles.some((style) => style.id === value) ? value : "mist";
+}
+
+function iconStyleId(person) {
+  const value = String(person?.icon_style || "none");
+  return iconStyles.some((style) => style.id === value) ? value : "none";
+}
+
+function iconFrameId(person) {
+  const value = String(person?.icon_frame || "paper");
+  return iconFrames.some((frame) => frame.id === value) ? value : "paper";
 }
 
 function assignmentText(assignment) {
@@ -337,13 +479,54 @@ async function selectAll(table, columns, options = {}) {
   }
 }
 
+function missingCardFields(error) {
+  const text = `${error?.code || ""} ${error?.message || ""}`;
+  return (
+    /42703|PGRST204/.test(text) ||
+    /card_style|icon_style|icon_frame/i.test(text)
+  );
+}
+
+async function selectPeople() {
+  const base =
+    "person_id,canonical_name,name_kana,aliases,profile_tags,active_status";
+  try {
+    const rows = await selectAll(
+      "people",
+      `${base},card_style,icon_style,icon_frame`,
+    );
+    state.cardFieldsAvailable = true;
+    return rows;
+  } catch (error) {
+    if (!missingCardFields(error)) throw error;
+    state.cardFieldsAvailable = false;
+    return selectAll("people", base);
+  }
+}
+
+async function selectPerson(personId) {
+  const base =
+    "person_id,canonical_name,name_kana,aliases,profile_tags,active_status";
+  let result = await state.client
+    .from("people")
+    .select(`${base},card_style,icon_style,icon_frame`)
+    .eq("person_id", personId)
+    .single();
+  if (result.error && missingCardFields(result.error)) {
+    state.cardFieldsAvailable = false;
+    result = await state.client
+      .from("people")
+      .select(base)
+      .eq("person_id", personId)
+      .single();
+  }
+  return result;
+}
+
 async function loadDirectory() {
   byId("sync-state").textContent = "読み込み中…";
   const [people, assignments, conversations, followUps] = await Promise.all([
-    selectAll(
-      "people",
-      "person_id,canonical_name,name_kana,aliases,profile_tags,active_status",
-    ),
+    selectPeople(),
     selectAll(
       "assignments",
       "assignment_id,person_id,fiscal_year,organization,department,role,verified_status",
@@ -391,7 +574,10 @@ async function loadDirectory() {
 }
 
 function personCard(person, context = null) {
-  const button = el("button", "person-card");
+  const button = el(
+    "button",
+    `person-card card-style-${cardStyleId(person)}`,
+  );
   button.type = "button";
   const left = el("div");
   left.append(el("div", "person-name", person.canonical_name));
@@ -478,6 +664,11 @@ function followUpCard(item, showPerson = false, selectable = false) {
       renderDetail();
     });
     card.append(select, copy);
+    return card;
+  }
+
+  if (!canEditPeople()) {
+    card.append(copy);
     return card;
   }
 
@@ -644,25 +835,36 @@ function makeField(labelText, id, type, value = "") {
   return { label, input };
 }
 
-function renderDetail() {
-  const detail = state.person;
-  const target = byId("detail-body");
-  clear(target);
-  byId("detail-title").textContent = detail.person.canonical_name;
-  const identity = el("section", "card identity-card");
-  const identityMain = el("div", "identity-main");
-  const monogram = el(
-    "div",
-    "identity-monogram",
-    detail.person.canonical_name.slice(0, 1),
+function identityCard(detail) {
+  const person = detail.person;
+  const style = cardStyleId(person);
+  const icon = iconStyleId(person);
+  const frame = iconFrameId(person);
+  const identity = el(
+    "section",
+    `card identity-card card-style-${style}`,
   );
-  const identityCopy = el("div", "identity-copy");
-  identityCopy.append(el("h1", "", detail.person.canonical_name));
-  if (detail.person.name_kana) {
-    identityCopy.append(el("p", "identity-kana", detail.person.name_kana));
+  const top = el("div", "identity-topline");
+  top.append(
+    el("span", "identity-label", "人物カード"),
+    el(
+      "span",
+      "identity-style-name",
+      cardStyles.find((item) => item.id === style)?.label || "朝もや",
+    ),
+  );
+  identity.append(top, el("div", "card-skyline"));
+
+  const panel = el("div", `identity-panel frame-${frame}`);
+  if (icon !== "none") {
+    const iconFrame = el("div", `identity-icon frame-${frame}`);
+    iconFrame.append(svgIcon(icon));
+    panel.append(iconFrame);
   }
+  const copy = el("div", "identity-copy");
+  copy.append(el("h1", "", person.canonical_name));
   const latestAssignment = currentAssignment(detail.assignments);
-  identityCopy.append(
+  copy.append(
     el(
       "div",
       "identity-assignment",
@@ -677,17 +879,140 @@ function renderDetail() {
         : "所属未登録",
     ),
   );
-  identityMain.append(monogram, identityCopy);
-  identity.append(identityMain);
-  const profileTags = Array.isArray(detail.person.profile_tags)
-    ? detail.person.profile_tags.slice(0, 4)
+  const profileTags = Array.isArray(person.profile_tags)
+    ? person.profile_tags.filter(Boolean)
     : [];
   if (profileTags.length) {
     const tagRow = el("div", "identity-tags");
-    profileTags.forEach((tag) => tagRow.append(el("span", "identity-tag", tag)));
-    identity.append(tagRow);
+    profileTags
+      .slice(0, 2)
+      .forEach((tag) => tagRow.append(el("span", "identity-tag", tag)));
+    if (profileTags.length > 2) {
+      tagRow.append(el("span", "identity-tag more-tag", `＋${profileTags.length - 2}`));
+    }
+    copy.append(tagRow);
   }
-  target.append(identity);
+  panel.append(copy);
+  identity.append(panel);
+  return identity;
+}
+
+function detailSectionButton(text, onClick) {
+  const button = el("button", "quiet-button compact-button", text);
+  button.type = "button";
+  button.addEventListener("click", onClick);
+  return button;
+}
+
+function renderProfileDetails(detail) {
+  const details = el("details", "card profile-details");
+  const summary = el("summary");
+  const summaryCopy = el("span");
+  summaryCopy.append(
+    el("strong", "", "プロフィール詳細"),
+    el("small", "", "所属履歴・家族情報"),
+  );
+  summary.append(summaryCopy, el("span", "summary-chevron", "⌄"));
+  details.append(summary);
+
+  const content = el("div", "profile-details-content");
+  const assignmentSection = el("section", "profile-subsection");
+  assignmentSection.append(el("h3", "", "所属履歴"));
+  const timeline = el("div", "timeline");
+  detail.assignments.forEach((assignment) => {
+    const item = el("div", "timeline-item");
+    item.append(
+      el(
+        "strong",
+        "",
+        `${assignment.fiscal_year} · ${assignment.organization || "所属未登録"}`,
+      ),
+      el(
+        "div",
+        "muted",
+        [assignment.department, assignment.role].filter(Boolean).join(" / ") ||
+          "役職未登録",
+      ),
+    );
+    timeline.append(item);
+  });
+  if (!timeline.childNodes.length) {
+    timeline.append(el("div", "empty", "所属履歴がありません"));
+  }
+  assignmentSection.append(timeline);
+  content.append(assignmentSection);
+
+  const family = el("section", "profile-subsection family-section");
+  family.append(el("h3", "", "家族・子ども"));
+  detail.familyMembers.forEach((member) => {
+    const row = el("div", "family-row");
+    row.append(
+      el("strong", "", member.display_name || member.relationship),
+      el("span", "pill", ageText(member)),
+    );
+    family.append(row);
+  });
+  if (!detail.familyMembers.length) {
+    family.append(el("div", "empty compact-empty", "家族情報は未登録です"));
+  }
+  if (canEditPeople()) {
+    const form = el("div", "family-form");
+    const name = makeField("呼び名", "family-name", "text");
+    const birth = makeField("生年月日", "family-birth", "date");
+    const age = makeField("年齢（誕生日不明時）", "family-age", "number");
+    const observed = makeField(
+      "確認日",
+      "family-observed",
+      "date",
+      new Date().toISOString().slice(0, 10),
+    );
+    const save = el("button", "secondary wide", "子ども情報を追加");
+    save.type = "button";
+    save.addEventListener("click", async () => {
+      if (!birth.input.value && !(age.input.value && observed.input.value)) {
+        toast("生年月日、または年齢と確認日を入力してください。", true);
+        return;
+      }
+      save.disabled = true;
+      try {
+        const { data, error } = await state.client
+          .from("family_members")
+          .insert({
+            person_id: detail.person.person_id,
+            relationship: "child",
+            display_name: name.input.value.trim(),
+            birth_date: birth.input.value || null,
+            observed_age: age.input.value ? Number(age.input.value) : null,
+            observed_on: observed.input.value || null,
+          })
+          .select()
+          .single();
+        if (error) throw error;
+        detail.familyMembers.push(data);
+        renderDetail();
+        toast("子ども情報を保存しました");
+      } catch (error) {
+        toast(message(error), true);
+      } finally {
+        save.disabled = false;
+      }
+    });
+    form.append(name.label, birth.label, age.label, observed.label, save);
+    family.append(form);
+  }
+  content.append(family);
+  details.append(content);
+  return details;
+}
+
+function renderDetail() {
+  const detail = state.person;
+  if (!detail) return;
+  const target = byId("detail-body");
+  clear(target);
+  byId("detail-title").textContent = detail.person.canonical_name;
+  byId("person-edit").hidden = !canEditPeople();
+  target.append(identityCard(detail));
 
   const followUps = el("section", "card follow-up-section");
   const openFollowUps = detail.followUps
@@ -700,157 +1025,125 @@ function renderDetail() {
     el("span", "count-pill", `${openFollowUps.length}件`),
   );
   followUpHead.append(followUpTitle);
-  if (openFollowUps.length && !state.followUpSelectionMode) {
-    const manage = el(
-      "button",
-      "text-button bulk-select-button",
-      "まとめて選択",
+  if (canEditPeople() && !state.followUpSelectionMode) {
+    const controls = el("div", "section-controls");
+    controls.append(
+      detailSectionButton(state.followUpAddOpen ? "閉じる" : "＋ 追加", () => {
+        state.followUpAddOpen = !state.followUpAddOpen;
+        renderDetail();
+      }),
     );
-    manage.type = "button";
-    manage.addEventListener("click", () => {
-      state.followUpSelectionMode = true;
-      state.selectedFollowUpIds.clear();
-      renderDetail();
-    });
-    followUpHead.append(manage);
+    if (openFollowUps.length) {
+      controls.append(
+        detailSectionButton("整理", () => {
+          state.followUpSelectionMode = true;
+          state.selectedFollowUpIds.clear();
+          state.expandedFollowUps = true;
+          renderDetail();
+        }),
+      );
+    }
+    followUpHead.append(controls);
   }
   followUps.append(followUpHead);
   followUps.append(
-    el(
-      "p",
-      "section-help",
-      "会う前に見返す話題だけを、ここにまとめます。",
-    ),
+    el("p", "section-help", "会う前に見るものだけ。最初の3件を表示します。"),
   );
 
-  if (!state.followUpSelectionMode) {
+  if (state.followUpAddOpen && !state.followUpSelectionMode) {
     const addActions = el("div", "follow-up-add-actions");
-    const chooseTopic = el("button", "primary topic-library-button", "話題から選ぶ");
+    const chooseTopic = el(
+      "button",
+      "secondary topic-library-button",
+      "話題ボックスから選ぶ",
+    );
     chooseTopic.type = "button";
     chooseTopic.addEventListener("click", openTopicPicker);
-    const addDirectly = el("button", "secondary", "＋ 自分で追加");
+    const addDirectly = el("button", "secondary", "自分で入力");
     addDirectly.type = "button";
     addDirectly.addEventListener("click", () => openComposer("next-topics"));
     addActions.append(chooseTopic, addDirectly);
     followUps.append(addActions);
   }
-
   if (state.followUpSelectionMode && openFollowUps.length) {
     followUps.append(renderFollowUpBulkToolbar(openFollowUps));
   }
-  openFollowUps.forEach((item) =>
+  const shownFollowUps =
+    state.expandedFollowUps || state.followUpSelectionMode
+      ? openFollowUps
+      : openFollowUps.slice(0, 3);
+  shownFollowUps.forEach((item) =>
     followUps.append(followUpCard(item, false, state.followUpSelectionMode)),
   );
-  if (!openFollowUps.length)
+  if (!openFollowUps.length) {
     followUps.append(el("div", "empty", "次に聞くことはありません"));
+  } else if (openFollowUps.length > 3 && !state.followUpSelectionMode) {
+    followUps.append(
+      detailSectionButton(
+        state.expandedFollowUps
+          ? "表示を戻す"
+          : `残り${openFollowUps.length - 3}件を見る`,
+        () => {
+          state.expandedFollowUps = !state.expandedFollowUps;
+          renderDetail();
+        },
+      ),
+    );
+  }
   target.append(followUps);
 
-  const conversations = el("section", "card");
-  conversations.append(el("h2", "", "会話履歴"));
+  const conversations = el("section", "card conversation-section");
   const notedConversations = detail.conversations.filter((conversation) =>
-    conversation.note.trim(),
+    String(conversation.note || "").trim(),
   );
-  notedConversations.forEach((conversation) => {
+  const conversationHead = el("div", "section-heading");
+  const conversationTitle = el("div", "section-title-with-count");
+  conversationTitle.append(
+    el("h2", "", "会話履歴"),
+    el("span", "count-pill neutral", `${notedConversations.length}件`),
+  );
+  conversationHead.append(conversationTitle);
+  conversations.append(conversationHead);
+  const shownConversations = state.expandedConversations
+    ? notedConversations
+    : notedConversations.slice(0, 2);
+  shownConversations.forEach((conversation) => {
     const card = el("article", "conversation");
     const head = el("div", "conversation-head");
     head.append(el("time", "", dateText(conversation.occurred_at)));
-    const remove = el("button", "delete-button", "削除");
-    remove.type = "button";
-    remove.addEventListener("click", () => deleteConversation(conversation));
-    head.append(remove);
+    if (canEditPeople()) {
+      const remove = el("button", "delete-button compact-button", "削除");
+      remove.type = "button";
+      remove.addEventListener("click", () => deleteConversation(conversation));
+      head.append(remove);
+    }
     card.append(head, el("p", "", conversation.note));
     conversations.append(card);
   });
-  if (!notedConversations.length)
+  if (!notedConversations.length) {
     conversations.append(el("div", "empty", "最初の会話メモを残しましょう"));
-  target.append(conversations);
-
-  const assignmentCard = el("section", "card");
-  assignmentCard.append(el("h2", "", "所属履歴"));
-  const timeline = el("div", "timeline");
-  detail.assignments.forEach((assignment) => {
-    const item = el("div", "timeline-item");
-    item.append(
-      el(
-        "strong",
-        "",
-        `${assignment.fiscal_year} · ${assignment.organization || "所属未登録"}`,
+  } else if (notedConversations.length > 2) {
+    conversations.append(
+      detailSectionButton(
+        state.expandedConversations
+          ? "最新2件に戻す"
+          : `過去の${notedConversations.length - 2}件も見る`,
+        () => {
+          state.expandedConversations = !state.expandedConversations;
+          renderDetail();
+        },
       ),
     );
-    item.append(
-      el(
-        "div",
-        "muted",
-        [assignment.department, assignment.role].filter(Boolean).join(" / ") ||
-          "役職未登録",
-      ),
-    );
-    timeline.append(item);
-  });
-  if (!timeline.childNodes.length)
-    timeline.append(el("div", "empty", "所属履歴がありません"));
-  assignmentCard.append(timeline);
-  target.append(assignmentCard);
-
-  const family = el("section", "card");
-  family.append(el("h2", "", "家族・子ども"));
-  detail.familyMembers.forEach((member) => {
-    const row = el("div", "family-row");
-    row.append(
-      el("strong", "", member.display_name || member.relationship),
-      el("span", "pill", ageText(member)),
-    );
-    family.append(row);
-  });
-  const form = el("div", "family-form");
-  const name = makeField("呼び名", "family-name", "text");
-  const birth = makeField("生年月日", "family-birth", "date");
-  const age = makeField("年齢（誕生日不明時）", "family-age", "number");
-  const observed = makeField(
-    "確認日",
-    "family-observed",
-    "date",
-    new Date().toISOString().slice(0, 10),
-  );
-  const save = el("button", "secondary wide", "子ども情報を追加");
-  save.type = "button";
-  save.addEventListener("click", async () => {
-    if (!birth.input.value && !(age.input.value && observed.input.value)) {
-      toast("生年月日、または年齢と確認日を入力してください。", true);
-      return;
-    }
-    save.disabled = true;
-    try {
-      const { data, error } = await state.client
-        .from("family_members")
-        .insert({
-          person_id: detail.person.person_id,
-          relationship: "child",
-          display_name: name.input.value.trim(),
-          birth_date: birth.input.value || null,
-          observed_age: age.input.value ? Number(age.input.value) : null,
-          observed_on: observed.input.value || null,
-        })
-        .select()
-        .single();
-      if (error) throw error;
-      detail.familyMembers.push(data);
-      renderDetail();
-      toast("子ども情報を保存しました");
-    } catch (error) {
-      toast(message(error), true);
-    } finally {
-      save.disabled = false;
-    }
-  });
-  form.append(name.label, birth.label, age.label, observed.label, save);
-  family.append(form);
-  target.append(family);
+  }
+  target.append(conversations, renderProfileDetails(detail));
 }
 
 async function openPerson(personId) {
   state.followUpSelectionMode = false;
   state.selectedFollowUpIds.clear();
+  state.expandedFollowUps = false;
+  state.expandedConversations = false;
+  state.followUpAddOpen = false;
   byId("person-detail").hidden = false;
   document.body.style.overflow = "hidden";
   byId("detail-body").replaceChildren(el("div", "empty", "読み込み中…"));
@@ -863,11 +1156,7 @@ async function openPerson(personId) {
       familyResult,
       followUpsResult,
     ] = await Promise.all([
-      state.client
-        .from("people")
-        .select("person_id,canonical_name,name_kana,aliases,profile_tags")
-        .eq("person_id", personId)
-        .single(),
+      selectPerson(personId),
       state.client
         .from("assignments")
         .select(
@@ -919,6 +1208,7 @@ async function openPerson(personId) {
       familyMembers: familyResult.data,
       followUps: followUpsResult.data,
     };
+    byId("composer-open").hidden = !canEditPeople();
     renderDetail();
   } catch (error) {
     toast(message(error), true);
@@ -930,13 +1220,271 @@ function closeDetail() {
   byId("person-detail").hidden = true;
   byId("composer").hidden = true;
   byId("topic-picker").hidden = true;
+  byId("person-editor").hidden = true;
   document.body.style.overflow = "";
   state.person = null;
   state.followUpSelectionMode = false;
   state.selectedFollowUpIds.clear();
   state.selectedTopicIds.clear();
   state.expandedTopicIds.clear();
+  state.expandedFollowUps = false;
+  state.expandedConversations = false;
+  state.followUpAddOpen = false;
   resetComposer();
+}
+
+function generateId(prefix) {
+  const raw =
+    typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID().replaceAll("-", "")
+      : `${Date.now().toString(16)}${Math.random().toString(16).slice(2)}`.padEnd(
+          32,
+          "0",
+        );
+  return `${prefix}_${raw.slice(0, 32)}`;
+}
+
+function splitTags(value) {
+  return [
+    ...new Set(
+      String(value || "")
+        .split(/[、,，\n]/)
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  ].slice(0, 30);
+}
+
+function renderCardStyleOptions() {
+  const target = byId("card-style-options");
+  clear(target);
+  cardStyles.forEach((style) => {
+    const button = el(
+      "button",
+      `style-option${state.selectedCardStyle === style.id ? " selected" : ""}`,
+    );
+    button.type = "button";
+    button.setAttribute("aria-pressed", String(state.selectedCardStyle === style.id));
+    const swatch = el("span", `style-swatch card-style-${style.id}`);
+    swatch.append(el("span", "mini-info-strip"));
+    button.append(swatch, el("span", "style-option-label", style.label));
+    button.addEventListener("click", () => {
+      state.selectedCardStyle = style.id;
+      renderCardStyleOptions();
+      renderEditorCardPreview();
+    });
+    target.append(button);
+  });
+}
+
+function renderIconStyleOptions() {
+  const target = byId("icon-style-options");
+  clear(target);
+  iconStyles.forEach((icon) => {
+    const button = el(
+      "button",
+      `icon-option${state.selectedIconStyle === icon.id ? " selected" : ""}`,
+    );
+    button.type = "button";
+    button.setAttribute("aria-pressed", String(state.selectedIconStyle === icon.id));
+    const preview = el("span", "icon-option-preview");
+    if (icon.id === "none") preview.append(el("span", "none-mark", "—"));
+    else preview.append(svgIcon(icon.id));
+    button.append(preview, el("span", "", icon.label));
+    button.addEventListener("click", () => {
+      state.selectedIconStyle = icon.id;
+      renderIconStyleOptions();
+      renderEditorCardPreview();
+    });
+    target.append(button);
+  });
+}
+
+function renderIconFrameOptions() {
+  const target = byId("icon-frame-options");
+  clear(target);
+  iconFrames.forEach((frame) => {
+    const button = el(
+      "button",
+      `frame-option frame-${frame.id}${state.selectedIconFrame === frame.id ? " selected" : ""}`,
+      frame.label,
+    );
+    button.type = "button";
+    button.setAttribute("aria-pressed", String(state.selectedIconFrame === frame.id));
+    button.addEventListener("click", () => {
+      state.selectedIconFrame = frame.id;
+      renderIconFrameOptions();
+      renderEditorCardPreview();
+    });
+    target.append(button);
+  });
+}
+
+function fillPersonForm(person = null, assignments = []) {
+  const assignment = currentAssignment(assignments);
+  byId("person-name").value = person?.canonical_name || "";
+  byId("person-kana").value = person?.name_kana || "";
+  byId("person-tags").value = Array.isArray(person?.profile_tags)
+    ? person.profile_tags.join("、")
+    : "";
+  byId("person-fiscal-year").value =
+    assignment?.fiscal_year || String(config.currentFiscalYear || "");
+  byId("person-organization").value = assignment?.organization || "";
+  byId("person-department").value = assignment?.department || "";
+  byId("person-role").value = assignment?.role || "";
+  state.selectedCardStyle = cardStyleId(person);
+  state.selectedIconStyle = iconStyleId(person);
+  state.selectedIconFrame = iconFrameId(person);
+  renderCardStyleOptions();
+  renderIconStyleOptions();
+  renderIconFrameOptions();
+  renderEditorCardPreview();
+  document.querySelector(".card-customize").hidden = !state.cardFieldsAvailable;
+}
+
+function renderEditorCardPreview() {
+  const target = byId("card-live-preview");
+  if (!target) return;
+  const assignment = {
+    fiscal_year: byId("person-fiscal-year").value.trim(),
+    organization: byId("person-organization").value.trim(),
+    department: byId("person-department").value.trim(),
+    role: byId("person-role").value.trim(),
+    verified_status: "verified",
+  };
+  const preview = identityCard({
+    person: {
+      canonical_name: byId("person-name").value.trim() || "人物名",
+      profile_tags: splitTags(byId("person-tags").value),
+      card_style: state.selectedCardStyle,
+      icon_style: state.selectedIconStyle,
+      icon_frame: state.selectedIconFrame,
+    },
+    assignments:
+      assignment.organization || assignment.department || assignment.role
+        ? [assignment]
+        : [],
+  });
+  preview.classList.add("editor-preview-card");
+  target.replaceChildren(preview);
+}
+
+function openPersonEditor(mode) {
+  if (!canEditPeople()) {
+    toast("人物情報を編集する権限がありません。", true);
+    return;
+  }
+  const editing = mode === "edit" && state.person;
+  state.editorMode = editing ? "edit" : "create";
+  state.editorPersonId = editing ? state.person.person.person_id : null;
+  byId("person-editor-title").textContent = editing
+    ? "人物情報を編集"
+    : "人物を追加";
+  fillPersonForm(
+    editing ? state.person.person : null,
+    editing ? state.person.assignments : [],
+  );
+  byId("person-editor").hidden = false;
+  document.body.style.overflow = "hidden";
+  setTimeout(() => byId("person-name").focus(), 0);
+}
+
+function closePersonEditor() {
+  byId("person-editor").hidden = true;
+  byId("person-form").reset();
+  state.editorPersonId = null;
+  document.body.style.overflow = byId("person-detail").hidden ? "" : "hidden";
+}
+
+async function savePerson(event) {
+  event.preventDefault();
+  if (!canEditPeople()) return;
+  const name = byId("person-name").value.trim();
+  if (!name) {
+    toast("氏名を入力してください。", true);
+    byId("person-name").focus();
+    return;
+  }
+  const personId =
+    state.editorMode === "edit" && state.editorPersonId
+      ? state.editorPersonId
+      : generateId("per");
+  const personValues = {
+    canonical_name: name,
+    name_kana: byId("person-kana").value.trim(),
+    profile_tags: splitTags(byId("person-tags").value),
+    active_status: "active",
+  };
+  if (state.editorMode === "create") personValues.aliases = [];
+  if (state.cardFieldsAvailable) {
+    personValues.card_style = state.selectedCardStyle;
+    personValues.icon_style = state.selectedIconStyle;
+    personValues.icon_frame = state.selectedIconFrame;
+  }
+  const fiscalYear = byId("person-fiscal-year").value.trim();
+  const assignmentValues = {
+    fiscal_year: fiscalYear,
+    organization: byId("person-organization").value.trim(),
+    department: byId("person-department").value.trim(),
+    role: byId("person-role").value.trim(),
+  };
+  const existingAssignment =
+    state.editorMode === "edit"
+      ? state.person?.assignments.find((item) => item.fiscal_year === fiscalYear)
+      : null;
+  const hasAssignment = Boolean(
+    fiscalYear &&
+      (existingAssignment ||
+        assignmentValues.organization ||
+        assignmentValues.department ||
+        assignmentValues.role),
+  );
+  const save = byId("person-save");
+  save.disabled = true;
+  save.textContent = "保存中…";
+  try {
+    if (state.editorMode === "edit") {
+      const { error } = await state.client
+        .from("people")
+        .update(personValues)
+        .eq("person_id", personId);
+      if (error) throw error;
+    } else {
+      const { error } = await state.client.from("people").insert({
+        person_id: personId,
+        ...personValues,
+        revision: 1,
+      });
+      if (error) throw error;
+    }
+
+    if (hasAssignment) {
+      if (existingAssignment) {
+        const { error } = await state.client
+          .from("assignments")
+          .update(assignmentValues)
+          .eq("assignment_id", existingAssignment.assignment_id);
+        if (error) throw error;
+      } else {
+        const { error } = await state.client.from("assignments").insert({
+          assignment_id: generateId("asg"),
+          person_id: personId,
+          ...assignmentValues,
+          verified_status: "verified",
+        });
+        if (error) throw error;
+      }
+    }
+    closePersonEditor();
+    await loadDirectory();
+    await openPerson(personId);
+    toast(state.editorMode === "edit" ? "人物情報を更新しました" : "人物を追加しました");
+  } catch (error) {
+    toast(message(error), true);
+  } finally {
+    save.disabled = false;
+    save.textContent = "保存する";
+  }
 }
 
 function renderTags() {
@@ -991,12 +1539,16 @@ function relationshipLabel(value) {
 
 function visibleTopics() {
   const query = normalize(state.topicQuery);
+  const currentMonth = `${new Date().getMonth() + 1}月`;
   return topicLibrary()
     .filter(topicMatchesProfile)
     .filter((topic) => !query || topicSearchText(topic).includes(query))
     .filter((topic) => {
       if (state.topicPickerTab === "initial") {
-        return topic.relationships.includes(state.topicRelationship);
+        return (
+          topic.sensitivity === "low" &&
+          topic.relationships.includes(state.topicRelationship)
+        );
       }
       if (state.topicPickerTab === "category") {
         return (
@@ -1005,6 +1557,17 @@ function visibleTopics() {
         );
       }
       return topic.recommended;
+    })
+    .sort((left, right) => {
+      const score = (topic) =>
+        (topic.builtIn ? 100 : 0) +
+        (topic.month === currentMonth ? 20 : 0) +
+        (topic.month === "日常" ? 8 : 0) +
+        (topic.sensitivity === "low" ? 2 : 0);
+      return (
+        score(right) - score(left) ||
+        left.title.localeCompare(right.title, "ja")
+      );
     });
 }
 
@@ -1027,6 +1590,7 @@ function renderTopicFilters() {
       button.addEventListener("click", () => {
         state.topicRelationship = relationship;
         state.selectedTopicIds.clear();
+        state.topicLimit = topicPageSize;
         renderTopicPicker();
       });
       relationshipFilters.append(button);
@@ -1047,6 +1611,7 @@ function renderTopicFilters() {
       button.type = "button";
       button.addEventListener("click", () => {
         state.topicCategory = category;
+        state.topicLimit = topicPageSize;
         renderTopicPicker();
       });
       categoryFilters.append(button);
@@ -1062,15 +1627,31 @@ function topicOptionCard(topic) {
     `topic-option${selected ? " selected" : ""}${expanded ? " expanded" : ""}`,
   );
   const copy = el("div", "topic-option-copy");
-  copy.append(el("span", "topic-category", topic.category));
+  const meta = el("div", "topic-meta");
+  meta.append(el("span", "topic-category", topic.category));
+  if (!topic.builtIn && topic.month !== "日常") {
+    meta.append(el("span", "topic-month", topic.month));
+  }
+  if (topic.sensitivity === "personal") {
+    meta.append(el("span", "topic-sensitivity", "少し個人的"));
+  }
+  copy.append(meta);
+  if (!topic.builtIn && topic.title !== topic.question) {
+    copy.append(el("div", "topic-title", topic.title));
+  }
   copy.append(el("div", "topic-question", topic.question));
   if (topic.opening) {
-    const opening = el("div", "topic-opening", `入り方：${topic.opening}`);
-    copy.append(opening);
+    const flow = el("div", "topic-flow");
+    flow.append(el("div", "topic-opening", `もう一歩：${topic.opening}`));
+    if (topic.exitPhrase) {
+      flow.append(el("div", "topic-exit", `締め方：${topic.exitPhrase}`));
+    }
+    flow.hidden = !expanded;
+    copy.append(flow);
     const details = el(
       "button",
       "topic-details-button",
-      expanded ? "閉じる" : "入り方を表示",
+      expanded ? "会話の流れを閉じる" : "会話の流れを見る",
     );
     details.type = "button";
     details.setAttribute("aria-expanded", String(expanded));
@@ -1118,10 +1699,13 @@ function renderTopicPicker() {
       : `${topics.length}件の話題`;
   const list = byId("topic-list");
   clear(list);
-  topics.forEach((topic) => list.append(topicOptionCard(topic)));
+  topics
+    .slice(0, state.topicLimit)
+    .forEach((topic) => list.append(topicOptionCard(topic)));
   if (!topics.length) {
     list.append(el("div", "empty", "条件に合う話題がありません"));
   }
+  byId("topic-load-more").hidden = topics.length <= state.topicLimit;
   const count = state.selectedTopicIds.size;
   byId("topic-selected-count").textContent = `${count}件を選択中`;
   byId("topic-add-selected").disabled = !count;
@@ -1135,6 +1719,7 @@ function openTopicPicker() {
   state.topicRelationship = "work";
   state.topicCategory = "all";
   state.topicQuery = "";
+  state.topicLimit = topicPageSize;
   byId("topic-picker").hidden = false;
   renderTopicPicker();
 }
@@ -1524,6 +2109,9 @@ async function handleSession(session) {
       return;
     }
     state.role = data.role;
+    byId("person-add").hidden = !canEditPeople();
+    byId("person-edit").hidden = !canEditPeople();
+    byId("composer-open").hidden = !canEditPeople();
     showOnly("app-screen");
     await loadDirectory();
   } catch (error) {
@@ -1563,6 +2151,18 @@ function bindEvents() {
     );
   });
   byId("detail-close").addEventListener("click", closeDetail);
+  byId("person-add").addEventListener("click", () => openPersonEditor("create"));
+  byId("person-edit").addEventListener("click", () => openPersonEditor("edit"));
+  byId("person-editor-close").addEventListener("click", closePersonEditor);
+  byId("person-form").addEventListener("submit", savePerson);
+  [
+    "person-name",
+    "person-tags",
+    "person-fiscal-year",
+    "person-organization",
+    "person-department",
+    "person-role",
+  ].forEach((id) => byId(id).addEventListener("input", renderEditorCardPreview));
   byId("composer-open").addEventListener("click", () => openComposer());
   byId("composer-close").addEventListener("click", closeComposer);
   byId("conversation-form").addEventListener("submit", saveConversation);
@@ -1573,10 +2173,16 @@ function bindEvents() {
     state.topicPickerTab = button.dataset.topicTab;
     state.selectedTopicIds.clear();
     state.expandedTopicIds.clear();
+    state.topicLimit = topicPageSize;
     renderTopicPicker();
   });
   byId("topic-search").addEventListener("input", (event) => {
     state.topicQuery = event.target.value;
+    state.topicLimit = topicPageSize;
+    renderTopicPicker();
+  });
+  byId("topic-load-more").addEventListener("click", () => {
+    state.topicLimit += topicPageSize;
     renderTopicPicker();
   });
   byId("topic-add-selected").addEventListener("click", addSelectedTopics);
