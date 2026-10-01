@@ -624,6 +624,7 @@ input:focus {
 }
 .card-style-sunset {
   --card-accent: #c3aeb5;
+  --skyline-shape: polygon(0 56%, 8% 56%, 8% 25%, 18% 25%, 18% 63%, 28% 63%, 28% 7%, 40% 7%, 40% 55%, 52% 55%, 52% 0, 64% 0, 64% 58%, 75% 58%, 75% 20%, 86% 20%, 86% 60%, 94% 60%, 94% 38%, 100% 38%, 100% 100%, 0 100%);
 }
 .identity-card.card-style-sunset,
 .style-swatch.card-style-sunset {
@@ -638,11 +639,32 @@ input:focus {
   right: 0;
   bottom: 0;
   left: 0;
-  height: 78px;
+  height: 112px;
   display: block;
-  background: #4e515c;
-  clip-path: polygon(0 42%, 9% 42%, 9% 12%, 21% 12%, 21% 54%, 33% 54%, 33% 0, 44% 0, 44% 48%, 59% 48%, 59% 25%, 72% 25%, 72% 55%, 84% 55%, 84% 18%, 94% 18%, 94% 40%, 100% 40%, 100% 100%, 0 100%);
+  background: #354758;
+  clip-path: var(--skyline-shape);
   opacity: 0.72;
+}
+.identity-card.card-style-sunset .identity-panel {
+  align-self: flex-start;
+  width: min(76%, 600px);
+}
+.style-swatch.card-style-sunset::before {
+  position: absolute;
+  z-index: 2;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 55%;
+  background: #354758;
+  clip-path: var(--skyline-shape);
+  opacity: 0.7;
+  content: "";
+  pointer-events: none;
+}
+@media (max-width: 560px) {
+  .identity-card.card-style-sunset .identity-panel { width: 100%; }
+  .identity-card.card-style-sunset .card-skyline { bottom: 79px; height: 90px; }
 }
 .card-style-orb {
   --card-accent: #cabdc1;
@@ -867,7 +889,8 @@ input:focus {
 .identity-card.card-style-sunset.card-tone-medium .card-skyline,
 .identity-card.card-style-sunset.card-tone-dark .card-skyline {
   z-index: 2;
-  opacity: 0.5;
+  background: #0d2535;
+  opacity: 0.82;
 }
 .identity-card.card-style-sunset.card-tone-medium .identity-panel,
 .identity-card.card-style-sunset.card-tone-dark .identity-panel,
@@ -899,27 +922,6 @@ input:focus {
 .person-card.card-tone-dark::before {
   width: 6px;
 }
-.tone-options {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 7px;
-  margin: 10px 0 12px;
-}
-.tone-option {
-  min-height: 42px;
-  border: 1px solid #dce4e0;
-  border-radius: 11px;
-  background: #fffefa;
-  color: #46545b;
-  font-weight: 800;
-}
-.tone-option.selected {
-  border-color: #537c76;
-  background: #e5efeb;
-  color: #213e39;
-  box-shadow: 0 0 0 2px rgba(83, 124, 118, 0.16);
-}
-.tone-option:disabled { opacity: 0.45; }
 .custom-tint-row[hidden] { display: none; }
 .backup-body {
   width: min(680px, 100%);

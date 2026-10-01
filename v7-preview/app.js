@@ -142,25 +142,6 @@ const cardTints = [
   { value: "#DDD5E7", label: "藤鼠", color: "#DDD5E7" },
   { value: "#E8E4C7", label: "若草", color: "#E8E4C7" },
 ];
-const cardTones = [
-  { id: "light", label: "淡い色" },
-  { id: "medium", label: "中間色" },
-  { id: "dark", label: "濃い色" },
-];
-const deeperCardTints = {
-  medium: [
-    { value: "#849AAF", label: "霞紺", color: "#849AAF" },
-    { value: "#829D8E", label: "森緑", color: "#829D8E" },
-    { value: "#AD8894", label: "葡萄", color: "#AD8894" },
-    { value: "#B69A7C", label: "琥珀", color: "#B69A7C" },
-  ],
-  dark: [
-    { value: "#243B53", label: "深紺", color: "#243B53" },
-    { value: "#254C42", label: "深森", color: "#254C42" },
-    { value: "#56384A", label: "深葡萄", color: "#56384A" },
-    { value: "#684538", label: "焦茶", color: "#684538" },
-  ],
-};
 const iconStyles = [
   { id: "none", label: "なし" },
   { id: "person", label: "人物" },
@@ -491,17 +472,23 @@ function cardTintValue(person) {
   return /^#[0-9a-f]{6}$/i.test(value) ? value.toUpperCase() : "";
 }
 
-function cardToneValue(person) {
-  const value = String(person?.card_tone || "light");
-  return cardTones.some((tone) => tone.id === value) ? value : "light";
-}
-
-function cardTopInk(tint) {
+function cardLuminance(tint) {
   const channels = [1, 3, 5].map((start) => {
     const channel = parseInt(tint.slice(start, start + 2), 16) / 255;
     return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
   });
-  const luminance = channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+  return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+}
+
+function cardToneValue(person) {
+  const tint = cardTintValue(person);
+  if (!tint) return "light";
+  const luminance = cardLuminance(tint);
+  return luminance < 0.16 ? "dark" : luminance < 0.55 ? "medium" : "light";
+}
+
+function cardTopInk(tint) {
+  const luminance = cardLuminance(tint);
   return 1.05 / (luminance + 0.05) >= (luminance + 0.05) / 0.07 ? "light" : "dark";
 }
 
@@ -519,7 +506,7 @@ function applyCardTint(node, person) {
     node.style.removeProperty("--card-accent");
   }
   if (tone !== "light") {
-    const ink = cardTopInk(tint || deeperCardTints[tone][0].value);
+    const ink = cardTopInk(tint);
     node.style.setProperty("--card-top-ink", ink === "light" ? "#fff" : "#142b3e");
     node.style.setProperty("--card-top-shadow", ink === "light"
       ? "rgba(0, 0, 0, 0.55)" : "rgba(255, 255, 255, 0.55)");
@@ -1636,39 +1623,17 @@ function renderCardStyleFilters() {
 
 function selectCardTint(value) {
   state.selectedCardTint = cardTintValue({ card_tint: value });
+  state.selectedCardTone = cardToneValue({ card_tint: state.selectedCardTint });
   renderCardTintOptions();
   renderCardStyleOptions();
   renderEditorCardPreview();
-}
-
-function renderCardToneOptions() {
-  const target = byId("card-tone-options");
-  clear(target);
-  cardTones.forEach((tone) => {
-    const selected = state.selectedCardTone === tone.id;
-    const button = el("button", `tone-option${selected ? " selected" : ""}`, tone.label);
-    button.type = "button";
-    button.disabled = !state.cardToneAvailable && tone.id !== "light";
-    button.setAttribute("aria-pressed", String(selected));
-    button.addEventListener("click", () => {
-      state.selectedCardTone = tone.id;
-      state.selectedCardTint = tone.id === "light" ? "" : deeperCardTints[tone.id][0].value;
-      renderCardToneOptions();
-      renderCardTintOptions();
-      renderCardStyleOptions();
-      renderEditorCardPreview();
-    });
-    target.append(button);
-  });
 }
 
 function renderCardTintOptions() {
   const target = byId("card-tint-options");
   if (!target) return;
   clear(target);
-  const visibleTints = state.selectedCardTone === "light"
-    ? cardTints
-    : deeperCardTints[state.selectedCardTone];
+  const visibleTints = cardTints;
   visibleTints.forEach((tint) => {
     const selected = state.selectedCardTint === tint.value;
     const button = el(
@@ -1687,13 +1652,11 @@ function renderCardTintOptions() {
   const presetValues = new Set(visibleTints.map((item) => item.value));
   const customSelected =
     Boolean(state.selectedCardTint) && !presetValues.has(state.selectedCardTint);
-  customInput.value = state.selectedCardTint || (state.selectedCardTone === "light"
-    ? "#D9E7E2"
-    : deeperCardTints[state.selectedCardTone][0].value);
+  customInput.value = state.selectedCardTint || "#D9E7E2";
   customInput.closest("label")?.classList.toggle("selected", customSelected);
   byId("card-tint-current").textContent = customSelected
     ? state.selectedCardTint
-    : `好きな${cardTones.find((tone) => tone.id === state.selectedCardTone).label}を選べます`;
+    : "好きな色を選べます";
 }
 
 function renderIconStyleOptions() {
@@ -1764,7 +1727,6 @@ function fillPersonForm(person = null, assignments = []) {
   state.selectedIconFrame = iconFrameId(person);
   renderCardStyleFilters();
   renderCardStyleOptions();
-  renderCardToneOptions();
   renderCardTintOptions();
   renderIconStyleOptions();
   renderIconFrameOptions();
@@ -2735,6 +2697,7 @@ function bindEvents() {
   byId("person-form").addEventListener("submit", savePerson);
   byId("card-tint-custom").addEventListener("input", (event) => {
     state.selectedCardTint = cardTintValue({ card_tint: event.target.value });
+    state.selectedCardTone = cardToneValue({ card_tint: state.selectedCardTint });
     renderCardStyleOptions();
     renderEditorCardPreview();
     byId("card-tint-current").textContent = state.selectedCardTint;
@@ -2744,9 +2707,7 @@ function bindEvents() {
       .forEach((button) => button.classList.remove("selected"));
   });
   byId("card-tint-custom").addEventListener("change", renderCardTintOptions);
-  byId("card-tint-reset").addEventListener("click", () => selectCardTint(
-    state.selectedCardTone === "light" ? "" : deeperCardTints[state.selectedCardTone][0].value,
-  ));
+  byId("card-tint-reset").addEventListener("click", () => selectCardTint(""));
   [
     "person-name",
     "person-tags",
