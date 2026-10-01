@@ -496,6 +496,15 @@ function cardToneValue(person) {
   return cardTones.some((tone) => tone.id === value) ? value : "light";
 }
 
+function cardTopInk(tint) {
+  const channels = [1, 3, 5].map((start) => {
+    const channel = parseInt(tint.slice(start, start + 2), 16) / 255;
+    return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+  });
+  const luminance = channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+  return 1.05 / (luminance + 0.05) >= (luminance + 0.05) / 0.07 ? "light" : "dark";
+}
+
 function applyCardTint(node, person) {
   const tint = cardTintValue(person);
   const tone = cardToneValue(person);
@@ -508,6 +517,15 @@ function applyCardTint(node, person) {
   } else {
     node.style.removeProperty("--card-tint");
     node.style.removeProperty("--card-accent");
+  }
+  if (tone !== "light") {
+    const ink = cardTopInk(tint || deeperCardTints[tone][0].value);
+    node.style.setProperty("--card-top-ink", ink === "light" ? "#fff" : "#142b3e");
+    node.style.setProperty("--card-top-shadow", ink === "light"
+      ? "rgba(0, 0, 0, 0.55)" : "rgba(255, 255, 255, 0.55)");
+  } else {
+    node.style.removeProperty("--card-top-ink");
+    node.style.removeProperty("--card-top-shadow");
   }
   return node;
 }
@@ -1669,12 +1687,13 @@ function renderCardTintOptions() {
   const presetValues = new Set(visibleTints.map((item) => item.value));
   const customSelected =
     Boolean(state.selectedCardTint) && !presetValues.has(state.selectedCardTint);
-  customInput.value = state.selectedCardTint || "#D9E7E2";
+  customInput.value = state.selectedCardTint || (state.selectedCardTone === "light"
+    ? "#D9E7E2"
+    : deeperCardTints[state.selectedCardTone][0].value);
   customInput.closest("label")?.classList.toggle("selected", customSelected);
   byId("card-tint-current").textContent = customSelected
     ? state.selectedCardTint
-    : "好きな淡色を選べます";
-  byId("custom-tint-row").hidden = state.selectedCardTone !== "light";
+    : `好きな${cardTones.find((tone) => tone.id === state.selectedCardTone).label}を選べます`;
 }
 
 function renderIconStyleOptions() {
@@ -2725,7 +2744,9 @@ function bindEvents() {
       .forEach((button) => button.classList.remove("selected"));
   });
   byId("card-tint-custom").addEventListener("change", renderCardTintOptions);
-  byId("card-tint-reset").addEventListener("click", () => selectCardTint(""));
+  byId("card-tint-reset").addEventListener("click", () => selectCardTint(
+    state.selectedCardTone === "light" ? "" : deeperCardTints[state.selectedCardTone][0].value,
+  ));
   [
     "person-name",
     "person-tags",

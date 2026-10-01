@@ -773,20 +773,107 @@ input:focus {
   mix-blend-mode: multiply;
 }
 .identity-card.has-card-tint .identity-topline,
-.identity-card.has-card-tint .identity-panel,
-.style-swatch.has-card-tint .mini-info-strip {
+.identity-card.has-card-tint .identity-panel {
   position: relative;
+  z-index: 2;
+}
+.style-swatch.has-card-tint .mini-info-strip {
   z-index: 2;
 }
 .identity-card.card-tone-medium::after,
 .style-swatch.card-tone-medium::after {
-  opacity: 0.84;
+  background: var(--tone-art, linear-gradient(145deg, var(--tone-glow-soft), transparent)), var(--card-tint, #849aaf);
+  opacity: 1;
   mix-blend-mode: normal;
 }
 .identity-card.card-tone-dark::after,
 .style-swatch.card-tone-dark::after {
+  background: var(--tone-art, linear-gradient(145deg, var(--tone-glow-soft), transparent)), var(--card-tint, #243b53);
   opacity: 1;
   mix-blend-mode: normal;
+}
+.card-tone-medium {
+  --tone-glow: rgba(255, 255, 255, 0.56);
+  --tone-glow-soft: rgba(255, 255, 255, 0.29);
+  --tone-shade: rgba(17, 35, 49, 0.26);
+  --tone-line: rgba(255, 255, 255, 0.33);
+}
+.card-tone-dark {
+  --tone-glow: rgba(255, 255, 255, 0.43);
+  --tone-glow-soft: rgba(255, 255, 255, 0.22);
+  --tone-shade: rgba(5, 14, 23, 0.34);
+  --tone-line: rgba(255, 255, 255, 0.29);
+}
+.card-tone-medium.card-style-mist,
+.card-tone-dark.card-style-mist {
+  --tone-art: radial-gradient(circle at 84% 19%, var(--tone-glow) 0, transparent 35%), radial-gradient(circle at 9% 82%, var(--tone-glow-soft) 0, transparent 41%), linear-gradient(145deg, transparent 22%, var(--tone-shade));
+}
+.card-tone-medium.card-style-watercolor,
+.card-tone-dark.card-style-watercolor {
+  --tone-art: radial-gradient(ellipse at 8% 18%, var(--tone-glow) 0, transparent 40%), radial-gradient(ellipse at 70% 100%, var(--tone-shade) 0, transparent 50%), radial-gradient(ellipse at 100% 30%, var(--tone-glow-soft) 0, transparent 43%);
+}
+.card-tone-medium.card-style-sunset,
+.card-tone-dark.card-style-sunset {
+  --tone-art: radial-gradient(circle at 76% 38%, var(--tone-glow) 0 8%, transparent 19%), linear-gradient(180deg, var(--tone-shade) 0%, transparent 49%, var(--tone-glow-soft) 50%, var(--tone-shade) 100%);
+}
+.card-tone-medium.card-style-orb,
+.card-tone-dark.card-style-orb {
+  --tone-art: radial-gradient(circle at 11% 17%, var(--tone-glow) 0 15%, transparent 16%), radial-gradient(circle at 80% 32%, var(--tone-glow-soft) 0 22%, transparent 23%), radial-gradient(circle at 38% 94%, var(--tone-shade) 0 24%, transparent 25%);
+}
+.card-tone-medium.card-style-spring,
+.card-tone-dark.card-style-spring {
+  --tone-art: radial-gradient(circle at 9% 20%, var(--tone-glow) 0 6%, transparent 7%), radial-gradient(circle at 19% 38%, var(--tone-glow-soft) 0 10%, transparent 11%), radial-gradient(circle at 84% 70%, var(--tone-glow) 0, transparent 39%), linear-gradient(140deg, transparent, var(--tone-shade));
+}
+.card-tone-medium.card-style-summer,
+.card-tone-dark.card-style-summer {
+  --tone-art: radial-gradient(circle at 82% 21%, var(--tone-glow) 0 12%, transparent 13%), linear-gradient(175deg, transparent 38%, var(--tone-glow-soft) 39% 49%, transparent 50%), linear-gradient(145deg, transparent, var(--tone-shade));
+}
+.card-tone-medium.card-style-autumn,
+.card-tone-dark.card-style-autumn {
+  --tone-art: radial-gradient(ellipse at 82% 72%, var(--tone-glow) 0, transparent 34%), radial-gradient(ellipse at 20% 11%, var(--tone-shade) 0, transparent 38%), linear-gradient(135deg, transparent 52%, var(--tone-glow-soft));
+}
+.card-tone-medium.card-style-winter,
+.card-tone-dark.card-style-winter {
+  --tone-art: radial-gradient(circle at 16% 16%, var(--tone-glow) 0 8%, transparent 24%), linear-gradient(165deg, transparent 55%, var(--tone-glow-soft) 56% 58%, transparent 59%), linear-gradient(145deg, var(--tone-shade), transparent 62%);
+}
+.card-tone-medium.card-style-dots,
+.card-tone-dark.card-style-dots {
+  --tone-art: radial-gradient(circle at 12px 14px, var(--tone-glow) 0 6px, transparent 7px), radial-gradient(circle at 47px 42px, var(--tone-glow-soft) 0 8px, transparent 9px), radial-gradient(circle at 74px 16px, var(--tone-shade) 0 5px, transparent 6px);
+}
+.card-tone-medium.card-style-linen,
+.card-tone-dark.card-style-linen {
+  --tone-art: repeating-linear-gradient(0deg, var(--tone-line) 0 1px, transparent 1px 5px), repeating-linear-gradient(90deg, var(--tone-line) 0 1px, transparent 1px 6px), linear-gradient(145deg, transparent, var(--tone-shade));
+}
+.card-tone-medium.card-style-seaglass,
+.card-tone-dark.card-style-seaglass {
+  --tone-art: radial-gradient(ellipse at 15% 22%, var(--tone-glow) 0 18%, transparent 19%), radial-gradient(ellipse at 78% 18%, var(--tone-glow-soft) 0 22%, transparent 23%), radial-gradient(ellipse at 64% 91%, var(--tone-shade) 0 27%, transparent 28%);
+}
+.card-tone-medium.card-style-twilight,
+.card-tone-dark.card-style-twilight {
+  --tone-art: linear-gradient(160deg, var(--tone-shade) 0%, transparent 45%, var(--tone-glow-soft) 68%, var(--tone-glow) 100%);
+}
+.card-tone-medium.card-style-soft-stripe,
+.card-tone-dark.card-style-soft-stripe {
+  --tone-art: repeating-linear-gradient(135deg, var(--tone-glow-soft) 0 12px, transparent 12px 24px), linear-gradient(145deg, transparent, var(--tone-shade));
+}
+.card-tone-medium.card-style-moonlight,
+.card-tone-dark.card-style-moonlight {
+  --tone-art: radial-gradient(circle at 79% 18%, var(--tone-glow) 0 9%, transparent 10%), radial-gradient(circle at 79% 18%, var(--tone-glow-soft) 0 16%, transparent 25%), linear-gradient(160deg, var(--tone-shade), transparent 68%);
+}
+.card-tone-medium.card-style-plain,
+.card-tone-dark.card-style-plain {
+  --tone-art: linear-gradient(145deg, var(--tone-glow-soft), transparent 42%, var(--tone-shade));
+}
+.identity-card.card-style-sunset.card-tone-medium .card-skyline,
+.identity-card.card-style-sunset.card-tone-dark .card-skyline {
+  z-index: 2;
+  opacity: 0.5;
+}
+.identity-card.card-style-sunset.card-tone-medium .identity-panel,
+.identity-card.card-style-sunset.card-tone-dark .identity-panel,
+.identity-card.card-style-sunset.card-tone-medium .identity-topline,
+.identity-card.card-style-sunset.card-tone-dark .identity-topline {
+  z-index: 3;
 }
 .identity-card.card-tone-medium .identity-label,
 .identity-card.card-tone-dark .identity-label {
@@ -795,8 +882,8 @@ input:focus {
 }
 .identity-card.card-tone-medium .identity-style-name,
 .identity-card.card-tone-dark .identity-style-name {
-  color: #fff;
-  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  color: var(--card-top-ink, #fff);
+  text-shadow: 0 1px 4px var(--card-top-shadow, rgba(0, 0, 0, 0.5));
 }
 .identity-card.card-tone-medium .identity-panel,
 .identity-card.card-tone-dark .identity-panel {
