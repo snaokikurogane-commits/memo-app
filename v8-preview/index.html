@@ -23,7 +23,7 @@
           Pages上には人物情報を保存しません。
         </p>
         <p class="hint">
-          リポジトリの <code>web/config.js</code> にProject URLと anon public
+          リポジトリの <code>v8-preview/config.js</code> にProject URLと anon public
           key を設定してから再読み込みしてください。
         </p>
       </section>
@@ -237,10 +237,10 @@
           <label><input id="ai-include-history" type="checkbox" checked /> 会話履歴</label>
           <label><input id="ai-include-details" type="checkbox" /> 詳しいメモも含める</label>
           <label><input id="ai-include-questions" type="checkbox" checked /> 次に聞くこと</label>
-          <label><input id="ai-include-personal" type="checkbox" /> 家族・個人的な出来事</label>
+          <label><input id="ai-include-personal" type="checkbox" /> 家族・出来事欄を追加</label>
           <label><input id="ai-all-history" type="checkbox" /> 会話履歴を全件含める</label>
         </div>
-        <p class="field-hint">選択を変えると文章を作り直します。編集した文章はコピー前にもう一度確認してください。</p>
+        <p class="field-hint">会話の振り返りにも個人的な情報が含まれる場合があります。コピー前に文章を確認・削除してください。選択を変えると文章を作り直します。</p>
         <label for="ai-draft"><strong>コピーする文章</strong></label>
         <textarea id="ai-draft" spellcheck="false"></textarea>
         <p id="ai-length" class="field-hint" role="status"></p>
