@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow, noarchive" />
+  <meta name="referrer" content="no-referrer" />
+  <title>バックアップを確認 | 人物ネタ帳</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="backup-body">
+    <section class="card">
+      <h1>バックアップを確認</h1>
+      <p>この画面内でファイルを復号します。人物データをサーバーへ送信しません。</p>
+      <form id="reader-form" class="backup-form">
+        <label>バックアップファイル<input id="reader-file" type="file" accept=".pnb,application/json" required /></label>
+        <label>バックアップ用パスワード<input id="reader-password" type="password" autocomplete="off" required /></label>
+        <button id="reader-open" class="primary full" type="submit">内容と件数を確認</button>
+      </form>
+      <p id="reader-status" class="hint" role="status"></p>
+      <div id="reader-result" hidden>
+        <h2>確認結果</h2>
+        <p id="reader-meta"></p>
+        <ul id="reader-counts"></ul>
+        <p class="muted">復元作業に使う場合だけ、暗号化されていないJSONを取り出してください。取り出したJSONには人物情報が含まれます。</p>
+        <button id="reader-plain-download" class="secondary full" type="button">復元作業用JSONを取り出す</button>
+      </div>
+    </section>
+    <section class="card">
+      <a href="./recovery.html">復元の手順</a>
+    </section>
+  </main>
+  <script type="module">
+    import { decryptBackup } from "./backup-crypto.js";
+    let opened = null;
+    const byId = (id) => document.getElementById(id);
+    const labels = {
+      people: "人物", assignments: "所属履歴", conversations: "会話メモ",
+      family_members: "家族", events: "出来事", follow_up_items: "次に聞くこと",
+      topic_preferences: "自分の話題設定",
+    };
+    byId("reader-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      opened = null;
+      byId("reader-result").hidden = true;
+      byId("reader-open").disabled = true;
+      byId("reader-status").textContent = "確認中…";
+      try {
+        const file = byId("reader-file").files[0];
+        if (!file || file.size > 100 * 1024 * 1024) throw new Error("100MB以下のファイルを選んでください。");
+        const envelope = JSON.parse(await file.text());
+        opened = await decryptBackup(envelope, byId("reader-password").value);
+        byId("reader-meta").textContent = `作成日時：${new Date(opened.exported_at).toLocaleString("ja-JP")}　元のプロジェクト：${opened.source_project}`;
+        byId("reader-counts").replaceChildren(...Object.entries(labels).map(([key, label]) => {
+          const item = document.createElement("li");
+          item.textContent = `${label}：${opened.counts[key]}件`;
+          return item;
+        }));
+        byId("reader-result").hidden = false;
+        byId("reader-status").textContent = "ファイルを確認できました。";
+      } catch (error) {
+        byId("reader-status").textContent = error?.message || "確認できませんでした。";
+      } finally {
+        byId("reader-password").value = "";
+        byId("reader-open").disabled = false;
+      }
+    });
+    byId("reader-plain-download").addEventListener("click", () => {
+      if (!opened) return;
+      const url = URL.createObjectURL(new Blob([JSON.stringify(opened, null, 2)], { type: "application/json" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `人物ネタ帳-復元用-${new Date(opened.exported_at).toISOString().slice(0, 10)}.json`;
+      document.body.append(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    });
+  </script>
+</body>
+</html>

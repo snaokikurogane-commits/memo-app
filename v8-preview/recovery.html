@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow, noarchive" />
+  <meta name="referrer" content="no-referrer" />
+  <title>復元の手順 | 人物ネタ帳</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="backup-body">
+    <section class="card">
+      <h1>人物ネタ帳の復元手順</h1>
+      <p>バックアップは人物データ７種類を保存します。ログイン設定、利用者権限、データベースの構造、ストレージ内のファイルは含みません。復元は管理者が内容を確認して行います。</p>
+      <ol>
+        <li><a href="./backup-reader.html">バックアップを開き</a>、件数を確認します。パスワードが必要です。</li>
+        <li>復元先のSupabaseプロジェクトを用意します。既存プロジェクトなら、作業前にそのプロジェクトのバックアップも保存します。</li>
+        <li>データベース構造と権限設定を先に復元します。手元にあるSupabaseの <code>db_cluster-13-09-2026@02-06-29.backup.gz</code> などのデータベースバックアップ、またはアプリのSQL定義を使います。新規プロジェクトではGoogleログインの設定と利用者登録も必要です。</li>
+        <li>旧プロジェクトに戻す場合は、既存行とバックアップ行の重複を確認してから、人物→所属履歴→会話メモ・家族・出来事・次に聞くことの順に取り込みます。自分の話題設定はログイン利用者IDを確認してから取り込みます。</li>
+        <li>新規プロジェクトに移す場合は、先に新しいプロジェクトでログインし、管理者権限を設定します。話題設定の <code>user_id</code> は新しいログイン利用者のIDに置き換えます。人物IDと各記録の紐付けは変えません。</li>
+        <li>取り込み後は７種類の件数と、数件の人物詳細・会話・予定をアプリで照合します。確認が終わるまで元のプロジェクトと暗号化ファイルを保管します。</li>
+      </ol>
+      <p class="muted">この画面からデータベースへ自動取り込みは行いません。復元作業用JSONには個人情報がそのまま含まれるため、作業後は保存場所を確認してください。</p>
+    </section>
+  </main>
+</body>
+</html>
