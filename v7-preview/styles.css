@@ -76,6 +76,13 @@ select:focus-visible {
   font-size: 29px;
   letter-spacing: -0.045em;
 }
+.gate-app-mark {
+  display: block;
+  width: 58px;
+  height: 58px;
+  margin-bottom: 16px;
+  border-radius: 16px;
+}
 .gate p {
   line-height: 1.8;
 }
@@ -98,6 +105,19 @@ select:focus-visible {
   justify-content: space-between;
   gap: 16px;
   padding: 4px 5px 19px;
+}
+.brand-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.app-mark {
+  display: block;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 12px;
 }
 .topbar h1 {
   margin: 6px 0 0;
