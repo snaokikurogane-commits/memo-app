@@ -2223,6 +2223,10 @@ input:focus {
 .prep-questions { display: grid; gap: 5px; }
 .prep-questions p { margin: 0; line-height: 1.55; overflow-wrap: anywhere; }
 .prep-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.follow-up-edit { margin-top: 8px; }
+.follow-up-edit-form { width: 100%; display: grid; gap: 8px; }
+.follow-up-edit-form input { width: 100%; }
+.follow-up-edit-form button { min-height: 40px; }
 .conversation-recap { font-weight: 750; }
 .conversation-detail { font-size: 13px !important; color: var(--muted) !important; }
 #next-topics-section[hidden], #follow-up-date-section[hidden] { display: none; }

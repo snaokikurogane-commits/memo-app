@@ -961,6 +961,52 @@ function followUpBucket(item, today, weekEnd) {
   return due <= weekEnd ? "week" : "later";
 }
 
+function followUpChanges(body, dueAt) {
+  const trimmed = String(body || "").trim();
+  return trimmed ? { body: trimmed, due_at: String(dueAt || "").trim() || null } : null;
+}
+
+function openFollowUpEditor(card, item) {
+  const form = el("form", "follow-up-edit-form");
+  const body = document.createElement("input");
+  body.type = "text";
+  body.maxLength = 5000;
+  body.required = true;
+  body.value = item.body;
+  body.setAttribute("aria-label", "次に聞くことを編集");
+  const due = document.createElement("input");
+  due.type = "date";
+  due.value = String(item.due_at || "").slice(0, 10);
+  due.setAttribute("aria-label", "次回目安を編集");
+  const save = el("button", "primary", "変更を保存");
+  save.type = "submit";
+  const cancel = el("button", "quiet-button", "キャンセル");
+  cancel.type = "button";
+  cancel.addEventListener("click", () => { renderAll(); if (state.person) renderDetail(); });
+  form.append(body, due, save, cancel);
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const changes = followUpChanges(body.value, due.value);
+    if (!changes) return toast("次に聞くことを入力してください。", true);
+    save.disabled = true;
+    try {
+      const { error } = await state.client.from("follow_up_items").update(changes)
+        .eq("follow_up_id", item.follow_up_id);
+      if (error) throw error;
+      [state.followUps, state.person?.followUps || []].forEach((rows) => rows.forEach((row) => {
+        if (row.follow_up_id === item.follow_up_id) Object.assign(row, changes);
+      }));
+      renderAll();
+      if (state.person) renderDetail();
+      toast("次に聞くことを更新しました");
+    } catch (error) {
+      toast(message(error), true);
+    } finally { save.disabled = false; }
+  });
+  card.replaceChildren(form);
+  body.focus();
+}
+
 function followUpCard(item, showPerson = false, selectable = false) {
   const card = el(
     "article",
@@ -1006,6 +1052,11 @@ function followUpCard(item, showPerson = false, selectable = false) {
     card.append(copy);
     return card;
   }
+
+  const edit = el("button", "quiet-button compact-button follow-up-edit", "編集");
+  edit.type = "button";
+  edit.addEventListener("click", () => openFollowUpEditor(card, item));
+  copy.append(edit);
 
   const actions = el("div", "item-actions");
   const done = el("button", "complete-button", "聞いた");
