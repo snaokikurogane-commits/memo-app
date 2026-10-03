@@ -185,6 +185,7 @@ const state = {
   expandedFollowUps: false,
   expandedConversations: false,
   followUpAddOpen: false,
+  profileDetailsOpen: false,
   cardFieldsAvailable: true,
   cardTintAvailable: true,
   cardToneAvailable: true,
@@ -1278,6 +1279,23 @@ function makeField(labelText, id, type, value = "") {
   return { label, input };
 }
 
+function familyMemberChanges(values, requireName = false) {
+  const displayName = String(values.name || "").trim();
+  const birthDate = String(values.birth || "").trim();
+  const ageValue = String(values.age ?? "").trim();
+  const observedOn = String(values.observed || "").trim();
+  if (requireName && !displayName) return null;
+  if (!birthDate && (!ageValue || !observedOn)) return null;
+  const age = Number(ageValue);
+  if (!birthDate && (!Number.isInteger(age) || age < 0)) return null;
+  return {
+    display_name: displayName,
+    birth_date: birthDate || null,
+    observed_age: birthDate ? null : age,
+    observed_on: birthDate ? null : observedOn,
+  };
+}
+
 function identityCard(detail) {
   const person = detail.person;
   const style = cardStyleId(person);
@@ -1348,8 +1366,57 @@ function detailSectionButton(text, onClick) {
   return button;
 }
 
+function familyMemberEditor(detail, member, onCancel) {
+  const form = el("form", "family-edit-form");
+  const prefix = `family-edit-${member.family_member_id}`;
+  const name = makeField("呼び名", `${prefix}-name`, "text", member.display_name || "");
+  const birth = makeField("生年月日", `${prefix}-birth`, "date", member.birth_date || "");
+  const age = makeField("年齢（誕生日不明時）", `${prefix}-age`, "number", member.observed_age ?? "");
+  const observed = makeField("確認日", `${prefix}-observed`, "date", member.observed_on || localDateKey());
+  const syncEstimated = () => {
+    age.input.disabled = Boolean(birth.input.value);
+    observed.input.disabled = Boolean(birth.input.value);
+  };
+  birth.input.addEventListener("input", syncEstimated);
+  syncEstimated();
+  const hint = el("p", "field-hint wide", "生年月日が分かる場合は、推定年齢と確認日を置き換えます。");
+  const save = el("button", "primary", "変更を保存");
+  save.type = "submit";
+  const cancel = el("button", "quiet-button", "キャンセル");
+  cancel.type = "button";
+  cancel.addEventListener("click", onCancel);
+  form.append(name.label, birth.label, age.label, observed.label, hint, save, cancel);
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const changes = familyMemberChanges({
+      name: name.input.value, birth: birth.input.value,
+      age: age.input.value, observed: observed.input.value,
+    });
+    if (!changes) return toast("生年月日、または年齢と確認日を入力してください。", true);
+    save.disabled = true;
+    try {
+      const { data, error } = await state.client.from("family_members")
+        .update(changes).eq("family_member_id", member.family_member_id)
+        .select().single();
+      if (error) throw error;
+      const index = detail.familyMembers.findIndex((item) => item.family_member_id === member.family_member_id);
+      if (index >= 0) detail.familyMembers[index] = data;
+      state.profileDetailsOpen = true;
+      renderDetail();
+      toast("家族情報を更新しました");
+    } catch (error) {
+      toast(message(error), true);
+    } finally {
+      save.disabled = false;
+    }
+  });
+  return form;
+}
+
 function renderProfileDetails(detail) {
   const details = el("details", "card profile-details");
+  details.open = state.profileDetailsOpen;
+  details.addEventListener("toggle", () => { state.profileDetailsOpen = details.open; });
   const summary = el("summary");
   const summaryCopy = el("span");
   summaryCopy.append(
@@ -1390,10 +1457,20 @@ function renderProfileDetails(detail) {
   family.append(el("h3", "", "家族・子ども"));
   detail.familyMembers.forEach((member) => {
     const row = el("div", "family-row");
-    row.append(
-      el("strong", "", member.display_name || member.relationship),
-      el("span", "pill", ageText(member)),
-    );
+    const summary = el("div", "family-row-summary");
+    summary.append(el("strong", "", member.display_name || member.relationship),
+      el("span", "pill", ageText(member)));
+    row.append(summary);
+    if (canEditPeople()) {
+      const edit = el("button", "quiet-button compact-button family-edit-button", "編集");
+      edit.type = "button";
+      edit.setAttribute("aria-label", `${member.display_name || "家族情報"}を編集`);
+      edit.addEventListener("click", () => {
+        state.profileDetailsOpen = true;
+        row.replaceChildren(familyMemberEditor(detail, member, () => renderDetail()));
+      });
+      row.append(edit);
+    }
     family.append(row);
   });
   if (!detail.familyMembers.length) {
@@ -1401,6 +1478,7 @@ function renderProfileDetails(detail) {
   }
   if (canEditPeople()) {
     const form = el("div", "family-form");
+    form.append(el("h4", "wide", "新しい子どもを追加"));
     const name = makeField("呼び名", "family-name", "text");
     const birth = makeField("生年月日", "family-birth", "date");
     const age = makeField("年齢（誕生日不明時）", "family-age", "number");
@@ -1408,13 +1486,17 @@ function renderProfileDetails(detail) {
       "確認日",
       "family-observed",
       "date",
-      new Date().toISOString().slice(0, 10),
+      localDateKey(),
     );
     const save = el("button", "secondary wide", "子ども情報を追加");
     save.type = "button";
     save.addEventListener("click", async () => {
-      if (!birth.input.value && !(age.input.value && observed.input.value)) {
-        toast("生年月日、または年齢と確認日を入力してください。", true);
+      const changes = familyMemberChanges({
+        name: name.input.value, birth: birth.input.value,
+        age: age.input.value, observed: observed.input.value,
+      }, true);
+      if (!changes) {
+        toast("新しく追加する場合は呼び名と、生年月日または年齢・確認日を入力してください。既存の情報は上の「編集」から変更できます。", true);
         return;
       }
       save.disabled = true;
@@ -1424,15 +1506,13 @@ function renderProfileDetails(detail) {
           .insert({
             person_id: detail.person.person_id,
             relationship: "child",
-            display_name: name.input.value.trim(),
-            birth_date: birth.input.value || null,
-            observed_age: age.input.value ? Number(age.input.value) : null,
-            observed_on: observed.input.value || null,
+            ...changes,
           })
           .select()
           .single();
         if (error) throw error;
         detail.familyMembers.push(data);
+        state.profileDetailsOpen = true;
         renderDetail();
         toast("子ども情報を保存しました");
       } catch (error) {
@@ -1609,6 +1689,7 @@ function renderDetail() {
 }
 
 async function openPerson(personId) {
+  state.profileDetailsOpen = false;
   state.followUpSelectionMode = false;
   state.selectedFollowUpIds.clear();
   state.expandedFollowUps = false;
@@ -1695,6 +1776,7 @@ function closeDetail() {
   state.expandedFollowUps = false;
   state.expandedConversations = false;
   state.followUpAddOpen = false;
+  state.profileDetailsOpen = false;
   resetComposer();
 }
 

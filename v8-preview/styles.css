@@ -41,6 +41,11 @@ textarea,
 select {
   font: inherit;
 }
+input,
+textarea,
+select {
+  font-size: 16px;
+}
 button {
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
@@ -1327,10 +1332,17 @@ input:focus {
 .family-row {
   display: flex;
   justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
   padding: 12px 0;
   border-bottom: 1px solid #e2eaeb;
 }
+.family-row-summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex: 1 1 220px; }
+.family-edit-form { width: 100%; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 10px 0; }
+.family-edit-form .wide { grid-column: 1 / -1; }
+.family-edit-form .field-hint { margin: 0; }
+@media (max-width: 520px) { .family-edit-form { grid-template-columns: 1fr; } }
 .family-row:last-child {
   border: 0;
 }
