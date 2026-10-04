@@ -193,6 +193,7 @@ const state = {
   editingConversationId: null,
   editorMode: "create",
   editorPersonId: null,
+  editorTags: [],
   selectedCardStyle: "mist",
   selectedCardCategory: "recommended",
   selectedCardTint: "",
@@ -1802,6 +1803,85 @@ function splitTags(value) {
   ].slice(0, 30);
 }
 
+function mergePersonTags(existing, raw) {
+  return [...new Set([...existing, ...splitTags(raw)])].slice(0, 30);
+}
+
+function suggestPersonTags(directory, selected, query) {
+  const counts = new Map();
+  directory.forEach((person) => {
+    new Set(Array.isArray(person.profile_tags) ? person.profile_tags : []).forEach((tag) => {
+      if (tag && !selected.includes(tag)) counts.set(tag, (counts.get(tag) || 0) + 1);
+    });
+  });
+  const needle = normalize(query);
+  return [...counts]
+    .filter(([tag]) => !needle || normalize(tag).includes(needle))
+    .sort(([left, leftCount], [right, rightCount]) => rightCount - leftCount || left.localeCompare(right, "ja"))
+    .slice(0, 8)
+    .map(([tag]) => tag);
+}
+
+function renderPersonTagEditor() {
+  const list = byId("person-tag-list");
+  clear(list);
+  state.editorTags.forEach((tag) => {
+    const chip = el("span", "person-tag-chip");
+    chip.append(el("span", "", tag));
+    const remove = el("button", "person-tag-remove", "×");
+    remove.type = "button";
+    remove.setAttribute("aria-label", `${tag}を削除`);
+    remove.addEventListener("click", () => {
+      state.editorTags = state.editorTags.filter((item) => item !== tag);
+      renderPersonTagEditor();
+      renderEditorCardPreview();
+    });
+    chip.append(remove);
+    list.append(chip);
+  });
+
+  const atLimit = state.editorTags.length >= 30;
+  byId("person-tag-input").disabled = atLimit;
+  byId("person-tag-add").disabled = atLimit;
+  const suggestions = byId("person-tag-suggestions");
+  clear(suggestions);
+  const options = atLimit
+    ? []
+    : suggestPersonTags(state.directory, state.editorTags, byId("person-tag-input").value);
+  if (options.length) {
+    suggestions.append(el("span", "person-tag-suggestions-label", "既存のタグ"));
+    options.forEach((tag) => {
+      const button = el("button", "person-tag-suggestion", tag);
+      button.type = "button";
+      button.addEventListener("click", () => {
+        state.editorTags = mergePersonTags(state.editorTags, tag);
+        byId("person-tag-input").value = "";
+        renderPersonTagEditor();
+        renderEditorCardPreview();
+      });
+      suggestions.append(button);
+    });
+  }
+  suggestions.hidden = !options.length;
+}
+
+function commitPersonTagInput() {
+  const input = byId("person-tag-input");
+  const candidates = splitTags(input.value);
+  if (!candidates.length) return true;
+  const next = mergePersonTags(state.editorTags, input.value);
+  if (candidates.some((tag) => !next.includes(tag))) {
+    toast("タグは30件まで追加できます。", true);
+    input.focus();
+    return false;
+  }
+  state.editorTags = next;
+  input.value = "";
+  renderPersonTagEditor();
+  renderEditorCardPreview();
+  return true;
+}
+
 function renderCardStyleOptions() {
   const target = byId("card-style-options");
   clear(target);
@@ -1938,9 +2018,11 @@ function fillPersonForm(person = null, assignments = []) {
   const assignment = currentAssignment(assignments);
   byId("person-name").value = person?.canonical_name || "";
   byId("person-kana").value = person?.name_kana || "";
-  byId("person-tags").value = Array.isArray(person?.profile_tags)
-    ? person.profile_tags.join("、")
-    : "";
+  state.editorTags = Array.isArray(person?.profile_tags)
+    ? person.profile_tags.filter(Boolean)
+    : [];
+  byId("person-tag-input").value = "";
+  renderPersonTagEditor();
   byId("person-fiscal-year").value =
     assignment?.fiscal_year || String(config.currentFiscalYear || "");
   byId("person-organization").value = assignment?.organization || "";
@@ -1980,7 +2062,7 @@ function renderEditorCardPreview() {
   const preview = identityCard({
     person: {
       canonical_name: byId("person-name").value.trim() || "人物名",
-      profile_tags: splitTags(byId("person-tags").value),
+      profile_tags: state.editorTags,
       card_style: state.selectedCardStyle,
       card_tint: state.selectedCardTint,
       card_tone: state.selectedCardTone,
@@ -2011,6 +2093,7 @@ function openPersonEditor(mode) {
     editing ? state.person.person : null,
     editing ? state.person.assignments : [],
   );
+  document.querySelector(".card-customize").open = false;
   byId("person-editor").hidden = false;
   document.body.style.overflow = "hidden";
   setTimeout(() => byId("person-name").focus(), 0);
@@ -2019,6 +2102,7 @@ function openPersonEditor(mode) {
 function closePersonEditor() {
   byId("person-editor").hidden = true;
   byId("person-form").reset();
+  state.editorTags = [];
   state.editorPersonId = null;
   document.body.style.overflow = byId("person-detail").hidden ? "" : "hidden";
 }
@@ -2026,6 +2110,7 @@ function closePersonEditor() {
 async function savePerson(event) {
   event.preventDefault();
   if (!canEditPeople()) return;
+  if (!commitPersonTagInput()) return;
   const name = byId("person-name").value.trim();
   if (!name) {
     toast("氏名を入力してください。", true);
@@ -2039,7 +2124,7 @@ async function savePerson(event) {
   const personValues = {
     canonical_name: name,
     name_kana: byId("person-kana").value.trim(),
-    profile_tags: splitTags(byId("person-tags").value),
+    profile_tags: state.editorTags,
     active_status: "active",
   };
   if (state.editorMode === "create") personValues.aliases = [];
@@ -3010,6 +3095,13 @@ function bindEvents() {
   byId("person-edit").addEventListener("click", () => openPersonEditor("edit"));
   byId("person-editor-close").addEventListener("click", closePersonEditor);
   byId("person-form").addEventListener("submit", savePerson);
+  byId("person-tag-add").addEventListener("click", commitPersonTagInput);
+  byId("person-tag-input").addEventListener("input", renderPersonTagEditor);
+  byId("person-tag-input").addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" || event.isComposing || event.keyCode === 229) return;
+    event.preventDefault();
+    commitPersonTagInput();
+  });
   byId("card-tint-custom").addEventListener("input", (event) => {
     state.selectedCardTint = cardTintValue({ card_tint: event.target.value });
     state.selectedCardTone = cardToneValue({ card_tint: state.selectedCardTint });
@@ -3025,7 +3117,6 @@ function bindEvents() {
   byId("card-tint-reset").addEventListener("click", () => selectCardTint(""));
   [
     "person-name",
-    "person-tags",
     "person-fiscal-year",
     "person-organization",
     "person-department",

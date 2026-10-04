@@ -11,7 +11,7 @@
     <link rel="icon" type="image/png" sizes="512x512" href="./app-icon-512.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="./app-icon-180.png" />
     <link rel="manifest" href="./manifest.webmanifest" />
-    <link rel="stylesheet" href="./styles.css?v=8-20261003-family-edit-input-zoom" />
+    <link rel="stylesheet" href="./styles.css?v=8-20261004-tag-editor" />
   </head>
   <body>
     <main class="shell">
@@ -267,7 +267,7 @@
         </button>
         <div>
           <h2 id="person-editor-title">人物を追加</h2>
-          <p class="editor-subtitle">スマホから基本情報とカード表紙を設定できます</p>
+          <p class="editor-subtitle">基本情報を入力し、必要ならカードの見た目を変更できます</p>
         </div>
       </header>
       <form id="person-form" class="person-form">
@@ -290,13 +290,15 @@
                 maxlength="160"
                 inputmode="kana"
             /></label>
-            <label
-              >タグ<input
-                id="person-tags"
-                type="text"
-                maxlength="500"
-                placeholder="同期、ゴルフ、LINE"
-            /></label>
+            <div class="person-tags-field wide">
+              <label for="person-tag-input">タグ</label>
+              <div id="person-tag-list" class="person-tag-list" aria-label="設定中のタグ"></div>
+              <div class="person-tag-entry">
+                <input id="person-tag-input" type="text" maxlength="80" placeholder="タグを入力" />
+                <button id="person-tag-add" class="quiet-button" type="button">追加</button>
+              </div>
+              <div id="person-tag-suggestions" class="person-tag-suggestions" aria-label="既存のタグから選ぶ" hidden></div>
+            </div>
           </div>
         </section>
 
@@ -325,10 +327,10 @@
           </div>
         </section>
 
-        <details class="form-section card-customize" open>
+        <details class="form-section card-customize">
           <summary>
-            <span>人物カードの表紙</span>
-            <small>背景とアイコンは後から変更できます</small>
+            <span>カードの見た目を変更</span>
+            <small>表紙・色・アイコンは必要なときだけ設定できます</small>
           </summary>
           <div id="card-live-preview" class="editor-card-preview"></div>
           <div
@@ -532,6 +534,6 @@
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
     <script src="./config.js"></script>
     <script src="./topics-data.js"></script>
-    <script type="module" src="./app.js?v=8-20261003-family-edit"></script>
+    <script type="module" src="./app.js?v=8-20261004-tag-editor"></script>
   </body>
 </html>
