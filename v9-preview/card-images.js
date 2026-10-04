@@ -13,7 +13,43 @@ export const hobbyIllustrations = [
   {id:'fishing',label:'釣り',tags:['釣り','つり','フィッシング']},
   {id:'cooking',label:'料理',tags:['料理','料理好き','お菓子作り']},
   {id:'gardening',label:'園芸',tags:['園芸','ガーデニング','家庭菜園']},
+  {"id":"baseball","label":"野球","tags":["野球","野球観戦","ベースボール"]},
+  {"id":"gym","label":"ジム・筋トレ","tags":["ジム","筋トレ","フィットネス","ウエイトトレーニング"]},
+  {"id":"alcohol","label":"お酒","tags":["お酒","酒","ビール","日本酒","ワイン","晩酌"]},
+  {"id":"movie","label":"映画","tags":["映画","映画鑑賞","シネマ"]},
+  {"id":"dog","label":"犬","tags":["犬","いぬ","イヌ","愛犬","わんこ"],"keywords":["ペット"]},
+  {"id":"cat","label":"猫","tags":["猫","ねこ","ネコ","愛猫"],"keywords":["ペット"]},
+  {"id":"pet","label":"ペット","tags":["ペット","動物"]},
+  {"id":"idol","label":"アイドル・推し活","tags":["アイドル","アイドル好き","推し活"]},
+  {"id":"gacha","label":"ガチャガチャ","tags":["ガチャガチャ","ガチャ","カプセルトイ","ガシャポン"]},
+  {"id":"tennis","label":"テニス","tags":["テニス","硬式テニス","ソフトテニス"]},
+  {"id":"basketball","label":"バスケットボール","tags":["バスケットボール","バスケ"]},
+  {"id":"cycling","label":"自転車・サイクリング","tags":["自転車","サイクリング","ロードバイク","ポタリング"]},
+  {"id":"swimming","label":"水泳","tags":["水泳","スイミング","泳ぐこと"]},
+  {"id":"yoga","label":"ヨガ","tags":["ヨガ","ピラティス"]},
+  {"id":"camping","label":"キャンプ","tags":["キャンプ","アウトドア","ソロキャンプ"]},
+  {"id":"sauna","label":"サウナ","tags":["サウナ","サ活"]},
+  {"id":"camera","label":"カメラ・写真","tags":["カメラ","写真","写真撮影","フォト"]},
+  {"id":"gaming","label":"ゲーム","tags":["ゲーム","ゲーム好き","テレビゲーム","ゲーム実況"]},
+  {"id":"anime","label":"アニメ","tags":["アニメ","アニメ鑑賞"]},
+  {"id":"manga","label":"漫画","tags":["漫画","マンガ","まんが"]},
+  {"id":"live","label":"ライブ・フェス","tags":["ライブ","コンサート","フェス","音楽フェス"]},
+  {"id":"karaoke","label":"カラオケ","tags":["カラオケ","歌","歌うこと"]},
+  {"id":"sweets","label":"スイーツ","tags":["スイーツ","甘いもの","お菓子"]},
+  {"id":"food","label":"食べ歩き・グルメ","tags":["食べ歩き","グルメ","外食"]},
+  {"id":"craft","label":"手芸・ハンドメイド","tags":["手芸","ハンドメイド","編み物","裁縫"]},
+  {"id":"shopping","label":"買い物・ショッピング","tags":["買い物","ショッピング"]},
+  {"id":"art","label":"美術・アート","tags":["美術","アート","美術館","絵画"]},
+  {"id":"boardgame","label":"ボードゲーム","tags":["ボードゲーム","ボドゲ","カードゲーム"]},
 ];
+const normalizedSearchText = value => String(value ?? '').normalize('NFKC').trim().toLowerCase();
+export function filterHobbyIllustrations(query = '') {
+  const terms = normalizedSearchText(query).split(/\s+/).filter(Boolean);
+  return hobbyIllustrations.filter(item => {
+    const searchable = normalizedSearchText([item.id,item.label,...item.tags,...(item.keywords || [])].join(' '));
+    return terms.every(term => searchable.includes(term));
+  });
+}
 const themes = new Set(['mist','watercolor','sunset','orb','spring','summer','autumn','winter','dots','linen','seaglass','twilight','soft-stripe','moonlight','plain']);
 const photoPathPattern = /^[A-Za-z0-9_-]{1,180}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.jpg$/i;
 const clamp = (value, fallback, min, max) => Number.isFinite(Number(value)) && value !== null

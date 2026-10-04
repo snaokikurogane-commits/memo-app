@@ -18,6 +18,18 @@ async function loadApp() {
   vm.runInContext(source,context);
   return {call:expression=>vm.runInContext(expression,context),context,elements};
 }
+test('enter in illustration search never implicitly submits the person form',async()=>{
+  const {call,elements}=await loadApp();
+  call('bindIllustrationSearch()');
+  const search=elements.get('illustration-search');
+  let prevented=0;
+  search.listeners.keydown({key:'Enter',preventDefault(){prevented++;}});
+  assert.equal(prevented,1);
+  search.listeners.keydown({key:'a',preventDefault(){prevented++;}});
+  search.listeners.keydown({key:'Enter',isComposing:true,preventDefault(){prevented++;}});
+  assert.equal(prevented,1);
+});
+
 test('choosing a fixed illustration after a photo previews the illustration instead of the retained draft',async()=>{
   const {call}=await loadApp();
   const art=call('createCardArtwork({card_image:{mode:"illustration",illustrationId:"reading"}},{draftUrl:"blob:draft-photo"})');

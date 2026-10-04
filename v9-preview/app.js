@@ -1,5 +1,5 @@
 import { encryptBackup, validateBackupPayload } from "./backup-crypto.js";
-import { hobbyIllustrations, normalizeCardImage, resolveCardArtwork, PhotoStore, preparePhoto, persistCardImage, collectPhotoMedia } from "./card-images.js";
+import { hobbyIllustrations, filterHobbyIllustrations, normalizeCardImage, resolveCardArtwork, PhotoStore, preparePhoto, persistCardImage, collectPhotoMedia } from "./card-images.js?v=9-20261005-hobbies";
 
 const config = window.PEOPLE_NOTEBOOK_CONFIG || {};
 const tags = [
@@ -2046,10 +2046,28 @@ function renderImageEditor() {
     });methods.append(button);
   });
   byId("theme-controls").hidden=state.editorCardImage.mode!=="theme";
-  byId("illustration-options").hidden=state.editorCardImage.mode!=="illustration";
+  byId("illustration-panel").hidden=state.editorCardImage.mode!=="illustration";
   byId("photo-panel").hidden=state.editorCardImage.mode!=="photo";
+  renderIllustrationOptions();
+  const hasPhoto=state.editorCardImage.mode==="photo" && (state.editorPhotoBlob || state.editorCardImage.path);
+  byId("photo-controls").disabled=!hasPhoto;
+  byId("photo-x").value=state.editorCardImage.x??.5;byId("photo-y").value=state.editorCardImage.y??.5;byId("photo-zoom").value=state.editorCardImage.zoom??1;
+  updateAutoImageStatus();
+}
+
+function bindIllustrationSearch() {
+  const input=byId("illustration-search");
+  input.addEventListener("input",renderIllustrationOptions);
+  input.addEventListener("keydown",event=>{
+    if (event.key==="Enter" && !event.isComposing && event.keyCode!==229) event.preventDefault();
+  });
+}
+
+function renderIllustrationOptions() {
   const grid=byId("illustration-options");grid.replaceChildren();
-  hobbyIllustrations.forEach(item=>{
+  const items=filterHobbyIllustrations(byId("illustration-search").value);
+  byId("illustration-empty").hidden=items.length>0;
+  items.forEach(item=>{
     const selected=state.editorCardImage.mode==="illustration" && state.editorCardImage.illustrationId===item.id;
     const button=el("button",`illustration-option${selected?' selected':''}`);button.type="button";button.setAttribute("aria-pressed",String(selected));
     const image=el("img");image.src=`./assets/${item.id}.webp`;image.alt="";image.loading="lazy";
@@ -2057,10 +2075,6 @@ function renderImageEditor() {
       state.editorCardImage={mode:"illustration",illustrationId:item.id};renderImageEditor();renderEditorCardPreview();
     });grid.append(button);
   });
-  const hasPhoto=state.editorCardImage.mode==="photo" && (state.editorPhotoBlob || state.editorCardImage.path);
-  byId("photo-controls").disabled=!hasPhoto;
-  byId("photo-x").value=state.editorCardImage.x??.5;byId("photo-y").value=state.editorCardImage.y??.5;byId("photo-zoom").value=state.editorCardImage.zoom??1;
-  updateAutoImageStatus();
 }
 
 async function choosePhoto() {
@@ -2088,6 +2102,7 @@ function fillPersonForm(person = null, assignments = []) {
     : [];
   byId("person-tag-input").value = "";
   renderPersonTagEditor();
+  byId("illustration-search").value = "";
   byId("person-fiscal-year").value =
     assignment?.fiscal_year || String(config.currentFiscalYear || "");
   byId("person-organization").value = assignment?.organization || "";
@@ -3199,6 +3214,7 @@ function bindEvents() {
   byId("person-add").addEventListener("click", () => openPersonEditor("create"));
   byId("person-edit").addEventListener("click", () => openPersonEditor("edit"));
   byId("person-editor-close").addEventListener("click", closePersonEditor);
+  bindIllustrationSearch();
   byId("person-form").addEventListener("submit", savePerson);
   byId("person-tag-add").addEventListener("click", commitPersonTagInput);
   byId("person-tag-input").addEventListener("input", renderPersonTagEditor);
