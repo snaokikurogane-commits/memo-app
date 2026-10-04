@@ -1,0 +1,323 @@
+/* Existing fifteen cover motifs, confined to the artwork area. */
+.card-style-mist {
+  --card-accent: #b9cdc9;
+}
+.card-art.card-style-mist,
+.style-swatch.card-style-mist {
+  background:
+    radial-gradient(circle at 82% 17%, rgba(229, 213, 201, 0.66), transparent 35%),
+    radial-gradient(circle at 8% 78%, rgba(198, 218, 215, 0.68), transparent 37%),
+    linear-gradient(145deg, #edf3f1, #f6f1ec);
+}
+.card-style-watercolor {
+  --card-accent: #c4cfd2;
+}
+.card-art.card-style-watercolor,
+.style-swatch.card-style-watercolor {
+  background:
+    radial-gradient(ellipse at 6% 20%, rgba(190, 218, 224, 0.68), transparent 43%),
+    radial-gradient(ellipse at 62% 100%, rgba(234, 194, 184, 0.62), transparent 48%),
+    radial-gradient(ellipse at 100% 30%, rgba(218, 222, 196, 0.54), transparent 42%),
+    #faf6f1;
+}
+.card-style-sunset {
+  --card-accent: #c3aeb5;
+  --skyline-shape: polygon(0 56%, 8% 56%, 8% 25%, 18% 25%, 18% 63%, 28% 63%, 28% 7%, 40% 7%, 40% 55%, 52% 55%, 52% 0, 64% 0, 64% 58%, 75% 58%, 75% 20%, 86% 20%, 86% 60%, 94% 60%, 94% 38%, 100% 38%, 100% 100%, 0 100%);
+}
+.card-art.card-style-sunset,
+.style-swatch.card-style-sunset {
+  background: linear-gradient(180deg, #9da4bb 0%, #c2adb7 42%, #e2b7aa 74%, #d6b29f 100%);
+}
+.card-skyline {
+  display: none;
+}
+.card-art.card-style-sunset .card-skyline {
+  position: absolute;
+  z-index: 1;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 112px;
+  display: block;
+  background: #354758;
+  clip-path: var(--skyline-shape);
+  opacity: 0.72;
+}
+.card-art.card-style-sunset .identity-panel {
+  align-self: flex-start;
+  width: min(76%, 600px);
+}
+.style-swatch.card-style-sunset::before {
+  position: absolute;
+  z-index: 2;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 55%;
+  background: #354758;
+  clip-path: var(--skyline-shape);
+  opacity: 0.7;
+  content: "";
+  pointer-events: none;
+}
+@media (max-width: 560px) {
+  .card-art.card-style-sunset .identity-panel { width: 100%; }
+  .card-art.card-style-sunset .card-skyline { bottom: 79px; height: 90px; }
+}
+.card-style-orb {
+  --card-accent: #cabdc1;
+}
+.card-art.card-style-orb,
+.style-swatch.card-style-orb {
+  background:
+    radial-gradient(circle at 10% 18%, rgba(221, 184, 190, 0.55) 0 16%, transparent 17%),
+    radial-gradient(circle at 80% 34%, rgba(187, 205, 201, 0.58) 0 22%, transparent 23%),
+    radial-gradient(circle at 38% 94%, rgba(213, 198, 181, 0.58) 0 25%, transparent 26%),
+    #f4f0ea;
+}
+.card-style-spring {
+  --card-accent: #d6c3c8;
+}
+.card-art.card-style-spring,
+.style-swatch.card-style-spring {
+  background:
+    radial-gradient(circle at 7% 12%, rgba(232, 194, 202, 0.52), transparent 31%),
+    linear-gradient(145deg, #f7f1ed, #edf2e9);
+}
+.card-style-summer {
+  --card-accent: #b8d2d3;
+}
+.card-art.card-style-summer,
+.style-swatch.card-style-summer {
+  background:
+    radial-gradient(circle at 82% 14%, rgba(255, 246, 204, 0.58), transparent 28%),
+    linear-gradient(145deg, #dcebed, #f2f5ea);
+}
+.card-style-autumn {
+  --card-accent: #ceb9a5;
+}
+.card-art.card-style-autumn,
+.style-swatch.card-style-autumn {
+  background:
+    radial-gradient(circle at 82% 76%, rgba(189, 138, 106, 0.3), transparent 33%),
+    linear-gradient(145deg, #eee3d5, #f5eee7);
+}
+.card-style-winter {
+  --card-accent: #bdcad4;
+}
+.card-art.card-style-winter,
+.style-swatch.card-style-winter {
+  background:
+    radial-gradient(circle at 16% 16%, rgba(255, 255, 255, 0.8), transparent 28%),
+    linear-gradient(145deg, #e2e9ed, #f5f3ef);
+}
+.card-style-dots {
+  --card-accent: #c9bfc7;
+}
+.card-art.card-style-dots,
+.style-swatch.card-style-dots {
+  background:
+    radial-gradient(circle at 12px 14px, rgba(217, 188, 193, 0.58) 0 6px, transparent 7px),
+    radial-gradient(circle at 47px 42px, rgba(185, 211, 205, 0.62) 0 8px, transparent 9px),
+    radial-gradient(circle at 74px 16px, rgba(218, 207, 170, 0.54) 0 5px, transparent 6px),
+    #f7f4ef;
+  background-size: 88px 66px;
+}
+.card-style-linen {
+  --card-accent: #c9c3b3;
+}
+.card-art.card-style-linen,
+.style-swatch.card-style-linen {
+  background:
+    repeating-linear-gradient(0deg, rgba(112, 108, 93, 0.022) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(90deg, rgba(112, 108, 93, 0.018) 0 1px, transparent 1px 5px),
+    linear-gradient(145deg, #f3eee4, #f8f5ee);
+}
+.card-style-seaglass {
+  --card-accent: #b8ceca;
+}
+.card-art.card-style-seaglass,
+.style-swatch.card-style-seaglass {
+  background:
+    radial-gradient(ellipse at 15% 22%, rgba(177, 207, 202, 0.54) 0 18%, transparent 19%),
+    radial-gradient(ellipse at 78% 18%, rgba(204, 216, 208, 0.58) 0 22%, transparent 23%),
+    radial-gradient(ellipse at 64% 91%, rgba(186, 202, 213, 0.45) 0 27%, transparent 28%),
+    #eef3ef;
+}
+.card-style-twilight {
+  --card-accent: #beb8c9;
+}
+.card-art.card-style-twilight,
+.style-swatch.card-style-twilight {
+  background: linear-gradient(155deg, #c8c8d7 0%, #d8c9cf 45%, #ead4c8 100%);
+}
+.card-style-soft-stripe {
+  --card-accent: #c6bfc9;
+}
+.card-art.card-style-soft-stripe,
+.style-swatch.card-style-soft-stripe {
+  background:
+    repeating-linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.28) 0 12px,
+      rgba(202, 190, 201, 0.13) 12px 24px
+    ),
+    #e9e3e7;
+}
+.card-style-moonlight {
+  --card-accent: #b4c2ce;
+}
+.card-art.card-style-moonlight,
+.style-swatch.card-style-moonlight {
+  background:
+    radial-gradient(circle at 79% 18%, rgba(255, 250, 225, 0.78) 0 9%, transparent 10%),
+    linear-gradient(160deg, #cbd4dc 0%, #d8d8df 52%, #e6ded8 100%);
+}
+.card-style-plain {
+  --card-accent: #c8cfca;
+}
+.card-art.card-style-plain,
+.style-swatch.card-style-plain {
+  background: #eeeFEb;
+}
+
+.card-art.has-card-tint::after,
+.style-swatch.has-card-tint::after {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  background: var(--card-tint);
+  content: "";
+  opacity: 0.22;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+}
+.card-art.has-card-tint .identity-topline,
+.card-art.has-card-tint .identity-panel {
+  position: relative;
+  z-index: 2;
+}
+.style-swatch.has-card-tint .mini-info-strip {
+  z-index: 2;
+}
+.card-art.card-tone-medium::after,
+.style-swatch.card-tone-medium::after {
+  background: var(--tone-art, linear-gradient(145deg, var(--tone-glow-soft), transparent)), var(--card-tint, #849aaf);
+  opacity: 1;
+  mix-blend-mode: normal;
+}
+.card-art.card-tone-dark::after,
+.style-swatch.card-tone-dark::after {
+  background: var(--tone-art, linear-gradient(145deg, var(--tone-glow-soft), transparent)), var(--card-tint, #243b53);
+  opacity: 1;
+  mix-blend-mode: normal;
+}
+.card-tone-medium {
+  --tone-glow: rgba(255, 255, 255, 0.56);
+  --tone-glow-soft: rgba(255, 255, 255, 0.29);
+  --tone-shade: rgba(17, 35, 49, 0.26);
+  --tone-line: rgba(255, 255, 255, 0.33);
+}
+.card-tone-dark {
+  --tone-glow: rgba(255, 255, 255, 0.43);
+  --tone-glow-soft: rgba(255, 255, 255, 0.22);
+  --tone-shade: rgba(5, 14, 23, 0.34);
+  --tone-line: rgba(255, 255, 255, 0.29);
+}
+.card-tone-medium.card-style-mist,
+.card-tone-dark.card-style-mist {
+  --tone-art: radial-gradient(circle at 84% 19%, var(--tone-glow) 0, transparent 35%), radial-gradient(circle at 9% 82%, var(--tone-glow-soft) 0, transparent 41%), linear-gradient(145deg, transparent 22%, var(--tone-shade));
+}
+.card-tone-medium.card-style-watercolor,
+.card-tone-dark.card-style-watercolor {
+  --tone-art: radial-gradient(ellipse at 8% 18%, var(--tone-glow) 0, transparent 40%), radial-gradient(ellipse at 70% 100%, var(--tone-shade) 0, transparent 50%), radial-gradient(ellipse at 100% 30%, var(--tone-glow-soft) 0, transparent 43%);
+}
+.card-tone-medium.card-style-sunset,
+.card-tone-dark.card-style-sunset {
+  --tone-art: radial-gradient(circle at 76% 38%, var(--tone-glow) 0 8%, transparent 19%), linear-gradient(180deg, var(--tone-shade) 0%, transparent 49%, var(--tone-glow-soft) 50%, var(--tone-shade) 100%);
+}
+.card-tone-medium.card-style-orb,
+.card-tone-dark.card-style-orb {
+  --tone-art: radial-gradient(circle at 11% 17%, var(--tone-glow) 0 15%, transparent 16%), radial-gradient(circle at 80% 32%, var(--tone-glow-soft) 0 22%, transparent 23%), radial-gradient(circle at 38% 94%, var(--tone-shade) 0 24%, transparent 25%);
+}
+.card-tone-medium.card-style-spring,
+.card-tone-dark.card-style-spring {
+  --tone-art: radial-gradient(circle at 9% 20%, var(--tone-glow) 0 6%, transparent 7%), radial-gradient(circle at 19% 38%, var(--tone-glow-soft) 0 10%, transparent 11%), radial-gradient(circle at 84% 70%, var(--tone-glow) 0, transparent 39%), linear-gradient(140deg, transparent, var(--tone-shade));
+}
+.card-tone-medium.card-style-summer,
+.card-tone-dark.card-style-summer {
+  --tone-art: radial-gradient(circle at 82% 21%, var(--tone-glow) 0 12%, transparent 13%), linear-gradient(175deg, transparent 38%, var(--tone-glow-soft) 39% 49%, transparent 50%), linear-gradient(145deg, transparent, var(--tone-shade));
+}
+.card-tone-medium.card-style-autumn,
+.card-tone-dark.card-style-autumn {
+  --tone-art: radial-gradient(ellipse at 82% 72%, var(--tone-glow) 0, transparent 34%), radial-gradient(ellipse at 20% 11%, var(--tone-shade) 0, transparent 38%), linear-gradient(135deg, transparent 52%, var(--tone-glow-soft));
+}
+.card-tone-medium.card-style-winter,
+.card-tone-dark.card-style-winter {
+  --tone-art: radial-gradient(circle at 16% 16%, var(--tone-glow) 0 8%, transparent 24%), linear-gradient(165deg, transparent 55%, var(--tone-glow-soft) 56% 58%, transparent 59%), linear-gradient(145deg, var(--tone-shade), transparent 62%);
+}
+.card-tone-medium.card-style-dots,
+.card-tone-dark.card-style-dots {
+  --tone-art: radial-gradient(circle at 12px 14px, var(--tone-glow) 0 6px, transparent 7px), radial-gradient(circle at 47px 42px, var(--tone-glow-soft) 0 8px, transparent 9px), radial-gradient(circle at 74px 16px, var(--tone-shade) 0 5px, transparent 6px);
+}
+.card-tone-medium.card-style-linen,
+.card-tone-dark.card-style-linen {
+  --tone-art: repeating-linear-gradient(0deg, var(--tone-line) 0 1px, transparent 1px 5px), repeating-linear-gradient(90deg, var(--tone-line) 0 1px, transparent 1px 6px), linear-gradient(145deg, transparent, var(--tone-shade));
+}
+.card-tone-medium.card-style-seaglass,
+.card-tone-dark.card-style-seaglass {
+  --tone-art: radial-gradient(ellipse at 15% 22%, var(--tone-glow) 0 18%, transparent 19%), radial-gradient(ellipse at 78% 18%, var(--tone-glow-soft) 0 22%, transparent 23%), radial-gradient(ellipse at 64% 91%, var(--tone-shade) 0 27%, transparent 28%);
+}
+.card-tone-medium.card-style-twilight,
+.card-tone-dark.card-style-twilight {
+  --tone-art: linear-gradient(160deg, var(--tone-shade) 0%, transparent 45%, var(--tone-glow-soft) 68%, var(--tone-glow) 100%);
+}
+.card-tone-medium.card-style-soft-stripe,
+.card-tone-dark.card-style-soft-stripe {
+  --tone-art: repeating-linear-gradient(135deg, var(--tone-glow-soft) 0 12px, transparent 12px 24px), linear-gradient(145deg, transparent, var(--tone-shade));
+}
+.card-tone-medium.card-style-moonlight,
+.card-tone-dark.card-style-moonlight {
+  --tone-art: radial-gradient(circle at 79% 18%, var(--tone-glow) 0 9%, transparent 10%), radial-gradient(circle at 79% 18%, var(--tone-glow-soft) 0 16%, transparent 25%), linear-gradient(160deg, var(--tone-shade), transparent 68%);
+}
+.card-tone-medium.card-style-plain,
+.card-tone-dark.card-style-plain {
+  --tone-art: linear-gradient(145deg, var(--tone-glow-soft), transparent 42%, var(--tone-shade));
+}
+.card-art.card-style-sunset.card-tone-medium .card-skyline,
+.card-art.card-style-sunset.card-tone-dark .card-skyline {
+  z-index: 2;
+  background: #0d2535;
+  opacity: 0.82;
+}
+.card-art.card-style-sunset.card-tone-medium .identity-panel,
+.card-art.card-style-sunset.card-tone-dark .identity-panel,
+.card-art.card-style-sunset.card-tone-medium .identity-topline,
+.card-art.card-style-sunset.card-tone-dark .identity-topline {
+  z-index: 3;
+}
+.card-art.card-tone-medium .identity-label,
+.card-art.card-tone-dark .identity-label {
+  background: rgba(255, 255, 255, 0.94);
+  color: #193044;
+}
+.card-art.card-tone-medium .identity-style-name,
+.card-art.card-tone-dark .identity-style-name {
+  color: var(--card-top-ink, #fff);
+  text-shadow: 0 1px 4px var(--card-top-shadow, rgba(0, 0, 0, 0.5));
+}
+.card-art.card-tone-medium .identity-panel,
+.card-art.card-tone-dark .identity-panel {
+  background: #fffdf8;
+  border-color: #fffdf8;
+  color: #1b2a3c;
+}
+.card-art.card-tone-medium .identity-assignment,
+.card-art.card-tone-dark .identity-assignment {
+  color: #47586a;
+}
+.person-card.card-tone-medium::before,
+.person-card.card-tone-dark::before {
+  width: 6px;
+}
+.custom-tint-row[hidden] { display: none; }

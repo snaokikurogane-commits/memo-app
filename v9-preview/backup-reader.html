@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow, noarchive" />
+  <meta name="referrer" content="no-referrer" />
+  <title>バックアップを確認 | 人物ネタ帳</title>
+  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="./v9.css" />
+</head>
+<body>
+  <main class="backup-body">
+    <section class="card">
+      <h1>バックアップを確認</h1>
+      <p>この画面内でファイルを復号します。人物データをサーバーへ送信しません。</p>
+      <form id="reader-form" class="backup-form">
+        <label>バックアップファイル<input id="reader-file" type="file" accept=".pnb,application/json" required /></label>
+        <label>バックアップ用パスワード<input id="reader-password" type="password" autocomplete="off" required /></label>
+        <button id="reader-open" class="primary full" type="submit">内容と件数を確認</button>
+      </form>
+      <p id="reader-status" class="hint" role="status"></p>
+      <div id="reader-result" hidden>
+        <h2>確認結果</h2>
+        <p id="reader-meta"></p>
+        <ul id="reader-counts"></ul>
+        <h2>保存した人物情報</h2>
+        <label for="reader-search">名前・タグで検索</label><input id="reader-search" type="search" />
+        <p id="reader-people-count" class="muted"></p><div id="reader-people"></div>
+        <p class="muted">復元作業に使う場合だけ、暗号化されていないJSONを取り出してください。取り出したJSONには人物情報が含まれます。</p>
+        <button id="reader-plain-download" class="secondary full" type="button">復元作業用JSONを取り出す</button>
+      </div>
+    </section>
+    <section class="card">
+      <a href="./recovery.html">復元の手順</a>
+    </section>
+  </main>
+  <script type="module" src="./backup-reader.js"></script>
+</body>
+</html>

@@ -33,7 +33,7 @@ function loadApp() {
   };
   const context = { window: {}, console, Intl, Date, Set, Map, URL, crypto: globalThis.crypto, document };
   vm.createContext(context);
-  vm.runInContext(source.replace(/^import .*\n/gm, '').replace(/\nboot\(\);\s*$/, ''), context);
+  vm.runInContext(source.replace(/^import[^\r\n]*\r?\n/gm, '').replace(/\r?\nboot\(\);\s*$/, ''), context);
   return { context, elements, call: (expression) => vm.runInContext(expression, context) };
 }
 
