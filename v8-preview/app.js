@@ -1808,15 +1808,18 @@ function mergePersonTags(existing, raw) {
 }
 
 function suggestPersonTags(directory, selected, query) {
+  const needle = normalize(query);
+  if (!needle) return [];
   const counts = new Map();
   directory.forEach((person) => {
     new Set(Array.isArray(person.profile_tags) ? person.profile_tags : []).forEach((tag) => {
-      if (tag && !selected.includes(tag)) counts.set(tag, (counts.get(tag) || 0) + 1);
+      if (tag && !tag.startsWith("#") && !tag.includes("@@") && !selected.includes(tag)) {
+        counts.set(tag, (counts.get(tag) || 0) + 1);
+      }
     });
   });
-  const needle = normalize(query);
   return [...counts]
-    .filter(([tag]) => !needle || normalize(tag).includes(needle))
+    .filter(([tag]) => normalize(tag).includes(needle))
     .sort(([left, leftCount], [right, rightCount]) => rightCount - leftCount || left.localeCompare(right, "ja"))
     .slice(0, 8)
     .map(([tag]) => tag);

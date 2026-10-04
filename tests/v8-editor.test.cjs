@@ -49,12 +49,14 @@ test('suggestions use existing tags, omit selected tags, and match typed text', 
   context.directoryFixture = [
     { profile_tags: ['旅行', 'ゴルフ'] },
     { profile_tags: ['旅行', '料理'] },
-    { profile_tags: ['ゴルフ'] },
+    { profile_tags: ['ゴルフ', '仲良し@@2026'] },
   ];
   assert.deepEqual(Array.from(call('suggestPersonTags(directoryFixture, ["料理"], "")')),
-    ['ゴルフ', '旅行']);
+    []);
   assert.deepEqual(Array.from(call('suggestPersonTags(directoryFixture, [], "旅")')),
     ['旅行']);
+  assert.deepEqual(Array.from(call('suggestPersonTags(directoryFixture, [], "仲良し")')),
+    []);
 });
 
 test('selected tags have individual remove controls without changing the other tags', () => {
