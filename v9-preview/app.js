@@ -1020,6 +1020,41 @@ function openFollowUpEditor(card, item) {
   body.focus();
 }
 
+function followUpMoreActions(item, card) {
+  const more = el("details", "follow-up-more");
+  const trigger = el("summary", "follow-up-more-trigger", "…");
+  trigger.setAttribute("aria-label", `「${item.body}」の編集・削除`);
+  const menu = el("div", "follow-up-menu");
+  const edit = el("button", "quiet-button follow-up-edit", "編集");
+  edit.type = "button";
+  edit.addEventListener("click", () => {
+    more.open = false;
+    openFollowUpEditor(card, item);
+  });
+  const remove = el("button", "delete-button", "削除");
+  remove.type = "button";
+  remove.addEventListener("click", () => {
+    more.open = false;
+    trigger.focus();
+    deleteFollowUp(item);
+  });
+  more.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    event.preventDefault();
+    more.open = false;
+    trigger.focus();
+  });
+  more.addEventListener("toggle", () => {
+    if (!more.open) return;
+    document.querySelectorAll(".follow-up-more[open]").forEach((other) => {
+      if (other !== more) other.open = false;
+    });
+  });
+  menu.append(edit, remove);
+  more.append(trigger, menu);
+  return more;
+}
+
 function followUpCard(item, showPerson = false, selectable = false) {
   const card = el(
     "article",
@@ -1066,19 +1101,11 @@ function followUpCard(item, showPerson = false, selectable = false) {
     return card;
   }
 
-  const edit = el("button", "quiet-button compact-button follow-up-edit", "編集");
-  edit.type = "button";
-  edit.addEventListener("click", () => openFollowUpEditor(card, item));
-  copy.append(edit);
-
   const actions = el("div", "item-actions");
   const done = el("button", "complete-button", "聞いた");
   done.type = "button";
   done.addEventListener("click", () => completeFollowUp(item));
-  const remove = el("button", "delete-button", "削除");
-  remove.type = "button";
-  remove.addEventListener("click", () => deleteFollowUp(item));
-  actions.append(done, remove);
+  actions.append(done, followUpMoreActions(item, card));
   card.append(copy, actions);
   return card;
 }
@@ -3160,6 +3187,11 @@ async function handleSession(session) {
 }
 
 function bindEvents() {
+  document.addEventListener("click", (event) => {
+    document.querySelectorAll(".follow-up-more[open]").forEach((menu) => {
+      if (!menu.contains(event.target)) menu.open = false;
+    });
+  });
   byId("photo-file").addEventListener("change", choosePhoto);
   ["photo-x","photo-y","photo-zoom"].forEach(id=>byId(id).addEventListener("input",()=>{
     state.editorCardImage={...state.editorCardImage,x:Number(byId("photo-x").value),y:Number(byId("photo-y").value),zoom:Number(byId("photo-zoom").value)};

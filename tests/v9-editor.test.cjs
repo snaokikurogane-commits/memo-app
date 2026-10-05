@@ -30,6 +30,47 @@ test('enter in illustration search never implicitly submits the person form',asy
   assert.equal(prevented,1);
 });
 
+test('follow-up editing is available from the overflow menu and preserves the selected question and date',async()=>{
+  const {call}=await loadApp();
+  call('state.role="owner"');
+  const card=call('followUpCard({follow_up_id:"question-1",body:"旅行はどうでしたか？",due_at:"2026-10-12",status:"open"})');
+  const all=node=>[node,...node.children.flatMap(all)];
+  const menu=all(card).find(node=>node.tagName==='details');
+  assert.ok(menu,'question actions are grouped in an overflow menu');
+  const edit=all(menu).find(node=>node.tagName==='button' && node.textContent==='編集');
+  edit.listeners.click();
+  const inputs=all(card).filter(node=>node.tagName==='input');
+  assert.equal(inputs[0].value,'旅行はどうでしたか？');
+  assert.equal(inputs[1].value,'2026-10-12');
+});
+
+test('escape closes the follow-up action menu and returns focus to its trigger',async()=>{
+  const {call}=await loadApp();
+  call('state.role="owner"');
+  const card=call('followUpCard({follow_up_id:"question-1",body:"おすすめの本は？",status:"open"})');
+  const all=node=>[node,...node.children.flatMap(all)];
+  const menu=all(card).find(node=>node.tagName==='details');
+  assert.ok(menu,'question actions are grouped in an overflow menu');
+  const summary=menu.children.find(node=>node.tagName==='summary');
+  let focused=0,prevented=0;summary.focus=()=>focused++;menu.open=true;
+  menu.listeners.keydown({key:'Escape',preventDefault(){prevented++;}});
+  assert.equal(menu.open,false);assert.equal(focused,1);assert.equal(prevented,1);
+});
+
+test('canceling question deletion keeps focus on the visible action trigger',async()=>{
+  const {call,context}=await loadApp();
+  call('state.role="owner"');
+  context.window.confirm=()=>false;
+  const card=call('followUpCard({follow_up_id:"question-1",body:"おすすめの本は？",status:"open"})');
+  const all=node=>[node,...node.children.flatMap(all)];
+  const menu=all(card).find(node=>node.tagName==='details');
+  const summary=menu.children.find(node=>node.tagName==='summary');
+  let focused=0;summary.focus=()=>focused++;menu.open=true;
+  all(menu).find(node=>node.tagName==='button' && node.textContent==='削除').listeners.click();
+  assert.equal(menu.open,false);assert.equal(focused,1);
+  assert.ok(all(card).some(node=>node.textContent==='おすすめの本は？'));
+});
+
 test('choosing a fixed illustration after a photo previews the illustration instead of the retained draft',async()=>{
   const {call}=await loadApp();
   const art=call('createCardArtwork({card_image:{mode:"illustration",illustrationId:"reading"}},{draftUrl:"blob:draft-photo"})');
