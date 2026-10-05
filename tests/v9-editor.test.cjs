@@ -74,7 +74,7 @@ test('canceling question deletion keeps focus on the visible action trigger',asy
 test('choosing a fixed illustration after a photo previews the illustration instead of the retained draft',async()=>{
   const {call}=await loadApp();
   const art=call('createCardArtwork({card_image:{mode:"illustration",illustrationId:"reading"}},{draftUrl:"blob:draft-photo"})');
-  assert.equal(art.children[0].src,'./assets/reading.webp');
+  assert.equal(art.children[0].src,'./assets/reading.webp?v=20261005-simple-a');
 });
 test('photo errors can be retried more than once, with a fresh fetch',async()=>{
   const {call,context}=await loadApp();

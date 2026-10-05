@@ -889,7 +889,7 @@ function createCardArtwork(person, {thumbnail=false,draftUrl=null,interactive=fa
   const load=()=>{
     if (draftUrl && artwork.kind === "photo") {image.src=draftUrl;return;}
     if (artwork.kind !== "photo") {
-      image.src=`./assets/${artwork.kind === "theme" ? "sunset-city" : artwork.id}.webp`;return;
+      image.src=`./assets/${artwork.kind === "theme" ? "sunset-city" : artwork.id}.webp?v=20261005-simple-a`;return;
     }
     photoStore.source(artwork.path).then(url=>{image.src=url;}).catch(failed);
   };
@@ -2097,7 +2097,7 @@ function renderIllustrationOptions() {
   items.forEach(item=>{
     const selected=state.editorCardImage.mode==="illustration" && state.editorCardImage.illustrationId===item.id;
     const button=el("button",`illustration-option${selected?' selected':''}`);button.type="button";button.setAttribute("aria-pressed",String(selected));
-    const image=el("img");image.src=`./assets/${item.id}.webp`;image.alt="";image.loading="lazy";
+    const image=el("img");image.src=`./assets/${item.id}.webp?v=20261005-simple-a`;image.alt="";image.loading="lazy";
     button.append(image,el("span","",item.label));button.addEventListener("click",()=>{
       state.editorCardImage={mode:"illustration",illustrationId:item.id};renderImageEditor();renderEditorCardPreview();
     });grid.append(button);
