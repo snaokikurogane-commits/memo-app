@@ -4,6 +4,14 @@ const {pathToFileURL}=require('node:url');
 const {join}=require('node:path');
 const mod=()=>import(pathToFileURL(join(__dirname,'../v9-preview/card-images.js')).href);
 
+test('child presence and count tags offer the parenting artwork while manual choices stay fixed',async()=>{
+  const {resolveCardArtwork,filterHobbyIllustrations}=await mod();
+  for (const tag of ['子どもあり','子供がいる','子ども2人'])
+    assert.deepEqual(resolveCardArtwork({card_image:{mode:'auto'},profile_tags:[tag]}),{kind:'illustration',id:'parenting'});
+  assert.deepEqual(filterHobbyIllustrations('子ども').map(x=>x.id),['parenting']);
+  assert.deepEqual(resolveCardArtwork({card_image:{mode:'illustration',illustrationId:'reading'},profile_tags:['子ども2人']}),{kind:'illustration',id:'reading'});
+});
+
 test('new hobby tags and everyday aliases choose their own artwork',async()=>{
   const {resolveCardArtwork}=await mod();
   for(const [tag,id] of [['野球','baseball'],['筋トレ','gym'],['映画鑑賞','movie'],['晩酌','alcohol'],['愛犬','dog'],['ねこ','cat'],['ペット','pet'],['推し活','idol'],['カプセルトイ','gacha'],['カラオケ','karaoke']]){

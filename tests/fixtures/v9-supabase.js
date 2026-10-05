@@ -32,7 +32,7 @@ class Query {
   select(columns='*',options={}) {this.count=options.count;return this;}
   range(a,b) {this.bounds=[a,b];return this;}
   order(key,options={}) {this.orders.push([key,options.ascending!==false]);return this;}
-  eq(key,value) {this.filters.push(row=>key==='card_image'?JSON.stringify(row[key])===value:row[key]===value);return this;}
+  eq(key,value) {this.filters.push(row=>['card_image','profile_tags'].includes(key)?JSON.stringify(row[key])===value:row[key]===value);return this;}
   is(key,value) {this.filters.push(row=>(row[key]??null)===value);return this;}
   in(key,values) {this.filters.push(row=>values.includes(row[key]));return this;}
   contains(key,values) {this.filters.push(row=>Object.entries(values).every(([k,v])=>row[key]?.[k]===v));return this;}

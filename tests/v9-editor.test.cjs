@@ -2,8 +2,11 @@ const test=require('node:test'),assert=require('node:assert/strict'),vm=require(
 const {readFileSync}=require('node:fs'),{join}=require('node:path'),{pathToFileURL}=require('node:url');
 async function loadApp() {
   const images=await import(pathToFileURL(join(__dirname,'../v9-preview/card-images.js')).href);
+  const family=await import(pathToFileURL(join(__dirname,'../v9-preview/family.js')).href);
+  const tagLibrary=await import(pathToFileURL(join(__dirname,'../v9-preview/tag-library.js')).href);
   class Node {
     constructor(tag='div') {this.tagName=tag;this.children=[];this.listeners={};this.dataset={};this.style={};this.hidden=false;this.className='';this.value='';this.classList={add:(...names)=>{this.className+=' '+names.join(' ');},remove:(name)=>{this.className=this.className.split(' ').filter(item=>item!==name).join(' ');}};}
+    get childNodes() {return this.children;}
     append(...nodes) {nodes.forEach(node=>{node.parent=this;this.children.push(node);});}
     replaceChildren(...nodes) {this.children=[];this.append(...nodes);}
     remove() {if (this.parent) this.parent.children=this.parent.children.filter(item=>item!==this);}
@@ -12,7 +15,7 @@ async function loadApp() {
     focus() {}
   }
   const elements=new Map();
-  const context={...images,window:{},document:{createElement:tag=>new Node(tag),getElementById:id=>{if (!elements.has(id)) elements.set(id,new Node());return elements.get(id);}},console,Set,Map,Intl,Date,URL,crypto:globalThis.crypto};
+  const context={...images,...family,...tagLibrary,window:{},document:{createElement:tag=>new Node(tag),getElementById:id=>{if (!elements.has(id)) elements.set(id,new Node());return elements.get(id);}},console,Set,Map,Intl,Date,URL,crypto:globalThis.crypto};
   vm.createContext(context);
   const source=readFileSync(join(__dirname,'../v9-preview/app.js'),'utf8').replace(/^import[^\r\n]*\r?\n/gm,'').replace(/\r?\nboot\(\);\s*$/,'');
   vm.runInContext(source,context);
@@ -109,4 +112,91 @@ test('a stale photo edit rejects the save and preserves the newer server image',
   await call('savePerson({preventDefault(){}})');
   assert.equal(row.card_image.path,freshPath);assert.match(notices[0],/別の画面で画像/);
   assert.equal(elements.get('person-save').disabled,false);
+});
+
+test('a newborn age can be saved without a nickname or manually entering the confirmation date',async()=>{
+  const {call}=await loadApp();
+  const value=call('familyMemberChanges({age:"0"})');
+  assert.ok(value,'age alone is enough to record a child');
+  assert.equal(value.observed_age,0);
+  assert.equal(value.display_name,'');
+  assert.equal(value.observed_on,call('localDateKey()'));
+});
+
+test('children remain visible in the list when their tag follows more than two hobby tags',async()=>{
+  const {call}=await loadApp();
+  const card=call('personCard({person_id:"person-test",canonical_name:"架空の人物",profile_tags:["読書","ゴルフ","子ども2人"],card_image:{mode:"illustration",illustrationId:"reading"},assignment:null})');
+  const all=node=>[node,...node.children.flatMap(all)];
+  assert.ok(all(card).some(node=>node.textContent==='子ども2人'),'family information must not be hidden behind +N');
+});
+
+test('existing child records make children visible even without a manually added profile tag',async()=>{
+  const {call}=await loadApp();
+  const card=call('personCard({person_id:"person-test",canonical_name:"架空の人物",profile_tags:["読書"],hasKnownChildren:true,card_image:{mode:"illustration",illustrationId:"reading"},assignment:null})');
+  const all=node=>[node,...node.children.flatMap(all)];
+  assert.ok(all(card).some(node=>node.textContent==='子どもあり'));
+});
+
+test('tag selection finds a preset and an existing custom tag instead of offering only eight hard-coded labels',async()=>{
+  const {call}=await loadApp();
+  call('state.role="owner";state.editorTags=[];state.directory=[{profile_tags:["地元の合唱団"]}];byId("person-tag-input").value="子ども";renderPersonTagEditor()');
+  const names=call('byId("person-tag-suggestions").children.filter(node=>node.tagName==="button").map(node=>node.textContent)');
+  assert.ok(Array.from(names).includes('子どもあり'));
+  call('byId("person-tag-input").value="合唱";renderPersonTagEditor()');
+  const custom=call('byId("person-tag-suggestions").children.filter(node=>node.tagName==="button").map(node=>node.textContent)');
+  assert.ok(Array.from(custom).includes('地元の合唱団'));
+});
+
+test('editing only the nickname preserves the original age confirmation anchor',async()=>{
+  const {call}=await loadApp();
+  const member={observed_age:5,observed_on:'2023-01-10',birth_date:null};
+  const result=call(`familyMemberChanges({name:'新しい呼び名',age:String(currentChildAge(${JSON.stringify(member)}))},${JSON.stringify(member)})`);
+  assert.equal(result.observed_age,5);
+  assert.equal(result.observed_on,'2023-01-10');
+});
+
+test('saving just a child count preserves freshly added unrelated tags and rejects a concurrent change',async()=>{
+  const {call,context}=await loadApp();
+  let row={person_id:'test',profile_tags:['読書','新しく追加されたタグ','子どもあり']};
+  let conflict=false;
+  context.clientFixture={from:()=>({filters:[],select(){return this;},eq(key,value){this.filters.push(current=>key==='profile_tags'?JSON.stringify(current[key])===value:current[key]===value);return this;},update(value){this.value=value;return this;},async single(){return {data:structuredClone(row),error:null};},async maybeSingle(){if(conflict || !this.filters.every(f=>f(row)))return {data:null,error:null};Object.assign(row,this.value);return {data:structuredClone(row),error:null};}})};
+  call('state.client=clientFixture');
+  const detail={person:{person_id:'test',profile_tags:['読書']}};context.detailFixture=detail;
+  await call('persistChildrenInfo(detailFixture,{hasChildren:true,count:"2"})');
+  assert.deepEqual(row.profile_tags,['読書','新しく追加されたタグ','子ども2人']);
+  conflict=true;
+  await assert.rejects(call('persistChildrenInfo(detailFixture,{hasChildren:true,count:"3"})'),/別の画面/);
+  assert.equal(detail.person.profile_tags.at(-1),'子ども2人');
+});
+
+test('conversation editing keeps saved tags and puts its existing content in the main memo',async()=>{
+  const {call,context}=await loadApp();context.setTimeout=()=>{};
+  call('state.role="owner";state.person={person:{person_id:"test"}};openConversationEditor({conversation_id:"c",note:"本文",recap:"短いまとめ",tags:["子どもあり","読書"]})');
+  assert.deepEqual(Array.from(call('[...state.selectedTags]')),['子どもあり','読書']);
+  assert.equal(call('byId("conversation-note").value'),'本文');
+  assert.equal(call('byId("recap-options").open'),true);
+});
+
+test('editing an older short-only conversation does not erase its historical summary',async()=>{
+  const {call,context}=await loadApp();context.setTimeout=()=>{};
+  call('state.role="owner";state.person={person:{person_id:"test"}};openConversationEditor({conversation_id:"c",note:"以前のまとめ",recap:"以前のまとめ",tags:[]})');
+  assert.equal(call('byId("conversation-recap").value'),'以前のまとめ');
+  assert.equal(call('byId("recap-options").open'),true);
+});
+
+test('a directory refresh failure after inserting a child clears the saved draft and does not invite a duplicate',async()=>{
+  const {call,context}=await loadApp();let inserts=0;const notices=[];
+  context.noticeFixture=notices;
+  context.detailFixture={person:{person_id:'test'},assignments:[],familyMembers:[]};
+  context.clientFixture={from:()=>({insert(values){this.values=values;return this;},select(){return this;},async single(){inserts++;return {data:{...this.values,family_member_id:'child-test'},error:null};}})};
+  call('state.role="owner";state.client=clientFixture;toast=text=>noticeFixture.push(text);loadDirectory=async()=>{throw new Error("refresh failed")};renderDetail=()=>{testProfile=renderProfileDetails(detailFixture)};testProfile=renderProfileDetails(detailFixture)');
+  const all=node=>[node,...node.children.flatMap(all)];
+  let form=all(call('testProfile')).find(node=>node.className==='family-form');
+  all(form).find(node=>node.id==='family-age').value='5';
+  await form.listeners.submit({preventDefault(){}});
+  form=all(call('testProfile')).find(node=>node.className==='family-form');
+  assert.equal(all(form).find(node=>node.id==='family-age').value,'');
+  await form.listeners.submit({preventDefault(){}});
+  assert.equal(inserts,1);
+  assert.ok(notices.some(text=>/保存済み/.test(text)));
 });

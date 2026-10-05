@@ -41,6 +41,7 @@ export const hobbyIllustrations = [
   {"id":"shopping","label":"買い物・ショッピング","tags":["買い物","ショッピング"]},
   {"id":"art","label":"美術・アート","tags":["美術","アート","美術館","絵画"]},
   {"id":"boardgame","label":"ボードゲーム","tags":["ボードゲーム","ボドゲ","カードゲーム"]},
+  {id:'parenting',label:'子育て',tags:['子どもあり','子供あり','こどもあり','子どもがいる','子供がいる','子ども有り','子供有り','子育て','育児'],keywords:['親子','家族','子ども','子供']},
 ];
 const normalizedSearchText = value => String(value ?? '').normalize('NFKC').trim().toLowerCase();
 export function filterHobbyIllustrations(query = '') {
@@ -77,7 +78,8 @@ export function resolveCardArtwork(person) {
   if (selection.mode === 'auto') {
     for (const tag of Array.isArray(person?.profile_tags)?person.profile_tags:[]) {
       const cleaned=String(tag).normalize('NFKC').trim().toLowerCase();
-      const item=hobbyIllustrations.find(item=>item.tags.some(alias=>alias.toLowerCase() === cleaned));
+      const item=hobbyIllustrations.find(item=>item.tags.some(alias=>alias.toLowerCase() === cleaned)
+        || (item.id === 'parenting' && /^(?:子ども|子供|こども)[1-9]\d?人$/.test(cleaned)));
       if (item) return {kind:'illustration',id:item.id};
     }
   }

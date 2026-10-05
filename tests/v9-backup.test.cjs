@@ -16,7 +16,11 @@ test('the new reader still decrypts original v1 backups',async()=>{
 });
 test('v2 encryption round trip retains photo bytes and crop settings',async()=>{
   const {encryptBackup,decryptBackup,validateBackupPayload}=await mod();
-  const original=payload(2); assert.equal(validateBackupPayload(original),true);
+  const original=payload(2);
+  original.tables.people[0].profile_tags=['読書','子ども2人'];
+  original.tables.family_members=[{family_member_id:'child_test',person_id:'per_test',relationship:'child',display_name:'',birth_date:null,observed_age:5,observed_on:'2026-10-06'}];
+  original.counts.family_members=1;
+  assert.equal(validateBackupPayload(original),true);
   const encrypted=await encryptBackup(original,'test-password-2026');
   assert.equal(JSON.stringify(encrypted).includes('架空'),false);
   assert.deepEqual(await decryptBackup(encrypted,'test-password-2026'),original);

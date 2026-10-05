@@ -1,6 +1,6 @@
 # V9 artwork
 
-The current 40 hobby images use the simplified hand-painted A style approved on 2026-10-05. See [the current production record](20261005-simple-hobbies.md) for the shared prompt, all subjects, and source filenames. The prompts below document the original 12 hobby images and the unchanged sunset-city image; [20261005-hobbies.md](20261005-hobbies.md) records the original additional 28 images.
+The current 40 hobby images and one parenting image use the simplified hand-painted A style approved on 2026-10-05. See [the parenting record](20261006-parenting.md) and [the current production record](20261005-simple-hobbies.md) for the shared prompt, all subjects, and source filenames. The prompts below document the original 12 hobby images and the unchanged sunset-city image; [20261005-hobbies.md](20261005-hobbies.md) records the original additional 28 images.
 
 Generated using the built-in image generation tool; packaged as WebP for the application. The source images remain in Codex generated_images.
 

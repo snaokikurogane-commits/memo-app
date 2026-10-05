@@ -1,17 +1,9 @@
 import { encryptBackup, validateBackupPayload } from "./backup-crypto.js";
-import { hobbyIllustrations, filterHobbyIllustrations, normalizeCardImage, resolveCardArtwork, PhotoStore, preparePhoto, persistCardImage, collectPhotoMedia } from "./card-images.js?v=9-20261005-hobbies";
+import { hobbyIllustrations, filterHobbyIllustrations, normalizeCardImage, resolveCardArtwork, PhotoStore, preparePhoto, persistCardImage, collectPhotoMedia } from "./card-images.js?v=9-20261006-family";
+import {isChildrenTag, childrenInfo, childrenProfileTags, currentChildAge} from './family.js?v=9-20261006-family';
+import {tagChoices, tagCategories} from './tag-library.js?v=9-20261006-family';
 
 const config = window.PEOPLE_NOTEBOOK_CONFIG || {};
-const tags = [
-  "同期",
-  "特に仲良し",
-  "ゴルフ",
-  "車",
-  "マラソン",
-  "LINE",
-  "雇用保険",
-  "給付経験あり",
-];
 const standardTopics = [
   {
     id: "standard-work-start",
@@ -170,6 +162,7 @@ const state = {
   assignments: [],
   conversations: [],
   followUps: [],
+  familyMembers: [],
   directory: [],
   person: null,
   selectedTags: new Set(),
@@ -204,6 +197,8 @@ const state = {
   editorMode: "create",
   editorPersonId: null,
   editorTags: [],
+  editorTagCategory: 'all',
+  conversationTagCategory: 'all',
   selectedCardStyle: "mist",
   selectedCardCategory: "recommended",
   selectedCardTint: "",
@@ -625,6 +620,7 @@ function personSearchText(person) {
       ...(Array.isArray(person.aliases) ? person.aliases : []),
       ...(Array.isArray(person.profile_tags) ? person.profile_tags : []),
       assignmentText(person.assignment),
+      childrenInfo(person).hasChildren ? `子どもあり 子供あり 子どもがいる ${childrenInfo(person).label}` : '',
     ].join(" "),
   );
 }
@@ -809,7 +805,7 @@ async function selectPerson(personId) {
 
 async function loadDirectory() {
   byId("sync-state").textContent = "読み込み中…";
-  const [people, assignments, conversations, followUps] = await Promise.all([
+  const [people, assignments, conversations, followUps, familyMembers] = await Promise.all([
     selectPeople(),
     selectAll(
       "assignments",
@@ -821,11 +817,15 @@ async function loadDirectory() {
       "follow_up_id,person_id,body,due_at,status,completed_at,created_at",
       { order: "created_at", ascending: false },
     ),
+    selectAll('family_members','family_member_id,person_id,relationship'),
   ]);
   state.people = people.filter((person) => person.active_status === "active");
   state.assignments = assignments;
   state.conversations = conversations;
   state.followUps = followUps;
+  state.familyMembers = familyMembers;
+  const childPeople = new Set(familyMembers.filter(member=>member.relationship === 'child').map(member=>member.person_id));
+  conversations.forEach(conversation=>{if ((conversation.tags || []).some(isChildrenTag)) childPeople.add(conversation.person_id);});
   const assignmentsByPerson = new Map();
   assignments.forEach((assignment) => {
     if (!assignmentsByPerson.has(assignment.person_id))
@@ -844,6 +844,7 @@ async function loadDirectory() {
         assignments: personAssignments,
         assignment: currentAssignment(personAssignments),
         latestConversation: latestByPerson.get(person.person_id) || null,
+        hasKnownChildren: childPeople.has(person.person_id),
       });
     })
     .sort((a, b) => a.canonical_name.localeCompare(b.canonical_name, "ja"));
@@ -911,7 +912,9 @@ function personCard(person, context = null) {
   const left = el("div", "person-card-copy");
   left.append(el("div", "person-name", person.canonical_name));
   left.append(el("div", "assignment", assignmentText(person.assignment)));
-  const profileTags = Array.isArray(person.profile_tags) ? person.profile_tags.filter(Boolean) : [];
+  const profileTags = Array.isArray(person.profile_tags) ? person.profile_tags.filter(tag=>tag && !isChildrenTag(tag)) : [];
+  const childLabel = childrenInfo(person).label;
+  if (childLabel) left.append(el('div','children-badge',childLabel));
   if (profileTags.length) {
     const tagRow = el("div", "person-card-tags");
     profileTags.slice(0,2).forEach(tag => tagRow.append(el("span", "identity-tag", tag)));
@@ -1319,21 +1322,69 @@ function makeField(labelText, id, type, value = "") {
   return { label, input };
 }
 
-function familyMemberChanges(values, requireName = false) {
+function familyMemberChanges(values, previous = null) {
   const displayName = String(values.name || "").trim();
   const birthDate = String(values.birth || "").trim();
   const ageValue = String(values.age ?? "").trim();
-  const observedOn = String(values.observed || "").trim();
-  if (requireName && !displayName) return null;
+  const observedOn = String(values.observed || localDateKey()).trim();
   if (!birthDate && (!ageValue || !observedOn)) return null;
   const age = Number(ageValue);
-  if (!birthDate && (!Number.isInteger(age) || age < 0)) return null;
+  if (!birthDate && (!Number.isInteger(age) || age < 0 || age > 130)) return null;
+  if (birthDate && (Number.isNaN(new Date(`${birthDate}T00:00:00`).getTime()) || birthDate > localDateKey())) return null;
+  const keepAnchor = previous && !previous.birth_date && !birthDate && age === currentChildAge(previous);
   return {
     display_name: displayName,
     birth_date: birthDate || null,
-    observed_age: birthDate ? null : age,
-    observed_on: birthDate ? null : observedOn,
+    observed_age: birthDate ? null : keepAnchor ? previous.observed_age : age,
+    observed_on: birthDate ? null : keepAnchor ? previous.observed_on : observedOn,
   };
+}
+
+async function persistChildrenInfo(detail, values) {
+  const id = detail.person.person_id;
+  const {data: latest, error: readError} = await state.client.from('people').select('person_id,profile_tags').eq('person_id',id).single();
+  if (readError) throw readError;
+  const profile_tags = childrenProfileTags(latest.profile_tags,values);
+  const {data, error} = await state.client.from('people').update({profile_tags})
+    .eq('person_id',id).eq('profile_tags',JSON.stringify(latest.profile_tags)).select('person_id,profile_tags').maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error('別の画面でタグが更新されました。画面を開き直してから保存してください。');
+  detail.person.profile_tags = data.profile_tags;
+}
+
+function childrenSummaryForm(detail) {
+  const form = el('form','children-summary-form');
+  const known = detail.familyMembers.some(member=>member.relationship === 'child');
+  const info = childrenInfo({...detail.person,hasKnownChildren:known || detail.person.hasKnownChildren});
+  const presence = makeField('子どもがいる','children-present','checkbox');
+  presence.input.checked = info.hasChildren;
+  presence.input.disabled = known;
+  const count = makeField('人数（わかる場合）','children-count','number',info.count ?? '');
+  count.input.min='1';count.input.max='30';count.input.inputMode='numeric';
+  count.input.addEventListener('input',()=>{if(count.input.value) presence.input.checked=true;});
+  const save = el('button','secondary','子ども情報を保存');save.type='submit';
+  form.append(presence.label,count.label,el('p','field-hint','いることだけ、人数だけでも保存できます。年齢は下から追加できます。'),save);
+  form.addEventListener('submit',async event=>{
+    event.preventDefault();save.disabled=true;
+    try {
+      await persistChildrenInfo(detail,{hasChildren:presence.input.checked,count:count.input.value});
+      state.profileDetailsOpen=true;renderDetail();toast('子ども情報を保存しました');
+      try {await loadDirectory();} catch {toast('子ども情報は保存済みです。一覧の更新に失敗したため、後で画面を再読み込みしてください。',true);}
+    } catch(error) {toast(message(error),true);} finally {save.disabled=false;}
+  });
+  return form;
+}
+
+function childAgeFields(prefix, member = {}) {
+  const age = makeField('年齢（わかる場合）',`${prefix}-age`,'number',currentChildAge(member) ?? '');
+  age.input.min='0';age.input.max='130';age.input.inputMode='numeric';
+  const extra=el('details','family-extra');extra.append(el('summary','','呼び名・誕生日も入力（任意）'));
+  const name=makeField('呼び名',`${prefix}-name`,'text',member.display_name || '');
+  const birth=makeField('生年月日',`${prefix}-birth`,'date',member.birth_date || '');birth.input.max=localDateKey();
+  name.input.maxLength=100;
+  const sync=()=>{age.input.disabled=Boolean(birth.input.value);};birth.input.addEventListener('input',sync);sync();
+  extra.append(name.label,birth.label);
+  return {age,name,birth,extra};
 }
 
 function identityCard(detail, options = {}) {
@@ -1372,8 +1423,10 @@ function identityCard(detail, options = {}) {
     ),
   );
   const profileTags = Array.isArray(person.profile_tags)
-    ? person.profile_tags.filter(Boolean)
+    ? person.profile_tags.filter(tag=>tag && !isChildrenTag(tag))
     : [];
+  const childLabel = childrenInfo({...person,hasKnownChildren:person.hasKnownChildren || detail.familyMembers?.some(member=>member.relationship === 'child')}).label;
+  if (childLabel) copy.append(el('div','children-badge',childLabel));
   if (profileTags.length) {
     const tagRow = el("div", "identity-tags");
     profileTags
@@ -1399,30 +1452,21 @@ function detailSectionButton(text, onClick) {
 function familyMemberEditor(detail, member, onCancel) {
   const form = el("form", "family-edit-form");
   const prefix = `family-edit-${member.family_member_id}`;
-  const name = makeField("呼び名", `${prefix}-name`, "text", member.display_name || "");
-  const birth = makeField("生年月日", `${prefix}-birth`, "date", member.birth_date || "");
-  const age = makeField("年齢（誕生日不明時）", `${prefix}-age`, "number", member.observed_age ?? "");
-  const observed = makeField("確認日", `${prefix}-observed`, "date", member.observed_on || localDateKey());
-  const syncEstimated = () => {
-    age.input.disabled = Boolean(birth.input.value);
-    observed.input.disabled = Boolean(birth.input.value);
-  };
-  birth.input.addEventListener("input", syncEstimated);
-  syncEstimated();
-  const hint = el("p", "field-hint wide", "生年月日が分かる場合は、推定年齢と確認日を置き換えます。");
+  const {name,birth,age,extra} = childAgeFields(prefix,member);
+  const hint = el("p", "field-hint wide", "誕生日が不明でも年齢だけで保存できます。推定年齢は毎年進みます。");
   const save = el("button", "primary", "変更を保存");
   save.type = "submit";
   const cancel = el("button", "quiet-button", "キャンセル");
   cancel.type = "button";
   cancel.addEventListener("click", onCancel);
-  form.append(name.label, birth.label, age.label, observed.label, hint, save, cancel);
+  form.append(age.label,extra,hint,save,cancel);
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const changes = familyMemberChanges({
       name: name.input.value, birth: birth.input.value,
-      age: age.input.value, observed: observed.input.value,
-    });
-    if (!changes) return toast("生年月日、または年齢と確認日を入力してください。", true);
+      age: age.input.value,
+    },member);
+    if (!changes) return toast("年齢または生年月日を入力してください。", true);
     save.disabled = true;
     try {
       const { data, error } = await state.client.from("family_members")
@@ -1485,10 +1529,11 @@ function renderProfileDetails(detail) {
 
   const family = el("section", "profile-subsection family-section");
   family.append(el("h3", "", "家族・子ども"));
+  if (canEditPeople()) family.append(childrenSummaryForm(detail));
   detail.familyMembers.forEach((member) => {
     const row = el("div", "family-row");
     const summary = el("div", "family-row-summary");
-    summary.append(el("strong", "", member.display_name || member.relationship),
+    summary.append(el("strong", "", member.display_name || (member.relationship === 'child' ? '子ども' : '家族')),
       el("span", "pill", ageText(member)));
     row.append(summary);
     if (canEditPeople()) {
@@ -1507,26 +1552,19 @@ function renderProfileDetails(detail) {
     family.append(el("div", "empty compact-empty", "家族情報は未登録です"));
   }
   if (canEditPeople()) {
-    const form = el("div", "family-form");
-    form.append(el("h4", "wide", "新しい子どもを追加"));
-    const name = makeField("呼び名", "family-name", "text");
-    const birth = makeField("生年月日", "family-birth", "date");
-    const age = makeField("年齢（誕生日不明時）", "family-age", "number");
-    const observed = makeField(
-      "確認日",
-      "family-observed",
-      "date",
-      localDateKey(),
-    );
-    const save = el("button", "secondary wide", "子ども情報を追加");
-    save.type = "button";
-    save.addEventListener("click", async () => {
+    const form = el("form", "family-form");
+    form.append(el("h4", "wide", "子どもの年齢を追加"));
+    const {name,birth,age,extra} = childAgeFields('family');
+    const save = el("button", "secondary wide", "年齢を追加する");
+    save.type = "submit";
+    form.addEventListener("submit", async event => {
+      event.preventDefault();
       const changes = familyMemberChanges({
         name: name.input.value, birth: birth.input.value,
-        age: age.input.value, observed: observed.input.value,
-      }, true);
+        age: age.input.value,
+      });
       if (!changes) {
-        toast("新しく追加する場合は呼び名と、生年月日または年齢・確認日を入力してください。既存の情報は上の「編集」から変更できます。", true);
+        toast("年齢または生年月日を入力してください。人数だけなら上の欄で保存できます。", true);
         return;
       }
       save.disabled = true;
@@ -1542,16 +1580,18 @@ function renderProfileDetails(detail) {
           .single();
         if (error) throw error;
         detail.familyMembers.push(data);
+        detail.person.hasKnownChildren = true;
         state.profileDetailsOpen = true;
         renderDetail();
         toast("子ども情報を保存しました");
+        try {await loadDirectory();} catch {toast('子ども情報は保存済みです。一覧の更新に失敗したため、後で画面を再読み込みしてください。',true);}
       } catch (error) {
         toast(message(error), true);
       } finally {
         save.disabled = false;
       }
     });
-    form.append(name.label, birth.label, age.label, observed.label, save);
+    form.append(age.label,extra,el('p','field-hint wide','確認日は自動で記録します。年齢は誕生日が分からない場合の目安です。'),save);
     family.append(form);
   }
   content.append(family);
@@ -1767,7 +1807,7 @@ async function openPerson(personId) {
     ].find((result) => result.error)?.error;
     if (error) throw error;
     state.person = {
-      person: personResult.data,
+      person: {...personResult.data,hasKnownChildren:state.directory.find(person=>person.person_id === personId)?.hasKnownChildren || false},
       assignments: assignmentsResult.data.sort(compareFiscalYear),
       conversations: conversationsResult.data,
       events: eventsResult.data,
@@ -1866,13 +1906,15 @@ function renderPersonTagEditor() {
   const atLimit = state.editorTags.length >= 30;
   byId("person-tag-input").disabled = atLimit;
   byId("person-tag-add").disabled = atLimit;
+  renderTagCategories('person-tag-categories',state.editorTagCategory,category=>{state.editorTagCategory=category;renderPersonTagEditor();});
+  if (byId('person-tag-input').value.trim()) byId('person-tag-picker').open=true;
   const suggestions = byId("person-tag-suggestions");
   clear(suggestions);
   const options = atLimit
     ? []
-    : suggestPersonTags(state.directory, state.editorTags, byId("person-tag-input").value);
+    : tagChoices(state.directory,state.conversations,state.editorTags,byId("person-tag-input").value,state.editorTagCategory).map(item=>item.label);
   if (options.length) {
-    suggestions.append(el("span", "person-tag-suggestions-label", "既存のタグ"));
+    suggestions.append(el("span", "person-tag-suggestions-label", "タグを選ぶ"));
     options.forEach((tag) => {
       const button = el("button", "person-tag-suggestion", tag);
       button.type = "button";
@@ -2128,6 +2170,8 @@ function fillPersonForm(person = null, assignments = []) {
     ? person.profile_tags.filter(Boolean)
     : [];
   byId("person-tag-input").value = "";
+  state.editorTagCategory='all';
+  byId('person-tag-picker').open=false;
   renderPersonTagEditor();
   byId("illustration-search").value = "";
   byId("person-fiscal-year").value =
@@ -2340,24 +2384,45 @@ async function savePerson(event) {
   }
 }
 
+function renderTagCategories(id,selected,onSelect) {
+  const target=byId(id);clear(target);
+  for (const [key,label] of tagCategories) {
+    const button=el('button',`tag-category${key === selected ? ' selected' : ''}`,label);button.type='button';
+    button.setAttribute('aria-pressed',String(key === selected));
+    button.addEventListener('click',()=>onSelect(key));target.append(button);
+  }
+}
+
 function renderTags() {
   const target = byId("tag-list");
   clear(target);
-  tags.forEach((tag) => {
-    const button = el(
-      "button",
-      `tag${state.selectedTags.has(tag) ? " selected" : ""}`,
-      tag,
-    );
+  state.selectedTags.forEach((tag) => {
+    const button = el('button','tag selected',`${tag} ×`);
     button.type = "button";
+    button.setAttribute('aria-label',`${tag}を外す`);
     button.addEventListener("click", () => {
-      state.selectedTags.has(tag)
-        ? state.selectedTags.delete(tag)
-        : state.selectedTags.add(tag);
+      state.selectedTags.delete(tag);
       renderTags();
     });
     target.append(button);
   });
+  renderTagCategories('conversation-tag-categories',state.conversationTagCategory,category=>{state.conversationTagCategory=category;renderTags();});
+  const choices=byId('conversation-tag-options');clear(choices);
+  const query=byId('conversation-tag-search').value;
+  const add=tag=>{
+    if (state.selectedTags.size >= 30) return toast('会話タグは30件まで選べます。',true);
+    state.selectedTags.add(tag);byId('conversation-tag-search').value='';renderTags();
+  };
+  for(const item of tagChoices(state.directory,state.conversations,state.selectedTags,query,state.conversationTagCategory)) {
+    const button=el('button','person-tag-suggestion',item.label);button.type='button';
+    button.addEventListener('click',()=>add(item.label));choices.append(button);
+  }
+  const custom=query.trim();
+  const all=tagChoices(state.directory,state.conversations,[], '', 'all');
+  if(custom && !all.some(item=>item.label.normalize('NFKC').toLowerCase() === custom.normalize('NFKC').toLowerCase()) && !state.selectedTags.has(custom)) {
+    const button=el('button','quiet-button tag-custom-add',`「${custom}」を追加`);button.type='button';
+    button.addEventListener('click',()=>add(custom));choices.append(button);
+  }
 }
 
 function resetComposer() {
@@ -2368,12 +2433,17 @@ function resetComposer() {
   byId("next-topics-section").hidden = false;
   byId("follow-up-date-section").hidden = false;
   state.selectedTags.clear();
+  state.conversationTagCategory='all';
+  byId('conversation-tag-search').value='';
+  byId('conversation-tag-picker').open=false;
+  byId('recap-options').open=false;
   renderTags();
 }
 
-function openComposer(focusId = "conversation-recap") {
+function openComposer(focusId = "conversation-note") {
   if (!state.person) return;
   byId("composer").hidden = false;
+  byId('composer').setAttribute('aria-label',byId('composer-title').textContent);
   setTimeout(() => {
     byId(focusId)?.focus();
   }, 0);
@@ -2384,8 +2454,11 @@ function openConversationEditor(conversation) {
   state.editingConversationId = conversation.conversation_id;
   byId("composer-title").textContent = "会話メモを編集";
   byId("save-conversation").textContent = "変更を保存";
-  byId("conversation-recap").value = conversation.recap || conversationRecap(conversation);
-  byId("conversation-note").value = conversation.note === byId("conversation-recap").value ? "" : conversation.note || "";
+  byId("conversation-note").value = conversation.note || conversation.recap || '';
+  byId("conversation-recap").value = conversation.recap || '';
+  byId('recap-options').open=Boolean(byId('conversation-recap').value);
+  state.selectedTags=new Set(conversation.tags || []);
+  renderTags();
   byId("next-topics-section").hidden = true;
   byId("follow-up-date-section").hidden = true;
   openComposer();
@@ -3045,7 +3118,7 @@ async function saveConversation(event) {
     .map((value) => value.trim())
     .filter(Boolean);
   if (!recap && !note && !followUpItems.length) {
-    toast("ひとこと振り返り、詳しいメモ、次に聞くことのいずれかを入力してください。", true);
+    toast("会話メモまたは次に聞くことを入力してください。", true);
     return;
   }
   const button = byId("save-conversation");
@@ -3053,7 +3126,7 @@ async function saveConversation(event) {
   button.textContent = "保存中…";
   try {
     if (state.editingConversationId) {
-      const changes = { note: conversationNoteForSave(recap, note, state.recapAvailable) };
+      const changes = { note: conversationNoteForSave(recap, note, state.recapAvailable),tags:[...state.selectedTags] };
       if (state.recapAvailable) changes.recap = recap || null;
       const { data, error } = await state.client.from("conversations")
         .update(changes).eq("conversation_id", state.editingConversationId).select().single();
@@ -3278,6 +3351,8 @@ function bindEvents() {
   byId("composer-open").addEventListener("click", () => openComposer());
   byId("composer-close").addEventListener("click", closeComposer);
   byId("conversation-form").addEventListener("submit", saveConversation);
+  byId('conversation-tag-search').addEventListener('input',renderTags);
+  byId('conversation-tag-search').addEventListener('keydown',event=>{if(event.key === 'Enter' && !event.isComposing) {event.preventDefault();}});
   byId("ai-consultation-close").addEventListener("click", closeAiConsultation);
   byId("ai-copy").addEventListener("click", copyAiDraft);
   byId("ai-draft").addEventListener("input", () => { byId("ai-length").textContent = `${byId("ai-draft").value.length}文字。コピー前に内容を確認・編集できます。`; });

@@ -13,7 +13,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="stylesheet" href="./styles.css?v=9-20261004" />
     <link rel="stylesheet" href="./theme-art.css?v=9-20261004" />
-    <link rel="stylesheet" href="./v9.css?v=9-20261005-questions" />
+    <link rel="stylesheet" href="./v9.css?v=9-20261006-family" />
   </head>
   <body>
     <main class="shell">
@@ -296,10 +296,14 @@
               <label for="person-tag-input">タグ</label>
               <div id="person-tag-list" class="person-tag-list" aria-label="設定中のタグ"></div>
               <div class="person-tag-entry">
-                <input id="person-tag-input" type="text" maxlength="80" placeholder="タグを入力" />
+                <input id="person-tag-input" type="text" maxlength="80" placeholder="タグを入力・検索" />
                 <button id="person-tag-add" class="quiet-button" type="button">追加</button>
               </div>
-              <div id="person-tag-suggestions" class="person-tag-suggestions" aria-label="既存のタグから選ぶ" hidden></div>
+              <details id="person-tag-picker" class="tag-picker">
+                <summary>タグを選ぶ・探す</summary>
+                <div id="person-tag-categories" class="tag-categories" aria-label="タグの種類"></div>
+                <div id="person-tag-suggestions" class="person-tag-suggestions tag-options" aria-label="タグの候補" hidden></div>
+              </details>
             </div>
           </div>
         </section>
@@ -340,7 +344,7 @@
           <section id="illustration-panel" class="illustration-panel" hidden>
             <label class="illustration-search-label" for="illustration-search">イラストを探す</label>
             <input id="illustration-search" type="search" placeholder="例：野球、ペット、筋トレ" autocomplete="off" maxlength="80" />
-            <p class="form-help">40種類から選べます。選んだ絵は、趣味タグが変わっても固定されます。</p>
+            <p class="form-help">趣味と子育ての41種類から選べます。選んだ絵は、タグが変わっても固定されます。</p>
             <div id="illustration-options" class="illustration-options" aria-label="趣味のイラスト"></div>
             <p id="illustration-empty" class="form-help" role="status" hidden>見つかりませんでした。別の言葉で探してみてください。</p>
           </section>
@@ -424,14 +428,24 @@
       </header>
       <form id="conversation-form" class="composer-form">
         <div id="tag-list" class="tag-list" aria-label="タグ"></div>
-        <label>ひとこと振り返り（100文字まで）<input id="conversation-recap" type="text" maxlength="100" placeholder="次に会う前に思い出したいこと" /></label>
+        <details id="conversation-tag-picker" class="tag-picker">
+          <summary>タグを選ぶ・探す</summary>
+          <label>タグを検索<input id="conversation-tag-search" type="search" maxlength="80" placeholder="趣味・家族・自分のタグを検索" /></label>
+          <div id="conversation-tag-categories" class="tag-categories" aria-label="タグの種類"></div>
+          <div id="conversation-tag-options" class="tag-options" aria-label="タグの候補"></div>
+        </details>
         <label
-          >詳しいメモ（任意）<textarea
+          >会話メモ<textarea
             id="conversation-note"
             maxlength="5000"
             placeholder="今回話した内容。会話履歴として残ります"
           ></textarea>
         </label>
+        <details id="recap-options" class="recap-options">
+          <summary>短いまとめも残す（任意）</summary>
+          <label>次に会う前に思い出したいこと<input id="conversation-recap" type="text" maxlength="100" placeholder="100文字まで" /></label>
+          <p class="field-hint">書かなくても、会話メモの冒頭を前回の話として表示します。</p>
+        </details>
         <label id="next-topics-section"
           >次に聞くこと<textarea
             id="next-topics"
@@ -562,6 +576,6 @@
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
     <script src="./config.js"></script>
     <script src="./topics-data.js"></script>
-    <script type="module" src="./app.js?v=9-20261005-simple-a"></script>
+    <script type="module" src="./app.js?v=9-20261006-family"></script>
   </body>
 </html>
