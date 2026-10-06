@@ -1,8 +1,8 @@
 import { encryptBackup, validateBackupPayload } from "./backup-crypto.js";
-import { hobbyIllustrations, filterHobbyIllustrations, normalizeCardImage, resolveCardArtwork, PhotoStore, preparePhoto, persistCardImage, collectPhotoMedia } from "./card-images.js?v=9-20261006-age";
-import {isChildrenTag, childrenInfo, childrenProfileTags, currentChildAge} from './family.js?v=9-20261006-age';
-import {tagChoices, tagCategories} from './tag-library.js?v=9-20261006-age';
-import {personAgeValues, personAgeSummary, personAgeInputs} from './person-age.js?v=9-20261006-age';
+import { hobbyIllustrations, filterHobbyIllustrations, normalizeCardImage, resolveCardArtwork, PhotoStore, preparePhoto, persistCardImage, collectPhotoMedia } from "./card-images.js?v=9-20261006-children-fix";
+import {isChildrenTag, childrenInfo, childrenProfileTags, childrenPresenceAfterTagEdit, currentChildAge} from './family.js?v=9-20261006-children-fix';
+import {tagChoices, tagCategories} from './tag-library.js?v=9-20261006-children-fix';
+import {personAgeValues, personAgeSummary, personAgeInputs} from './person-age.js?v=9-20261006-children-fix';
 
 const config = window.PEOPLE_NOTEBOOK_CONFIG || {};
 const standardTopics = [
@@ -187,6 +187,9 @@ const state = {
   cardFieldsAvailable: true,
   cardImageAvailable: true,
   personAgeAvailable: true,
+  childrenPresenceAvailable: true,
+  editorOriginalChildren: null,
+  editorOriginalTags: null,
   editorOriginalAge: null,
   editorCardImage: {mode: "auto"},
   editorPhotoBlob: null,
@@ -396,7 +399,7 @@ function buildAiConsultation(detail, options = {}) {
   }
   if (includePersonal) {
     lines.push("", "家族・個人的な出来事：");
-    const family = detail.familyMembers || [];
+    const family = (detail.familyMembers || []).filter(item=>item.relationship !== 'child' || detail.person.children_present !== false);
     const events = detail.events || [];
     if (!family.length && !events.length) lines.push("記録なし");
     family.forEach((item) => lines.push(`・家族：${[item.relationship, item.display_name, item.observed_age == null ? "" : `${item.observed_age}歳`, item.note].filter(Boolean).join(" / ")}`));
@@ -778,11 +781,12 @@ function missingCardFields(error) {
 
 async function selectWithCardFields(fetchRows) {
   const base="person_id,canonical_name,name_kana,aliases,profile_tags,active_status";
-  let optional=["card_style","card_tint","card_tone","icon_style","icon_frame","card_image","age_info"];
+  let optional=["card_style","card_tint","card_tone","icon_style","icon_frame","card_image","age_info","children_present"];
   for (;;) {
     const result=await fetchRows([base,...optional].join(","));
     if (!result.error) {
       state.personAgeAvailable=optional.includes('age_info');
+      state.childrenPresenceAvailable=optional.includes('children_present');
       state.cardImageAvailable=optional.includes("card_image");
       state.cardFieldsAvailable=["card_style","icon_style","icon_frame"].every(field=>optional.includes(field));
       state.cardTintAvailable=optional.includes("card_tint");
@@ -1348,14 +1352,21 @@ function familyMemberChanges(values, previous = null) {
 
 async function persistChildrenInfo(detail, values) {
   const id = detail.person.person_id;
-  const {data: latest, error: readError} = await state.client.from('people').select('person_id,profile_tags').eq('person_id',id).single();
+  const columns = state.childrenPresenceAvailable ? 'person_id,profile_tags,children_present' : 'person_id,profile_tags';
+  if (!state.childrenPresenceAvailable && !values.hasChildren && (detail.person.hasKnownChildren || detail.familyMembers?.some(member=>member.relationship === 'child')))
+    throw new Error('子ども情報の解除に必要な保存設定がまだ反映されていません。画面を再読み込みしてください。');
+  const {data: latest, error: readError} = await state.client.from('people').select(columns).eq('person_id',id).single();
   if (readError) throw readError;
   const profile_tags = childrenProfileTags(latest.profile_tags,values);
-  const {data, error} = await state.client.from('people').update({profile_tags})
-    .eq('person_id',id).eq('profile_tags',JSON.stringify(latest.profile_tags)).select('person_id,profile_tags').maybeSingle();
+  const changes = {profile_tags};
+  if (state.childrenPresenceAvailable) changes.children_present=Boolean(values.hasChildren);
+  let query = state.client.from('people').update(changes).eq('person_id',id).eq('profile_tags',JSON.stringify(latest.profile_tags));
+  if (state.childrenPresenceAvailable) query = latest.children_present == null ? query.is('children_present',null) : query.eq('children_present',latest.children_present);
+  const {data, error} = await query.select(columns).maybeSingle();
   if (error) throw error;
   if (!data) throw new Error('別の画面でタグが更新されました。画面を開き直してから保存してください。');
   detail.person.profile_tags = data.profile_tags;
+  if (state.childrenPresenceAvailable) detail.person.children_present = data.children_present;
 }
 
 function childrenSummaryForm(detail) {
@@ -1364,12 +1375,12 @@ function childrenSummaryForm(detail) {
   const info = childrenInfo({...detail.person,hasKnownChildren:known || detail.person.hasKnownChildren});
   const presence = makeField('子どもがいる','children-present','checkbox');
   presence.input.checked = info.hasChildren;
-  presence.input.disabled = known;
   const count = makeField('人数（わかる場合）','children-count','number',info.count ?? '');
   count.input.min='1';count.input.max='30';count.input.inputMode='numeric';
-  count.input.addEventListener('input',()=>{if(count.input.value) presence.input.checked=true;});
-  const save = el('button','secondary','子ども情報を保存');save.type='submit';
-  form.append(presence.label,count.label,el('p','field-hint','いることだけ、人数だけでも保存できます。年齢は下から追加できます。'),save);
+  const sync = ()=>{count.input.disabled=!presence.input.checked;if(!presence.input.checked) count.input.value='';};
+  presence.input.addEventListener('change',sync);sync();
+  const save = el('button','secondary','有無・人数を保存');save.type='submit';
+  form.append(presence.label,count.label,el('p','field-hint','チェックを外して保存すると一覧の表示を解除できます。登録済みの年齢は削除されません。'),save);
   form.addEventListener('submit',async event=>{
     event.preventDefault();save.disabled=true;
     try {
@@ -1382,11 +1393,12 @@ function childrenSummaryForm(detail) {
 }
 
 function childAgeFields(prefix, member = {}) {
-  const age = makeField('年齢（わかる場合）',`${prefix}-age`,'number',currentChildAge(member) ?? '');
+  const subject = member.relationship && member.relationship !== 'child' ? '家族' : '子ども';
+  const age = makeField(`${subject}の年齢（わかる場合）`,`${prefix}-age`,'number',currentChildAge(member) ?? '');
   age.input.min='0';age.input.max='130';age.input.inputMode='numeric';
-  const extra=el('details','family-extra');extra.append(el('summary','','呼び名・誕生日も入力（任意）'));
-  const name=makeField('呼び名',`${prefix}-name`,'text',member.display_name || '');
-  const birth=makeField('生年月日',`${prefix}-birth`,'date',member.birth_date || '');birth.input.max=localDateKey();
+  const extra=el('details','family-extra');extra.append(el('summary','',`${subject}の呼び名・誕生日（任意）`));
+  const name=makeField(`${subject}の呼び名`,`${prefix}-name`,'text',member.display_name || '');
+  const birth=makeField(`${subject}の生年月日`,`${prefix}-birth`,'date',member.birth_date || '');birth.input.max=localDateKey();
   name.input.maxLength=100;
   const sync=()=>{age.input.disabled=Boolean(birth.input.value);};birth.input.addEventListener('input',sync);sync();
   extra.append(name.label,birth.label);
@@ -1536,8 +1548,17 @@ function renderProfileDetails(detail) {
   content.append(assignmentSection);
 
   const family = el("section", "profile-subsection family-section");
-  family.append(el("h3", "", "家族・子ども"));
-  if (canEditPeople()) family.append(childrenSummaryForm(detail));
+  family.append(el("h3", "", "子どもの情報"),el('p','field-hint','この枠は子どもについての入力欄です。本人の年齢は上部の「編集」へ。'));
+  if (canEditPeople()) {
+    const overview=el('fieldset','children-block');
+    overview.append(el('legend','','子どもの有無・人数'),childrenSummaryForm(detail));family.append(overview);
+  }
+  const paused = detail.person.children_present === false;
+  const registered = el(paused ? 'details' : 'section','children-block children-records');
+  registered.append(el(paused ? 'summary' : 'h4','',paused ? '表示を解除した子どもの記録' : '登録済みの子ども'));
+  if (paused) registered.append(el('p','field-hint','記録は削除していません。「子どもがいる」にチェックを戻して保存すると、一覧でも再表示します。'));
+  const otherFamily = el('section','other-family');
+  otherFamily.append(el('h4','','その他の家族'));
   detail.familyMembers.forEach((member) => {
     const row = el("div", "family-row");
     const summary = el("div", "family-row-summary");
@@ -1554,16 +1575,22 @@ function renderProfileDetails(detail) {
       });
       row.append(edit);
     }
-    family.append(row);
+    (member.relationship === 'child' ? registered : otherFamily).append(row);
   });
-  if (!detail.familyMembers.length) {
-    family.append(el("div", "empty compact-empty", "家族情報は未登録です"));
+  if (!detail.familyMembers.some(member=>member.relationship === 'child')) {
+    registered.append(el("div", "empty compact-empty", "子どもの年齢は未登録です"));
   }
+  family.append(registered);
   if (canEditPeople()) {
+    const addBlock=el('fieldset','children-block children-add');
+    addBlock.append(el('legend','','子どもを1人追加'));
     const form = el("form", "family-form");
-    form.append(el("h4", "wide", "子どもの年齢を追加"));
+    if (paused) {
+      addBlock.append(el('p','field-hint','追加するときは「子どもがいる」にチェックを戻し、「有無・人数を保存」を押してください。'));
+    }
+    form.hidden=paused;
     const {name,birth,age,extra} = childAgeFields('family');
-    const save = el("button", "secondary wide", "年齢を追加する");
+    const save = el("button", "secondary wide", "この子どもの情報を追加");
     save.type = "submit";
     form.addEventListener("submit", async event => {
       event.preventDefault();
@@ -1600,9 +1627,10 @@ function renderProfileDetails(detail) {
       }
     });
     form.append(age.label,extra,el('p','field-hint wide','確認日は自動で記録します。年齢は誕生日が分からない場合の目安です。'),save);
-    family.append(form);
+    addBlock.append(form);family.append(addBlock);
   }
   content.append(family);
+  if (otherFamily.childNodes.length > 1) content.append(otherFamily);
   details.append(content);
   return details;
 }
@@ -2209,6 +2237,8 @@ function fillPersonForm(person = null, assignments = []) {
   state.editorTags = Array.isArray(person?.profile_tags)
     ? person.profile_tags.filter(Boolean)
     : [];
+  state.editorOriginalTags = person?.profile_tags ?? null;
+  state.editorOriginalChildren = person?.children_present ?? null;
   byId("person-tag-input").value = "";
   state.editorTagCategory='all';
   byId('person-tag-picker').open=false;
@@ -2334,6 +2364,7 @@ async function savePerson(event) {
     try {personValues.age_info=personAgeValues({birthday:byId('person-birthday').value,age:byId('person-age').value},state.editorOriginalAge);}
     catch(error) {toast(message(error),true);byId('person-age-options').open=true;return;}
   }
+  if (state.childrenPresenceAvailable) personValues.children_present=childrenPresenceAfterTagEdit(state.editorOriginalTags,state.editorTags,state.editorOriginalChildren);
   if (state.cardFieldsAvailable) {
     personValues.card_style = state.selectedCardStyle;
     personValues.icon_style = state.selectedIconStyle;
@@ -2374,6 +2405,10 @@ async function savePerson(event) {
       let result;
       if (state.editorMode === "edit") {
         let query=state.client.from("people").update(personValues).eq("person_id",personId);
+        if (state.childrenPresenceAvailable) {
+          query=state.editorOriginalChildren==null ? query.is('children_present',null) : query.eq('children_present',state.editorOriginalChildren);
+          query=state.editorOriginalTags==null ? query.is('profile_tags',null) : query.eq('profile_tags',JSON.stringify(state.editorOriginalTags));
+        }
         if (state.personAgeAvailable) query=state.editorOriginalAge===null
           ? query.is('age_info',null) : query.eq('age_info',JSON.stringify(state.editorOriginalAge));
         // Compare the original raw setting, including legacy null, before replacing any photo.
@@ -2393,6 +2428,8 @@ async function savePerson(event) {
     } else await writePerson(null);
     personSaved=true;
     if (state.personAgeAvailable) state.editorOriginalAge=personValues.age_info;
+    state.editorOriginalChildren=personValues.children_present ?? null;
+    state.editorOriginalTags=[...state.editorTags];
     const previousEditorMode=state.editorMode;
     state.editorPersonId=personId;
     state.editorMode="edit";

@@ -13,7 +13,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="stylesheet" href="./styles.css?v=9-20261004" />
     <link rel="stylesheet" href="./theme-art.css?v=9-20261004" />
-    <link rel="stylesheet" href="./v9.css?v=9-20261006-age" />
+    <link rel="stylesheet" href="./v9.css?v=9-20261006-children-fix" />
   </head>
   <body>
     <main class="shell">
@@ -309,11 +309,11 @@
         </section>
 
         <details id="person-age-options" class="form-section">
-          <summary>誕生日・年齢 <span class="muted">（任意）</span></summary>
-          <p class="form-help">月日だけでも入力できます。生年が分かれば年齢を計算します。</p>
+          <summary>本人の誕生日・年齢 <span class="muted">（任意）</span></summary>
+          <p class="form-help">この人物本人の情報です。月日だけでも入力できます。生年が分かれば年齢を計算します。</p>
           <div class="form-grid">
-            <label>誕生日<input id="person-birthday" type="text" maxlength="20" placeholder="5/12 または 1991/5/12" autocomplete="off" /></label>
-            <label>年齢<input id="person-age" type="number" min="0" max="130" step="1" inputmode="numeric" placeholder="年齢だけでもOK" /></label>
+            <label>本人の誕生日<input id="person-birthday" type="text" maxlength="20" placeholder="5/12 または 1991/5/12" autocomplete="off" /></label>
+            <label>本人の年齢<input id="person-age" type="number" min="0" max="130" step="1" inputmode="numeric" placeholder="年齢だけでもOK" /></label>
           </div>
           <p id="person-age-status" class="form-help" role="status"></p>
         </details>
@@ -586,6 +586,6 @@
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
     <script src="./config.js"></script>
     <script src="./topics-data.js"></script>
-    <script type="module" src="./app.js?v=9-20261006-age"></script>
+    <script type="module" src="./app.js?v=9-20261006-children-fix"></script>
   </body>
 </html>

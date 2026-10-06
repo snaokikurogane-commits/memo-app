@@ -2,6 +2,21 @@ const test=require('node:test'),assert=require('node:assert/strict');
 const {pathToFileURL}=require('node:url'),{join}=require('node:path');
 const mod=()=>import(pathToFileURL(join(__dirname,'../v9-preview/family.js')).href);
 
+test('explicitly clearing children overrides old child records and ignores the stale count',async()=>{
+  const {childrenProfileTags,childrenInfo}=await mod();
+  assert.deepEqual(childrenProfileTags(['読書','子ども2人'],{hasChildren:false,count:'2'}),['読書']);
+  assert.deepEqual(childrenInfo({profile_tags:['読書'],children_present:false,hasKnownChildren:true}),{hasChildren:false,count:null,label:''});
+  assert.equal(childrenInfo({profile_tags:[],children_present:true}).hasChildren,true);
+});
+
+test('an intentional child tag change reactivates or clears presence without changing unrelated edits',async()=>{
+  const {childrenPresenceAfterTagEdit}=await mod();
+  assert.equal(childrenPresenceAfterTagEdit(['読書'],['読書','子どもあり'],false),true);
+  assert.equal(childrenPresenceAfterTagEdit(['読書','子ども2人'],['読書'],true),false);
+  assert.equal(childrenPresenceAfterTagEdit(['読書'],['ゴルフ'],false),false);
+  assert.equal(childrenPresenceAfterTagEdit(['読書'],['ゴルフ'],null),null);
+});
+
 test('presence without a count, changing a count, and clearing it preserve unrelated profile tags',async()=>{
   const {childrenProfileTags,childrenInfo}=await mod();
   assert.deepEqual(childrenProfileTags(['ゴルフ'],{hasChildren:true}),['ゴルフ','子どもあり']);

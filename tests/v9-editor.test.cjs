@@ -124,6 +124,64 @@ test('a newborn age can be saved without a nickname or manually entering the con
   assert.equal(value.observed_on,call('localDateKey()'));
 });
 
+test('editing an adult family member does not label their birthday as a child birthday',async()=>{
+  const {call}=await loadApp();
+  const form=call('familyMemberEditor({familyMembers:[]},{family_member_id:"spouse",relationship:"spouse",display_name:"配偶者",observed_age:35},()=>{})');
+  const all=node=>[node,...node.children.flatMap(all)];
+  const labels=all(form).filter(node=>node.tagName==='label').map(node=>node.textContent);
+  assert.ok(!labels.some(label=>label.includes('子ども')));
+  assert.ok(labels.some(label=>label.includes('家族の年齢')));
+});
+
+test('children presence can be unchecked even with saved ages, and clears its count draft',async()=>{
+  const {call}=await loadApp();
+  const form=call('childrenSummaryForm({person:{profile_tags:["子ども2人"]},familyMembers:[{relationship:"child",observed_age:5}]})');
+  const all=node=>[node,...node.children.flatMap(all)];
+  const presence=all(form).find(node=>node.id==='children-present');
+  const count=all(form).find(node=>node.id==='children-count');
+  assert.ok(!presence.disabled,'saved child ages must not lock the presence checkbox');
+  presence.checked=false;
+  presence.listeners.change();
+  assert.equal(count.value,'');
+  assert.equal(count.disabled,true);
+  presence.checked=true;presence.listeners.change();
+  assert.equal(count.disabled,false);
+});
+
+test('saving cleared children keeps age records but removes the list badge and AI family entry',async()=>{
+  const {call,context}=await loadApp();
+  let row={person_id:'test',profile_tags:['読書','子ども2人'],children_present:null};
+  context.clientFixture={from:()=>({filters:[],select(){return this;},eq(key,value){this.filters.push(current=>key==='profile_tags'?JSON.stringify(current[key])===value:current[key]===value);return this;},is(key,value){this.filters.push(current=>(current[key]??null)===value);return this;},update(value){this.value=value;return this;},async single(){return {data:structuredClone(row),error:null};},async maybeSingle(){if(!this.filters.every(f=>f(row)))return {data:null,error:null};Object.assign(row,this.value);return {data:structuredClone(row),error:null};}})};
+  context.detailFixture={person:{...row,hasKnownChildren:true},familyMembers:[{relationship:'child',observed_age:5,display_name:'保留する子ども'}],assignments:[]};
+  call('state.client=clientFixture');
+  await call('persistChildrenInfo(detailFixture,{hasChildren:false,count:"2"})');
+  assert.equal(row.children_present,false);
+  assert.deepEqual(row.profile_tags,['読書']);
+  assert.equal(context.detailFixture.familyMembers.length,1,'clearing must be reversible without deleting saved ages');
+  const card=call('personCard({...detailFixture.person,canonical_name:"架空の人物",card_image:{mode:"illustration",illustrationId:"reading"}})');
+  const all=node=>[node,...node.children.flatMap(all)];
+  assert.ok(!all(card).some(node=>node.className==='children-badge'));
+  assert.ok(!call('buildAiConsultation(detailFixture,{includePersonal:true})').includes('保留する子ども'));
+  await call('persistChildrenInfo(detailFixture,{hasChildren:true,count:"2"})');
+  assert.equal(row.children_present,true);
+  assert.deepEqual(row.profile_tags,['読書','子ども2人']);
+});
+
+test('person editor can re-add a child tag after clearing presence, and rejects concurrent presence changes',async()=>{
+  const {call,context}=await loadApp();
+  let row={person_id:'test',profile_tags:['読書'],children_present:false};
+  const notices=[];context.notices=notices;
+  context.clientFixture={from:()=>({filters:[],update(value){this.value=value;return this;},eq(key,value){this.filters.push(current=>key==='profile_tags'?JSON.stringify(current[key])===value:current[key]===value);return this;},is(key,value){this.filters.push(current=>(current[key]??null)===value);return this;},select(){return this;},async maybeSingle(){if(!this.filters.every(f=>f(row)))return {data:null,error:null};Object.assign(row,this.value);return {data:{person_id:'test'},error:null};}})};
+  call('state.client=clientFixture;state.role="owner";state.editorMode="edit";state.editorPersonId="test";state.cardImageAvailable=false;state.personAgeAvailable=false;state.editorTags=["読書","子どもあり"];state.editorOriginalTags=["読書"];state.editorOriginalChildren=false;byId("person-name").value="架空の人物";byId("person-fiscal-year").value="";commitPersonTagInput=()=>true;closePersonEditor=()=>{};loadDirectory=async()=>{};openPerson=async()=>{};toast=text=>notices.push(text)');
+  await call('savePerson({preventDefault(){}})');
+  assert.equal(row.children_present,true);
+  assert.deepEqual(Array.from(row.profile_tags),['読書','子どもあり']);
+  row.children_present=false;
+  await call('savePerson({preventDefault(){}})');
+  assert.equal(row.children_present,false,'a newer cleared presence must not be overwritten');
+  assert.ok(notices.some(text=>text.includes('別の画面')));
+});
+
 test('children remain visible in the list when their tag follows more than two hobby tags',async()=>{
   const {call}=await loadApp();
   const card=call('personCard({person_id:"person-test",canonical_name:"架空の人物",profile_tags:["読書","ゴルフ","子ども2人"],card_image:{mode:"illustration",illustrationId:"reading"},assignment:null})');
@@ -160,7 +218,7 @@ test('saving just a child count preserves freshly added unrelated tags and rejec
   const {call,context}=await loadApp();
   let row={person_id:'test',profile_tags:['読書','新しく追加されたタグ','子どもあり']};
   let conflict=false;
-  context.clientFixture={from:()=>({filters:[],select(){return this;},eq(key,value){this.filters.push(current=>key==='profile_tags'?JSON.stringify(current[key])===value:current[key]===value);return this;},update(value){this.value=value;return this;},async single(){return {data:structuredClone(row),error:null};},async maybeSingle(){if(conflict || !this.filters.every(f=>f(row)))return {data:null,error:null};Object.assign(row,this.value);return {data:structuredClone(row),error:null};}})};
+  context.clientFixture={from:()=>({filters:[],select(){return this;},eq(key,value){this.filters.push(current=>key==='profile_tags'?JSON.stringify(current[key])===value:current[key]===value);return this;},is(key,value){this.filters.push(current=>(current[key]??null)===value);return this;},update(value){this.value=value;return this;},async single(){return {data:structuredClone(row),error:null};},async maybeSingle(){if(conflict || !this.filters.every(f=>f(row)))return {data:null,error:null};Object.assign(row,this.value);return {data:structuredClone(row),error:null};}})};
   call('state.client=clientFixture');
   const detail={person:{person_id:'test',profile_tags:['読書']}};context.detailFixture=detail;
   await call('persistChildrenInfo(detailFixture,{hasChildren:true,count:"2"})');
