@@ -3,6 +3,7 @@ const {readFileSync}=require('node:fs'),{join}=require('node:path'),{pathToFileU
 async function loadApp() {
   const images=await import(pathToFileURL(join(__dirname,'../v9-preview/card-images.js')).href);
   const family=await import(pathToFileURL(join(__dirname,'../v9-preview/family.js')).href);
+  const personAge=await import(pathToFileURL(join(__dirname,'../v9-preview/person-age.js')).href);
   const tagLibrary=await import(pathToFileURL(join(__dirname,'../v9-preview/tag-library.js')).href);
   class Node {
     constructor(tag='div') {this.tagName=tag;this.children=[];this.listeners={};this.dataset={};this.style={};this.hidden=false;this.className='';this.value='';this.classList={add:(...names)=>{this.className+=' '+names.join(' ');},remove:(name)=>{this.className=this.className.split(' ').filter(item=>item!==name).join(' ');}};}
@@ -15,7 +16,7 @@ async function loadApp() {
     focus() {}
   }
   const elements=new Map();
-  const context={...images,...family,...tagLibrary,window:{},document:{createElement:tag=>new Node(tag),getElementById:id=>{if (!elements.has(id)) elements.set(id,new Node());return elements.get(id);}},console,Set,Map,Intl,Date,URL,crypto:globalThis.crypto};
+  const context={...images,...family,...personAge,...tagLibrary,window:{},document:{createElement:tag=>new Node(tag),getElementById:id=>{if (!elements.has(id)) elements.set(id,new Node());return elements.get(id);}},console,Set,Map,Intl,Date,URL,crypto:globalThis.crypto};
   vm.createContext(context);
   const source=readFileSync(join(__dirname,'../v9-preview/app.js'),'utf8').replace(/^import[^\r\n]*\r?\n/gm,'').replace(/\r?\nboot\(\);\s*$/,'');
   vm.runInContext(source,context);
@@ -105,12 +106,12 @@ test('a stale photo edit rejects the save and preserves the newer server image',
   const freshPath='per_test/87654321-1234-1234-1234-123456789abc.jpg';
   let row={person_id:'per_test',card_image:{mode:'photo',path:freshPath,x:.5,y:.5,zoom:1}};
   const notices=[];context.noticeFixture=notices;
-  context.clientFixture={from:()=>({filters:[],update(value){this.value=value;return this;},eq(key,value){this.filters.push(current=>key==='card_image'?JSON.stringify(current[key])===value:current[key]===value);return this;},select(){return this;},async maybeSingle(){if(!this.filters.every(filter=>filter(row)))return {data:null,error:null};row={...row,...this.value};return {data:{person_id:'per_test'},error:null};}})};
+  context.clientFixture={from:()=>({filters:[],update(value){this.value=value;return this;},eq(key,value){this.filters.push(current=>key==='card_image'?JSON.stringify(current[key])===value:current[key]===value);return this;},is(key,value){this.filters.push(current=>(current[key]??null)===value);return this;},select(){return this;},async maybeSingle(){if(!this.filters.every(filter=>filter(row)))return {data:null,error:null};row={...row,...this.value};return {data:{person_id:'per_test'},error:null};}})};
   context.storeFixture={remove:async()=>assert.fail('must not remove a saved image'),removeIfUnused:async()=>assert.fail('must not clean up after rejected edit')};
   call(`state.role='owner';state.editorMode='edit';state.editorPersonId='per_test';state.client=clientFixture;photoStore=storeFixture;state.editorOriginalImage={mode:'photo',path:'${oldPath}',x:.5,y:.5,zoom:1};state.editorCardImage=state.editorOriginalImage;commitPersonTagInput=()=>true;toast=text=>noticeFixture.push(text)`);
   call('byId("person-name").value="架空の人物";byId("person-fiscal-year").value=""');
   await call('savePerson({preventDefault(){}})');
-  assert.equal(row.card_image.path,freshPath);assert.match(notices[0],/別の画面で画像/);
+  assert.equal(row.card_image.path,freshPath);assert.match(notices[0],/別の画面で人物情報/);
   assert.equal(elements.get('person-save').disabled,false);
 });
 
@@ -199,4 +200,33 @@ test('a directory refresh failure after inserting a child clears the saved draft
   await form.listeners.submit({preventDefault(){}});
   assert.equal(inserts,1);
   assert.ok(notices.some(text=>/保存済み/.test(text)));
+});
+
+test('person identity displays own age separately from children and keeps legacy people unchanged',async()=>{
+  const {call}=await loadApp();
+  const card=call('identityCard({person:{canonical_name:"架空の人物",card_image:{mode:"illustration",illustrationId:"reading"},age_info:{birth_date:"1991-01-01"}},assignments:[],familyMembers:[]})');
+  const all=node=>[node,...node.children.flatMap(all)];
+  assert.ok(all(card).some(node=>node.textContent==='35歳 · 誕生日 1月1日'));
+  const old=call('identityCard({person:{canonical_name:"旧データ",card_image:{mode:"illustration",illustrationId:"reading"}},assignments:[],familyMembers:[]})');
+  assert.ok(!all(old).some(node=>String(node.textContent||'').includes('歳')));
+});
+
+test('editing another person does not retain the previous birthday draft',async()=>{
+  const {call,elements}=await loadApp();
+  call('fillPersonAgeEditor({birth_date:"1991-01-01"})');
+  assert.equal(elements.get('person-birthday').value,'1991/01/01');
+  assert.equal(elements.get('person-age').value,'35');
+  assert.equal(elements.get('person-age').readOnly,true);
+  call('fillPersonAgeEditor(null)');
+  assert.equal(elements.get('person-birthday').value,'');
+  assert.equal(elements.get('person-age').value,'');
+  assert.equal(elements.get('person-age').readOnly,false);
+});
+
+test('person selection retains age data and falls back safely on a database without the optional column',async()=>{
+  const {call,context}=await loadApp();let attempts=0;
+  context.fetchFixture=async columns=>{attempts++;return columns.includes('age_info')?{data:null,error:{code:'42703',message:'column people.age_info does not exist'}}:{data:[{person_id:'old'}],error:null};};
+  const result=await call('selectWithCardFields(fetchFixture)');
+  assert.equal(attempts,2);assert.equal(result.data[0].person_id,'old');
+  assert.equal(call('state.personAgeAvailable'),false);
 });

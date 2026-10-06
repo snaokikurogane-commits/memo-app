@@ -181,3 +181,6 @@ h2 {font-size:19px;letter-spacing:-.025em;color:var(--ink);}
 @media(max-width:360px) {.tag-options {grid-template-columns:repeat(2,minmax(0,1fr));}}
 @media(min-width:700px) {.card-art {height:140px;}.card-art-thumbnail {height:76px;}.form-grid {grid-template-columns:1fr 1fr;}.identity-copy h1 {font-size:27px;}.illustration-options {grid-template-columns:repeat(4,minmax(0,1fr));}}
 @media(max-width:360px) {.shell,.detail-body {padding-left:12px;padding-right:12px;}.topbar {gap:8px;}.brand-heading {gap:8px;}.app-mark {width:28px;}.topbar h1 {font-size:20px;}.person-card {gap:10px;grid-template-columns:48px minmax(0,1fr) 12px;}.card-art-thumbnail {width:48px;height:70px;}.illustration-options {grid-template-columns:repeat(2,minmax(0,1fr));}.item-actions {flex-basis:64px;}}
+.person-age-summary { color: var(--muted); font-size: 14px; line-height: 1.6; margin-top: 6px; }
+#person-age-options summary { cursor: pointer; min-height: 44px; display: list-item; padding-top: 12px; }
+#person-age[readonly] { background: #f4f6f3; }

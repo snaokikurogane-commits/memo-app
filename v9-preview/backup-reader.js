@@ -1,4 +1,5 @@
 import {decryptBackup} from './backup-crypto.js';
+import {personAgeSummary} from './person-age.js?v=9-20261006-age';
 import {verifyPhotoBlob} from './jpeg.js';
 let opened=null;
 const photoUrls=new Map();
@@ -28,6 +29,8 @@ function renderPeople() {
     const details=node('details','','reader-person');const summary=node('summary','');
     const thumb=photo(person,'reader-photo');if (thumb) summary.append(thumb);
     const title=node('div','','reader-person-copy');title.append(node('strong',person.canonical_name||'名前未登録'),node('p',(person.profile_tags||[]).join('・'),'muted'));
+    const age=personAgeSummary(person.age_info);
+    if (age.ageLabel || age.birthdayLabel) title.append(node('p',[age.ageLabel,age.birthdayLabel].filter(Boolean).join(' · '),'muted'));
     summary.append(title);details.append(summary);
     details.addEventListener('toggle',()=>{
       if (!details.open || details.dataset.loaded) return;details.dataset.loaded='true';

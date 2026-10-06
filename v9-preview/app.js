@@ -1,7 +1,8 @@
 import { encryptBackup, validateBackupPayload } from "./backup-crypto.js";
-import { hobbyIllustrations, filterHobbyIllustrations, normalizeCardImage, resolveCardArtwork, PhotoStore, preparePhoto, persistCardImage, collectPhotoMedia } from "./card-images.js?v=9-20261006-family";
-import {isChildrenTag, childrenInfo, childrenProfileTags, currentChildAge} from './family.js?v=9-20261006-family';
-import {tagChoices, tagCategories} from './tag-library.js?v=9-20261006-family';
+import { hobbyIllustrations, filterHobbyIllustrations, normalizeCardImage, resolveCardArtwork, PhotoStore, preparePhoto, persistCardImage, collectPhotoMedia } from "./card-images.js?v=9-20261006-age";
+import {isChildrenTag, childrenInfo, childrenProfileTags, currentChildAge} from './family.js?v=9-20261006-age';
+import {tagChoices, tagCategories} from './tag-library.js?v=9-20261006-age';
+import {personAgeValues, personAgeSummary, personAgeInputs} from './person-age.js?v=9-20261006-age';
 
 const config = window.PEOPLE_NOTEBOOK_CONFIG || {};
 const standardTopics = [
@@ -185,6 +186,8 @@ const state = {
   profileDetailsOpen: false,
   cardFieldsAvailable: true,
   cardImageAvailable: true,
+  personAgeAvailable: true,
+  editorOriginalAge: null,
   editorCardImage: {mode: "auto"},
   editorPhotoBlob: null,
   editorPhotoUrl: null,
@@ -366,6 +369,8 @@ function buildAiConsultation(detail, options = {}) {
   const lines = ["次に話す内容について相談したいです。以下は私が記録した情報です。"];
   if (includeName) lines.push(`相手の名前：${detail.person.canonical_name}`);
   if (includeProfile) {
+    const age=personAgeSummary(detail.person.age_info);
+    if (age.ageLabel || age.birthdayLabel) lines.push(`本人の年齢・誕生日：${[age.ageLabel,age.birthdayLabel].filter(Boolean).join('、')}`);
     const tags = Array.isArray(detail.person.profile_tags) ? detail.person.profile_tags.filter(Boolean) : [];
     if (tags.length) lines.push(`特徴・関心：${tags.join("、")}`);
     const assignment = currentAssignment(detail.assignments || []);
@@ -773,10 +778,11 @@ function missingCardFields(error) {
 
 async function selectWithCardFields(fetchRows) {
   const base="person_id,canonical_name,name_kana,aliases,profile_tags,active_status";
-  let optional=["card_style","card_tint","card_tone","icon_style","icon_frame","card_image"];
+  let optional=["card_style","card_tint","card_tone","icon_style","icon_frame","card_image","age_info"];
   for (;;) {
     const result=await fetchRows([base,...optional].join(","));
     if (!result.error) {
+      state.personAgeAvailable=optional.includes('age_info');
       state.cardImageAvailable=optional.includes("card_image");
       state.cardFieldsAvailable=["card_style","icon_style","icon_frame"].every(field=>optional.includes(field));
       state.cardTintAvailable=optional.includes("card_tint");
@@ -1406,6 +1412,8 @@ function identityCard(detail, options = {}) {
   }
   const copy = el("div", "identity-copy");
   copy.append(el("h1", "", person.canonical_name));
+  const age=personAgeSummary(person.age_info);
+  if (age.ageLabel || age.birthdayLabel) copy.append(el('div','person-age-summary',[age.ageLabel,age.birthdayLabel].filter(Boolean).join(' · ')));
   const latestAssignment = currentAssignment(detail.assignments);
   copy.append(
     el(
@@ -2161,11 +2169,43 @@ async function choosePhoto() {
   finally {if (token===state.photoSelectionToken) {state.photoPreparing=false;byId("person-save").disabled=false;byId("photo-file").value="";}}
 }
 
+function fillPersonAgeEditor(info) {
+  state.editorOriginalAge=info || null;
+  const values=personAgeInputs(info);
+  byId('person-birthday').value=values.birthday;
+  byId('person-age').value=values.age;
+  byId('person-age-options').open=false;
+  renderPersonAgeEditor();
+}
+
+function renderPersonAgeEditor() {
+  const ageInput=byId('person-age');
+  byId('person-birthday').disabled=!state.personAgeAvailable;
+  ageInput.disabled=!state.personAgeAvailable;
+  if (!state.personAgeAvailable) {
+    byId('person-age-status').textContent='誕生日・年齢の保存設定は準備中です。現在の人物情報はそのまま保存できます。';
+    return;
+  }
+  try {
+    const birthday=personAgeValues({birthday:byId('person-birthday').value});
+    ageInput.readOnly=Boolean(birthday?.birth_date);
+    if (ageInput.readOnly) ageInput.value=String(personAgeSummary(birthday).age);
+    const info=personAgeValues({birthday:byId('person-birthday').value,age:ageInput.value},state.editorOriginalAge);
+    const summary=personAgeSummary(info);
+    byId('person-age-status').textContent=info ? [summary.ageLabel,summary.birthdayLabel,
+      summary.estimated ? `${info.observed_on.replaceAll('-','/')}に${info.observed_age}歳と確認` : ''].filter(Boolean).join(' · ') : '分かる方だけ入力できます。どちらも空欄で大丈夫です。';
+  } catch (error) {
+    ageInput.readOnly=false;
+    byId('person-age-status').textContent=message(error);
+  }
+}
+
 function fillPersonForm(person = null, assignments = []) {
   byId("card-customize").open=false;
   const assignment = currentAssignment(assignments);
   byId("person-name").value = person?.canonical_name || "";
   byId("person-kana").value = person?.name_kana || "";
+  fillPersonAgeEditor(person?.age_info);
   state.editorTags = Array.isArray(person?.profile_tags)
     ? person.profile_tags.filter(Boolean)
     : [];
@@ -2290,6 +2330,10 @@ async function savePerson(event) {
     active_status: "active",
   };
   if (state.editorMode === "create") personValues.aliases = [];
+  if (state.personAgeAvailable) {
+    try {personValues.age_info=personAgeValues({birthday:byId('person-birthday').value,age:byId('person-age').value},state.editorOriginalAge);}
+    catch(error) {toast(message(error),true);byId('person-age-options').open=true;return;}
+  }
   if (state.cardFieldsAvailable) {
     personValues.card_style = state.selectedCardStyle;
     personValues.icon_style = state.selectedIconStyle;
@@ -2330,11 +2374,13 @@ async function savePerson(event) {
       let result;
       if (state.editorMode === "edit") {
         let query=state.client.from("people").update(personValues).eq("person_id",personId);
+        if (state.personAgeAvailable) query=state.editorOriginalAge===null
+          ? query.is('age_info',null) : query.eq('age_info',JSON.stringify(state.editorOriginalAge));
         // Compare the original raw setting, including legacy null, before replacing any photo.
         if (state.cardImageAvailable) query=state.editorOriginalImage===null
           ? query.is("card_image",null) : query.eq("card_image",JSON.stringify(state.editorOriginalImage));
         result=await query.select("person_id").maybeSingle();
-        if (!result.error && !result.data) throw new Error("別の画面で画像が変更されました。この画面を閉じて人物を開き直し、もう一度編集してください。");
+        if (!result.error && !result.data) throw new Error("別の画面で人物情報が変更されました。この画面を閉じて人物を開き直し、もう一度編集してください。");
       } else result = await state.client.from("people").insert({person_id:personId,...personValues,revision:1}).select("person_id").single();
       if (result.error) throw result.error;
     };
@@ -2346,6 +2392,7 @@ async function savePerson(event) {
       disposePhotoDraft();
     } else await writePerson(null);
     personSaved=true;
+    if (state.personAgeAvailable) state.editorOriginalAge=personValues.age_info;
     const previousEditorMode=state.editorMode;
     state.editorPersonId=personId;
     state.editorMode="edit";
@@ -3321,6 +3368,8 @@ function bindEvents() {
   byId("person-editor-close").addEventListener("click", closePersonEditor);
   bindIllustrationSearch();
   byId("person-form").addEventListener("submit", savePerson);
+  byId('person-birthday').addEventListener('input',renderPersonAgeEditor);
+  byId('person-age').addEventListener('input',renderPersonAgeEditor);
   byId("person-tag-add").addEventListener("click", commitPersonTagInput);
   byId("person-tag-input").addEventListener("input", renderPersonTagEditor);
   byId("person-tag-input").addEventListener("keydown", (event) => {
