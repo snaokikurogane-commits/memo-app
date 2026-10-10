@@ -1,8 +1,9 @@
 import { encryptBackup, validateBackupPayload } from "./backup-crypto.js";
-import { hobbyIllustrations, filterHobbyIllustrations, normalizeCardImage, resolveCardArtwork, PhotoStore, preparePhoto, persistCardImage, collectPhotoMedia } from "./card-images.js?v=9-20261006-children-fix";
-import {isChildrenTag, childrenInfo, childrenProfileTags, childrenPresenceAfterTagEdit, currentChildAge} from './family.js?v=9-20261006-children-fix';
-import {tagChoices, tagCategories} from './tag-library.js?v=9-20261006-children-fix';
-import {personAgeValues, personAgeSummary, personAgeInputs} from './person-age.js?v=9-20261006-children-fix';
+import { hobbyIllustrations, filterHobbyIllustrations, normalizeCardImage, resolveCardArtwork, PhotoStore, preparePhoto, persistCardImage, collectPhotoMedia } from "./card-images.js?v=9-20261010-drafts";
+import {isChildrenTag, childrenInfo, childrenProfileTags, childrenPresenceAfterTagEdit, currentChildAge} from './family.js?v=9-20261010-drafts';
+import {tagChoices, tagCategories} from './tag-library.js?v=9-20261010-drafts';
+import {personAgeValues, personAgeSummary, personAgeInputs} from './person-age.js?v=9-20261010-drafts';
+import {ConversationDrafts} from './conversation-drafts.js?v=9-20261010-drafts';
 
 const config = window.PEOPLE_NOTEBOOK_CONFIG || {};
 const standardTopics = [
@@ -155,6 +156,7 @@ const iconFrames = [
 let topicLibraryCache = null;
 let photoStore = null;
 let photoObserver = null;
+const conversationDrafts = new ConversationDrafts(() => window.sessionStorage);
 const state = {
   client: null,
   session: null,
@@ -200,6 +202,9 @@ const state = {
   cardToneAvailable: true,
   recapAvailable: true,
   editingConversationId: null,
+  conversationJob: null,
+  conversationSaving: false,
+  conversationEpoch: 0,
   editorMode: "create",
   editorPersonId: null,
   editorTags: [],
@@ -1786,6 +1791,7 @@ function renderDetail() {
 }
 
 async function openPerson(personId) {
+  if (!byId('composer').hidden) closeComposer();
   state.profileDetailsOpen = false;
   state.followUpSelectionMode = false;
   state.selectedFollowUpIds.clear();
@@ -1859,6 +1865,7 @@ async function openPerson(personId) {
 }
 
 function closeDetail() {
+  captureConversationDraft();
   byId("person-detail").hidden = true;
   closeAiConsultation();
   byId("composer").hidden = true;
@@ -2487,6 +2494,7 @@ function renderTags() {
     button.addEventListener("click", () => {
       state.selectedTags.delete(tag);
       renderTags();
+      captureConversationDraft();
     });
     target.append(button);
   });
@@ -2496,6 +2504,7 @@ function renderTags() {
   const add=tag=>{
     if (state.selectedTags.size >= 30) return toast('会話タグは30件まで選べます。',true);
     state.selectedTags.add(tag);byId('conversation-tag-search').value='';renderTags();
+    captureConversationDraft();
   };
   for(const item of tagChoices(state.directory,state.conversations,state.selectedTags,query,state.conversationTagCategory)) {
     const button=el('button','person-tag-suggestion',item.label);button.type='button';
@@ -2512,6 +2521,10 @@ function renderTags() {
 function resetComposer() {
   byId("conversation-form").reset();
   state.editingConversationId = null;
+  state.conversationJob = null;
+  byId('conversation-fields').disabled = false;
+  byId('conversation-save-status').textContent = '';
+  byId('discard-conversation-draft').hidden = true;
   byId("composer-title").textContent = "会話メモを追加";
   byId("save-conversation").textContent = "保存して履歴に戻る";
   byId("next-topics-section").hidden = false;
@@ -2524,9 +2537,86 @@ function resetComposer() {
   renderTags();
 }
 
+function conversationScope() {
+  const user = state.session?.user?.id, person = state.person?.person.person_id;
+  return user && person ? [config.supabaseUrl || '', user, person, state.editingConversationId || 'new'] : null;
+}
+
+function conversationDraftValue() {
+  return {
+    note: byId('conversation-note').value,
+    recap: byId('conversation-recap').value,
+    questions: byId('next-topics').value,
+    due: byId('follow-up-at').value,
+    tags: [...state.selectedTags],
+    job: state.conversationJob,
+  };
+}
+
+function captureConversationDraft() {
+  const scope = conversationScope();
+  if (!scope || byId('composer').hidden) return;
+  const draft = conversationDraftValue();
+  const hasContent = draft.job || draft.note || draft.recap || draft.questions || draft.due || draft.tags.length;
+  const durable = hasContent ? conversationDrafts.write(scope, draft) : conversationDrafts.remove(scope);
+  byId('discard-conversation-draft').hidden = !hasContent;
+  byId('conversation-fields').disabled = Boolean(draft.job);
+  byId('save-conversation').disabled = state.conversationSaving;
+  if (draft.job) {
+    byId('save-conversation').textContent = state.conversationSaving ? '保存中…' : '保存を再試行';
+    const progress = state.conversationSaving ? '保存中です。' : draft.job.conversationConfirmed
+      ? '会話メモは保存済みです。残りの質問の保存を再試行してください。'
+      : '前回の保存完了を確認できていません。「保存を再試行」を押してください。';
+    byId('conversation-save-status').textContent = progress + (durable
+      ? '内容を保持しているので、閉じてもこのタブから続けられます。'
+      : 'ブラウザに下書きを保持できないため、再読み込みやタブを閉じる操作は控えてください。');
+  } else {
+    byId('conversation-save-status').textContent = durable
+      ? '下書きはこのタブに保持します。再読み込み後も同じ人物から開けます。ログアウトすると削除します。'
+      : '下書きはこの画面を開いている間のみ保持します。再読み込みやタブを閉じると失われます。';
+  }
+}
+
+function restoreConversationDraft() {
+  const scope = conversationScope(), draft = scope && conversationDrafts.read(scope);
+  if (draft) {
+    byId('conversation-note').value = draft.note;
+    byId('conversation-recap').value = draft.recap || '';
+    byId('next-topics').value = draft.questions || '';
+    byId('follow-up-at').value = draft.due || '';
+    state.selectedTags = new Set(Array.isArray(draft.tags) ? draft.tags : []);
+    state.conversationJob = draft.job || null;
+    byId('recap-options').open = Boolean(draft.recap);
+    renderTags();
+  }
+  captureConversationDraft();
+}
+
+function discardConversationDraft() {
+  if (state.conversationSaving) return;
+  const warning = state.conversationJob
+    ? '保存済みの会話や質問がある可能性があります。下書きだけを破棄しますか？ 保存済みの記録は残ります。'
+    : 'この会話メモの下書きを破棄しますか？';
+  if (!window.confirm(warning)) return;
+  const scope = conversationScope();
+  if (scope) conversationDrafts.remove(scope);
+  byId('composer').hidden = true;
+  resetComposer();
+}
+
+function clearConversationAccount() {
+  state.conversationEpoch++;
+  const user = state.session?.user?.id;
+  if (user) conversationDrafts.clearAccount(config.supabaseUrl || '', user);
+  byId('composer').hidden = true;
+  resetComposer();
+  state.person = null;
+}
+
 function openComposer(focusId = "conversation-note") {
   if (!state.person) return;
   byId("composer").hidden = false;
+  restoreConversationDraft();
   byId('composer').setAttribute('aria-label',byId('composer-title').textContent);
   setTimeout(() => {
     byId(focusId)?.focus();
@@ -2535,6 +2625,7 @@ function openComposer(focusId = "conversation-note") {
 
 function openConversationEditor(conversation) {
   if (!canEditPeople()) return;
+  if (!byId('composer').hidden) closeComposer();
   state.editingConversationId = conversation.conversation_id;
   byId("composer-title").textContent = "会話メモを編集";
   byId("save-conversation").textContent = "変更を保存";
@@ -2549,6 +2640,7 @@ function openConversationEditor(conversation) {
 }
 
 function closeComposer() {
+  captureConversationDraft();
   byId("composer").hidden = true;
   resetComposer();
 }
@@ -3194,7 +3286,7 @@ async function deleteConversation(conversation) {
 
 async function saveConversation(event) {
   event.preventDefault();
-  if (!state.person) return;
+  if (!state.person || !canEditPeople() || state.conversationSaving) return;
   const recap = byId("conversation-recap").value.trim();
   const note = byId("conversation-note").value.trim();
   const followUpItems = state.editingConversationId ? [] : byId("next-topics")
@@ -3205,71 +3297,102 @@ async function saveConversation(event) {
     toast("会話メモまたは次に聞くことを入力してください。", true);
     return;
   }
-  const button = byId("save-conversation");
-  button.disabled = true;
-  button.textContent = "保存中…";
+  if (!state.conversationJob && followUpItems.some(body=>body.length > 1000)) {
+    toast('次に聞くことは、1行につき1000文字以内にしてください。内容を短くしてから保存できます。',true);
+    return;
+  }
+  if (!state.conversationJob && conversationNoteForSave(recap,note,state.recapAvailable).length > 5000) {
+    toast('会話メモは5000文字以内にしてください。',true);
+    return;
+  }
+  const scope = conversationScope();
+  if (!scope) return;
+  const detail = state.person, client = state.client, epoch = state.conversationEpoch;
+  if (!state.conversationJob) {
+    const changes = {note: conversationNoteForSave(recap,note,state.recapAvailable),tags:[...state.selectedTags]};
+    if (state.recapAvailable) changes.recap = recap || null;
+    state.conversationJob = {
+      id: crypto.randomUUID(),
+      personId: detail.person.person_id,
+      editId: state.editingConversationId,
+      conversation: recap || note ? {
+        ...changes,
+        ...(state.editingConversationId ? {} : {
+          conversation_id: crypto.randomUUID(), person_id: detail.person.person_id,
+          occurred_at: new Date().toISOString(), next_topic: '', follow_up_at: null,
+        }),
+      } : null,
+      questions: followUpItems.map(body=>({follow_up_id:crypto.randomUUID(),person_id:detail.person.person_id,body,due_at:byId('follow-up-at').value || null})),
+      conversationConfirmed: false,
+    };
+  }
+  const job = state.conversationJob;
+  state.conversationSaving = true;
+  byId('discard-conversation-draft').disabled = true;
+  captureConversationDraft(); // Persist stable IDs before the first request, including uncertain responses.
+  const sameLogin = () => state.conversationEpoch === epoch && state.session?.user?.id === scope[1];
+  const isCurrent = () => sameLogin() && state.person?.person.person_id === scope[2];
+  const isCurrentComposer = () => isCurrent() && (state.editingConversationId || 'new') === scope[3] && state.conversationJob?.id === job.id;
+  const persistProgress = () => {
+    const draft = conversationDrafts.read(scope);
+    if (isCurrentComposer()) state.conversationJob = job;
+    // A completed logout deliberately removes drafts, including pending jobs.
+    if (sameLogin() && draft?.job?.id === job.id) conversationDrafts.write(scope,{...draft,job});
+  };
   try {
-    if (state.editingConversationId) {
-      const changes = { note: conversationNoteForSave(recap, note, state.recapAvailable),tags:[...state.selectedTags] };
-      if (state.recapAvailable) changes.recap = recap || null;
-      const { data, error } = await state.client.from("conversations")
-        .update(changes).eq("conversation_id", state.editingConversationId).select().single();
-      if (error) throw error;
-      const index = state.person.conversations.findIndex((item) => item.conversation_id === data.conversation_id);
-      if (index >= 0) state.person.conversations[index] = data;
-      closeComposer();
+    let savedConversation = null, savedQuestions = [];
+    if (job.conversation) {
+      if (!job.conversationConfirmed) {
+        const query = client.from('conversations');
+        const result = job.editId
+          ? await query.update(job.conversation).eq('conversation_id',job.editId).eq('person_id',job.personId).select().single()
+          : await query.upsert(job.conversation,{onConflict:'conversation_id',ignoreDuplicates:true});
+        if (result.error) throw result.error;
+      }
+      const result = await client.from('conversations').select('*').eq('person_id',job.personId)
+        .eq('conversation_id',job.editId || job.conversation.conversation_id).single();
+      if (result.error) throw result.error;
+      if (!result.data) throw new Error('会話メモの保存結果を確認できませんでした。');
+      savedConversation = result.data;
+      job.conversationConfirmed = true;
+      persistProgress();
+    }
+    if (job.questions.length) {
+      // Do not continue a second write after the user has logged out or changed accounts.
+      if (!sameLogin()) return;
+      const result = await client.from('follow_up_items').upsert(job.questions,{onConflict:'follow_up_id',ignoreDuplicates:true});
+      if (result.error) throw result.error;
+      const verified = await client.from('follow_up_items').select('*').eq('person_id',job.personId)
+        .in('follow_up_id',job.questions.map(row=>row.follow_up_id));
+      if (verified.error) throw verified.error;
+      if (verified.data?.length !== job.questions.length) throw new Error('質問の保存結果を確認できませんでした。');
+      savedQuestions = verified.data;
+    }
+    // Once DB writes are verified, a later directory refresh must not invite a duplicate retry.
+    if (sameLogin() && conversationDrafts.read(scope)?.job?.id === job.id) conversationDrafts.remove(scope);
+    if (isCurrent()) {
+      if (savedConversation) state.person.conversations = [savedConversation,...state.person.conversations.filter(row=>row.conversation_id !== savedConversation.conversation_id)];
+      const ids = new Set(savedQuestions.map(row=>row.follow_up_id));
+      state.person.followUps = [...savedQuestions,...state.person.followUps.filter(row=>!ids.has(row.follow_up_id))];
+      if (isCurrentComposer()) {
+        byId('composer').hidden = true;
+        resetComposer();
+      }
       renderDetail();
-      await loadDirectory();
-      toast("会話メモを更新しました");
-      return;
     }
-    if (recap || note) {
-      const record = {
-        person_id: state.person.person.person_id,
-        occurred_at: new Date().toISOString(),
-        note: conversationNoteForSave(recap, note, state.recapAvailable),
-        next_topic: "",
-        follow_up_at: null,
-        tags: [...state.selectedTags],
-      };
-      if (state.recapAvailable) record.recap = recap || null;
-      const { data, error } = await state.client
-        .from("conversations")
-        .insert(record)
-        .select()
-        .single();
-      if (error) throw error;
-      state.person.conversations.unshift(data);
-    }
-    if (followUpItems.length) {
-      const { data, error } = await state.client
-        .from("follow_up_items")
-        .insert(
-          followUpItems.map((body) => ({
-            person_id: state.person.person.person_id,
-            body,
-            due_at: byId("follow-up-at").value || null,
-          })),
-        )
-        .select();
-      if (error) throw error;
-      state.person.followUps.unshift(...data);
-    }
-    closeComposer();
-    renderDetail();
-    toast(
-      (recap || note) && followUpItems.length
-        ? "会話メモと次に聞くことを保存しました"
-        : recap || note
-          ? "会話メモを保存しました"
-          : "次に聞くことを追加しました",
-    );
-    await loadDirectory();
+    if (!sameLogin()) return;
+    toast(job.editId ? '会話メモを更新しました' : job.conversation && job.questions.length
+      ? '会話メモと次に聞くことを保存しました' : job.conversation ? '会話メモを保存しました' : '次に聞くことを追加しました');
+    try { await loadDirectory(); }
+    catch (error) { toast(`保存は完了しました。一覧の更新に失敗しました。画面を再読み込みしてください：${message(error)}`,true); }
   } catch (error) {
-    toast(message(error), true);
+    persistProgress();
+    if (sameLogin()) toast(`${job.conversationConfirmed ? '会話メモは保存済みです。質問の保存を完了できませんでした。' : '保存の完了を確認できませんでした。'}「保存を再試行」を押してください。同じ記録を重複させずに再試行します：${message(error)}`,true);
   } finally {
-    button.disabled = false;
-    button.textContent = state.editingConversationId ? "変更を保存" : "保存して履歴に戻る";
+    state.conversationSaving = false;
+    byId('save-conversation').disabled = false;
+    byId('discard-conversation-draft').disabled = false;
+    if (isCurrentComposer() && !byId('composer').hidden) captureConversationDraft();
   }
 }
 
@@ -3296,7 +3419,8 @@ async function signIn() {
 
 async function signOut() {
   const { error } = await state.client.auth.signOut();
-  if (error) toast(message(error), true);
+  if (error) { toast(message(error), true); return; }
+  clearConversationAccount();
   photoStore?.clear();photoObserver?.disconnect();photoObserver=null;
   disposePhotoDraft();
   state.session = null;
@@ -3309,6 +3433,7 @@ async function handleSession(session) {
   state.handlingSession = true;
   try {
     if (!session) {
+      clearConversationAccount();
       photoStore?.clear();photoObserver?.disconnect();photoObserver=null;
       disposePhotoDraft();
       state.session = null;
@@ -3316,6 +3441,7 @@ async function handleSession(session) {
       showOnly("auth-screen");
       return;
     }
+    if (state.session?.user?.id && state.session.user.id !== session.user.id) clearConversationAccount();
     state.session = session;
     const { data, error } = await state.client
       .from("app_members")
@@ -3437,6 +3563,10 @@ function bindEvents() {
   byId("composer-open").addEventListener("click", () => openComposer());
   byId("composer-close").addEventListener("click", closeComposer);
   byId("conversation-form").addEventListener("submit", saveConversation);
+  byId('conversation-form').addEventListener('input', captureConversationDraft);
+  byId('conversation-form').addEventListener('change', captureConversationDraft);
+  byId('discard-conversation-draft').addEventListener('click', discardConversationDraft);
+  window.addEventListener('pagehide', captureConversationDraft);
   byId('conversation-tag-search').addEventListener('input',renderTags);
   byId('conversation-tag-search').addEventListener('keydown',event=>{if(event.key === 'Enter' && !event.isComposing) {event.preventDefault();}});
   byId("ai-consultation-close").addEventListener("click", closeAiConsultation);

@@ -1276,6 +1276,17 @@ input:focus {
 .composer {
   z-index: 70;
 }
+.conversation-fields {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  display: grid;
+  gap: 20px;
+}
+.conversation-fields:disabled { opacity: .72; }
+.draft-status { margin: 0; line-height: 1.6; }
+
 .composer-form {
   width: min(100%, 920px);
   margin: 0 auto;

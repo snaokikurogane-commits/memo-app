@@ -11,9 +11,9 @@
     <link rel="icon" type="image/png" sizes="512x512" href="./app-icon-512.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="./app-icon-180.png" />
     <link rel="manifest" href="./manifest.webmanifest" />
-    <link rel="stylesheet" href="./styles.css?v=9-20261004" />
+    <link rel="stylesheet" href="./styles.css?v=9-20261010-drafts" />
     <link rel="stylesheet" href="./theme-art.css?v=9-20261004" />
-    <link rel="stylesheet" href="./v9.css?v=9-20261006-children-fix" />
+    <link rel="stylesheet" href="./v9.css?v=9-20261010-drafts" />
   </head>
   <body>
     <main class="shell">
@@ -437,6 +437,9 @@
         </button>
       </header>
       <form id="conversation-form" class="composer-form">
+        <p id="conversation-save-status" class="field-hint draft-status" role="status"></p>
+        <fieldset id="conversation-fields" class="conversation-fields">
+          <legend class="sr-only">会話メモの内容</legend>
         <div id="tag-list" class="tag-list" aria-label="タグ"></div>
         <details id="conversation-tag-picker" class="tag-picker">
           <summary>タグを選ぶ・探す</summary>
@@ -467,9 +470,11 @@
           ></label
         >
         <label id="follow-up-date-section">次回目安<input id="follow-up-at" type="date" /></label>
+        </fieldset>
         <button id="save-conversation" class="primary" type="submit">
           保存して履歴に戻る
         </button>
+        <button id="discard-conversation-draft" class="quiet-button" type="button" hidden>下書きを破棄</button>
       </form>
     </section>
 
@@ -586,6 +591,6 @@
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
     <script src="./config.js"></script>
     <script src="./topics-data.js"></script>
-    <script type="module" src="./app.js?v=9-20261006-children-fix"></script>
+    <script type="module" src="./app.js?v=9-20261010-drafts"></script>
   </body>
 </html>

@@ -1,10 +1,11 @@
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
 const {readFileSync}=require('node:fs'),{join}=require('node:path'),{pathToFileURL}=require('node:url');
-async function loadApp() {
+async function loadApp(sessionStorage) {
   const images=await import(pathToFileURL(join(__dirname,'../v9-preview/card-images.js')).href);
   const family=await import(pathToFileURL(join(__dirname,'../v9-preview/family.js')).href);
   const personAge=await import(pathToFileURL(join(__dirname,'../v9-preview/person-age.js')).href);
   const tagLibrary=await import(pathToFileURL(join(__dirname,'../v9-preview/tag-library.js')).href);
+  const drafts=await import(pathToFileURL(join(__dirname,'../v9-preview/conversation-drafts.js')).href);
   class Node {
     constructor(tag='div') {this.tagName=tag;this.children=[];this.listeners={};this.dataset={};this.style={};this.hidden=false;this.className='';this.value='';this.classList={add:(...names)=>{this.className+=' '+names.join(' ');},remove:(name)=>{this.className=this.className.split(' ').filter(item=>item!==name).join(' ');}};}
     get childNodes() {return this.children;}
@@ -14,14 +15,110 @@ async function loadApp() {
     addEventListener(name,handler) {this.listeners[name]=handler;}
     setAttribute(name,value) {this[name]=value;}
     focus() {}
+    reset() {for (const id of ['conversation-note','conversation-recap','next-topics','follow-up-at']) if(elements.has(id)) elements.get(id).value='';}
   }
   const elements=new Map();
-  const context={...images,...family,...personAge,...tagLibrary,window:{},document:{createElement:tag=>new Node(tag),getElementById:id=>{if (!elements.has(id)) elements.set(id,new Node());return elements.get(id);}},console,Set,Map,Intl,Date,URL,crypto:globalThis.crypto};
+  const context={...images,...family,...personAge,...tagLibrary,...drafts,window:{sessionStorage},document:{createElement:tag=>new Node(tag),getElementById:id=>{if (!elements.has(id)) elements.set(id,new Node());return elements.get(id);}},console,Set,Map,Intl,Date,URL,crypto:globalThis.crypto};
   vm.createContext(context);
   const source=readFileSync(join(__dirname,'../v9-preview/app.js'),'utf8').replace(/^import[^\r\n]*\r?\n/gm,'').replace(/\r?\nboot\(\);\s*$/,'');
   vm.runInContext(source,context);
   return {call:expression=>vm.runInContext(expression,context),context,elements};
 }
+
+test('retrying after question failure or a lost save response never duplicates the conversation',async()=>{
+  for (const lostResponse of [false,'conversation','question']) {
+    const {call,context}=await loadApp();
+    const tables={conversations:[],follow_up_items:[]};let fail=true;
+    context.clientFixture={from:table=>({operation:'read',filters:[],insert(values){this.operation='insert';this.values=values;return this;},upsert(values,options){this.operation='upsert';this.values=values;this.options=options;return this;},select(){return this;},eq(key,value){this.filters.push(row=>row[key]===value);return this;},in(key,values){this.filters.push(row=>values.includes(row[key]));return this;},single(){this.one=true;return this;},async then(resolve,reject){try {
+      const key=table==='conversations'?'conversation_id':'follow_up_id';
+      if(fail && table==='follow_up_items' && !lostResponse) {fail=false;return resolve({data:null,error:new Error('質問の保存失敗')});}
+      let rows=tables[table].filter(row=>this.filters.every(f=>f(row)));
+      if(this.operation!=='read') {rows=[];for(const value of (Array.isArray(this.values)?this.values:[this.values])) {const row={...value,[key]:value[key]||crypto.randomUUID()};const old=tables[table].find(item=>item[key]===row[key]);if(!old){tables[table].push(row);rows.push(row);}else if(!this.options?.ignoreDuplicates) Object.assign(old,row);}}
+      if(fail && table===(lostResponse==='conversation'?'conversations':'follow_up_items') && lostResponse && this.operation!=='read') {fail=false;return resolve({data:null,error:new Error('応答だけ失われた')});}
+      resolve({data:this.one?rows[0]:rows,error:null});
+    }catch(error){reject(error);}}})};
+    context.notices=[];context.setTimeout=()=>{};
+    call('state.role="owner";state.session={user:{id:"test-user"}};state.client=clientFixture;state.person={person:{person_id:"test-person"},conversations:[],followUps:[]};byId("conversation-note").value="週末はゴルフ";byId("conversation-recap").value="";byId("next-topics").value="次の大会は？";byId("follow-up-at").value="";renderDetail=()=>{};loadDirectory=async()=>{};toast=text=>notices.push(text)');
+    await call('saveConversation({preventDefault(){}})');
+    await call('saveConversation({preventDefault(){}})');
+    assert.equal(tables.conversations.length,1,lostResponse?'an uncertain response must reuse the same record ID':'a saved memo must not be inserted again');
+    assert.equal(tables.follow_up_items.length,1);
+    assert.equal(tables.conversations[0].note,'週末はゴルフ');
+  }
+});
+
+test('closing and reopening a draft restores its person-specific note and questions',async()=>{
+  const {call,context}=await loadApp();context.setTimeout=()=>{};
+  call('state.session={user:{id:"test-user"}};state.person={person:{person_id:"person-a"}};byId("composer").hidden=false;byId("conversation-note").value="まだ保存していない話";byId("next-topics").value="旅行はどうだった？";byId("conversation-recap").value="";byId("follow-up-at").value="";closeComposer();state.person={person:{person_id:"person-b"}};openComposer()');
+  assert.equal(call('byId("conversation-note").value'),'');
+  call('closeComposer();state.person={person:{person_id:"person-a"}};openComposer()');
+  assert.equal(call('byId("conversation-note").value'),'まだ保存していない話');
+  assert.equal(call('byId("next-topics").value'),'旅行はどうだった？');
+});
+
+test('an in-flight save survives closing and reopening, clears its draft, and cannot double-submit',async()=>{
+  const {call,context}=await loadApp();let release,writes=0;const committed=new Promise(resolve=>release=resolve);
+  const row={conversation_id:'result',person_id:'person-a',note:'保存中の話'};
+  context.clientFixture={from:()=>({select(){return this;},eq(){return this;},single(){return this;},upsert(value){writes++;row.conversation_id=value.conversation_id;this.writing=true;return this;},then(resolve,reject){return (this.writing?committed:Promise.resolve()).then(()=>({data:this.writing?null:row,error:null})).then(resolve,reject);}})};
+  context.setTimeout=()=>{};context.notices=[];
+  call('state.role="owner";state.session={user:{id:"test-user"}};state.client=clientFixture;state.person={person:{person_id:"person-a"},conversations:[],followUps:[]};byId("composer").hidden=false;byId("conversation-note").value="保存中の話";toast=text=>notices.push(text);renderDetail=()=>{};loadDirectory=async()=>{throw new Error("一覧だけ失敗")}');
+  const first=call('saveConversation({preventDefault(){}})');
+  await call('saveConversation({preventDefault(){}})');
+  call('closeComposer();openComposer()');
+  release();await first;
+  assert.equal(writes,1);assert.equal(call('byId("composer").hidden'),true);
+  call('openComposer()');assert.equal(call('byId("conversation-note").value'),'');
+  assert.ok(context.notices.some(text=>text.includes('保存は完了しました')));
+});
+
+test('editing drafts survive reload without mixing with new notes and logout clears both',async()=>{
+  const values=new Map(),disk={get length(){return values.size;},key:i=>[...values.keys()][i],getItem:k=>values.get(k)??null,setItem:(k,v)=>values.set(k,v),removeItem:k=>values.delete(k)};
+  const first=await loadApp(disk);first.context.setTimeout=()=>{};
+  first.call('state.role="owner";state.session={user:{id:"user-a"}};state.person={person:{person_id:"person-a"}};byId("composer").hidden=true;openComposer();byId("conversation-note").value="新規の下書き";closeComposer();openConversationEditor({conversation_id:"edit-a",note:"元の会話",tags:["読書"]});byId("conversation-note").value="編集途中";closeComposer()');
+  const reload=await loadApp(disk);reload.context.setTimeout=()=>{};
+  reload.call('state.role="owner";state.session={user:{id:"user-a"}};state.person={person:{person_id:"person-a"}};byId("composer").hidden=true;openComposer()');
+  assert.equal(reload.call('byId("conversation-note").value'),'新規の下書き');
+  reload.call('openConversationEditor({conversation_id:"edit-a",note:"元の会話",tags:["読書"]})');
+  assert.equal(reload.call('byId("conversation-note").value'),'編集途中');
+  reload.call('clearConversationAccount()');assert.equal(values.size,0);
+  assert.equal(reload.call('byId("conversation-note").value'),'');
+});
+
+test('a delayed save from a previous login cannot erase a fresh draft after logging back in',async()=>{
+  const {call,context}=await loadApp();let release;const pending=new Promise(resolve=>release=resolve);let row;
+  context.clientFixture={from:()=>({select(){return this;},eq(){return this;},single(){return this;},upsert(value){row={...value};this.writing=true;return this;},then(resolve,reject){return (this.writing?pending:Promise.resolve()).then(()=>({data:this.writing?null:row,error:null})).then(resolve,reject);}})};
+  context.setTimeout=()=>{};
+  call('state.role="owner";state.session={user:{id:"user-a"}};state.client=clientFixture;state.person={person:{person_id:"person-a"},conversations:[],followUps:[]};byId("composer").hidden=false;byId("conversation-note").value="以前のログインで保存";renderDetail=()=>{};loadDirectory=async()=>{};toast=()=>{}');
+  const saving=call('saveConversation({preventDefault(){}})');
+  call('clearConversationAccount();state.session={user:{id:"user-a"}};state.person={person:{person_id:"person-a"},conversations:[],followUps:[]};openComposer();byId("conversation-note").value="再ログイン後の別の下書き";captureConversationDraft()');
+  release();await saving;
+  assert.equal(call('conversationDrafts.read(conversationScope())?.note'),'再ログイン後の別の下書き');
+  call('closeComposer();openComposer()');
+  assert.equal(call('byId("conversation-note").value'),'再ログイン後の別の下書き');
+});
+
+test('an oversized question is rejected before freezing a save job so it can be corrected',async()=>{
+  const {call,context}=await loadApp();context.notices=[];
+  call('state.role="owner";state.session={user:{id:"user-a"}};state.person={person:{person_id:"person-a"}};byId("composer").hidden=false;byId("next-topics").value="長".repeat(1001);toast=text=>notices.push(text)');
+  await call('saveConversation({preventDefault(){}})');
+  assert.equal(call('state.conversationJob'),null);
+  assert.ok(context.notices.some(text=>text.includes('1000文字')));
+});
+
+test('question-only saves create no empty conversation and edits update the selected record',async()=>{
+  for(const edit of [false,true]) {
+    const {call,context}=await loadApp();const rows={conversations:[{conversation_id:'existing',person_id:'person-a',note:'元の内容'}],follow_up_items:[]};
+    context.clientFixture={from:table=>({filters:[],select(){return this;},eq(key,value){this.filters.push(row=>row[key]===value);return this;},in(key,values){this.filters.push(row=>values.includes(row[key]));return this;},single(){this.one=true;return this;},update(value){this.changes=value;return this;},upsert(value){this.values=value;return this;},then(resolve){if(this.values) for(const row of Array.isArray(this.values)?this.values:[this.values]) rows[table].push({...row});const found=rows[table].filter(row=>this.filters.every(f=>f(row)));if(this.changes)found.forEach(row=>Object.assign(row,this.changes));return Promise.resolve({data:this.one?found[0]:found,error:null}).then(resolve);}})};
+    context.setTimeout=()=>{};
+    call('state.role="owner";state.session={user:{id:"user-a"}};state.client=clientFixture;state.person={person:{person_id:"person-a"},conversations:[],followUps:[]};byId("composer").hidden=false;renderDetail=()=>{};loadDirectory=async()=>{};toast=()=>{}');
+    if(edit) call('state.editingConversationId="existing";byId("conversation-note").value="編集した内容"');
+    else call('byId("next-topics").value="おすすめは？"');
+    await call('saveConversation({preventDefault(){}})');
+    assert.equal(rows.conversations.length,1);assert.equal(rows.follow_up_items.length,edit?0:1);
+    assert.equal(rows.conversations[0].note,edit?'編集した内容':'元の内容');
+    assert.equal(call('byId("composer").hidden'),true);
+  }
+});
 test('enter in illustration search never implicitly submits the person form',async()=>{
   const {call,elements}=await loadApp();
   call('bindIllustrationSearch()');

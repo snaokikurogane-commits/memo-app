@@ -40,16 +40,22 @@ class Query {
   single() {this.one=true;return this;}
   maybeSingle() {this.one=true;return this;}
   insert(values) {this.operation='insert';this.values=values;return this;}
-  upsert(values) {return this.insert(values);}
+  upsert(values,options={}) {this.options=options;return this.insert(values);}
   update(values) {this.operation='update';this.values=values;return this;}
   delete() {this.operation='delete';return this;}
   async result() {
     const mode=await fetch('/fixture-mode.json',{cache:'no-store'}).then(r=>r.json()).catch(()=>({}));
     if (mode.failPeople && this.table==='people' && this.operation!=='select') return {data:null,error:{message:'確認用：人物の保存に失敗しました'}};
+    if (mode.failQuestions && this.table==='follow_up_items' && this.operation==='insert') return {data:null,error:{message:'確認用：質問の保存に失敗しました'}};
     let rows=data[this.table]||[];let selected=rows.filter(row=>this.filters.every(filter=>filter(row)));
     if (this.operation==='insert') {
       selected=(Array.isArray(this.values)?this.values:[this.values]).map(values=>({...values,[keys[this.table]]:values[keys[this.table]]||crypto.randomUUID(),created_at:new Date().toISOString(),status:values.status||'open'}));
-      rows.push(...selected);
+      selected=selected.filter(row=>{
+        const old=rows.find(item=>item[keys[this.table]]===row[keys[this.table]]);
+        if(old && this.options?.ignoreDuplicates) return false;
+        if(old) Object.assign(old,row);else rows.push(row);
+        return true;
+      });
     } else if (this.operation==='update') selected.forEach(row=>Object.assign(row,this.values));
     else if (this.operation==='delete') data[this.table]=rows.filter(row=>!selected.includes(row));
     for (const [key,asc] of this.orders) selected.sort((a,b)=>String(a[key]||'').localeCompare(String(b[key]||''))*(asc?1:-1));
