@@ -185,6 +185,25 @@ test('follow-up editing is available from the overflow menu and preserves the se
   assert.equal(inputs[1].value,'2026-10-12');
 });
 
+test('editing the date of a linked multiline topic preserves its original quote and body',async()=>{
+  const {call,context}=await loadApp();let written;
+  const item={follow_up_id:'f-linked',person_id:'p',body:'来月の旅行\n北海道を予定',due_at:null,status:'open',
+    source_conversation_id:'c-source',source_quote:{text:'来月の旅行\n北海道を予定',occurred_at:'2026-10-01T00:00:00Z'}};
+  context.item=item;context.setTimeout=()=>{};
+  context.clientFixture={from:()=>({update(value){written=value;return this;},eq(){return this;},then(resolve){return Promise.resolve({error:null}).then(resolve);}})};
+  call('state.role="owner";state.client=clientFixture;state.followUps=[item];renderAll=()=>{};toast=()=>{}');
+  const card=call('followUpCard(item)'),all=node=>[node,...node.children.flatMap(all)];
+  all(card).find(node=>node.tagName==='button' && node.textContent==='編集').listeners.click();
+  const quote=all(card).find(node=>node.tagName==='textarea');
+  assert.ok(quote,'a multiline original uses a multiline control');
+  assert.equal(quote.value,item.source_quote.text);assert.equal(quote.readOnly,true);
+  all(card).find(node=>node.type==='date').value='2026-11-01';
+  await all(card).find(node=>node.tagName==='form').listeners.submit({preventDefault(){}});
+  assert.deepEqual(JSON.parse(JSON.stringify(written)),{due_at:'2026-11-01'});
+  assert.equal(item.source_quote.text,'来月の旅行\n北海道を予定');
+  assert.equal(item.body,'来月の旅行\n北海道を予定');
+});
+
 test('escape closes the follow-up action menu and returns focus to its trigger',async()=>{
   const {call}=await loadApp();
   call('state.role="owner"');

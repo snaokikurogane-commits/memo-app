@@ -1,8 +1,21 @@
 // Storage boundary: the UI and flow do not depend on Supabase queries.
+function sameStoredValue(actual,expected,key) {
+  if(actual===expected)return true;
+  if(actual==null || expected==null)return actual==null && expected==null;
+  if(['occurred_at','completed_at','created_at'].includes(key) && typeof actual==='string' && typeof expected==='string') {
+    const instant=Date.parse(actual),wanted=Date.parse(expected);
+    return Number.isFinite(instant) && Number.isFinite(wanted) && instant===wanted;
+  }
+  if(Array.isArray(actual) || Array.isArray(expected))return Array.isArray(actual) && Array.isArray(expected)
+    && actual.length===expected.length && expected.every((value,index)=>sameStoredValue(actual[index],value));
+  if(typeof actual==='object' && typeof expected==='object')return Object.keys(actual).length===Object.keys(expected).length
+    && Object.entries(expected).every(([name,value])=>Object.hasOwn(actual,name) && sameStoredValue(actual[name],value,name));
+  return false;
+}
 export class SupabaseConversationStore {
   constructor(client){this.client=client;}
   verify(row,expected) {
-    if(!row || Object.entries(expected).some(([key,value])=>JSON.stringify(row[key] ?? null)!==JSON.stringify(value ?? null)))
+    if(!row || Object.entries(expected).some(([key,value])=>!sameStoredValue(row[key],value,key)))
       throw Error('保存結果を確認できませんでした。内容を保持したまま再試行できます。');
     return row;
   }

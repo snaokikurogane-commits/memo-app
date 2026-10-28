@@ -26,6 +26,12 @@ const data = {
   events:[],topic_preferences:[],
 };
 const photos=new Map();
+function backendValue(value,key) {
+  if(['occurred_at','completed_at','created_at'].includes(key) && typeof value==='string')return value.replace(/Z$/,'+00:00');
+  if(Array.isArray(value))return value.map(item=>backendValue(item));
+  if(value && typeof value==='object')return Object.fromEntries(Object.keys(value).sort().map(name=>[name,backendValue(value[name],name)]));
+  return value;
+}
 const keys={people:'person_id',assignments:'assignment_id',conversations:'conversation_id',follow_up_items:'follow_up_id',family_members:'family_member_id',events:'event_id'};
 class Query {
   constructor(table) {this.table=table;this.filters=[];this.operation='select';this.bounds=null;this.one=false;this.orders=[];}
@@ -62,7 +68,7 @@ class Query {
     for (const [key,asc] of this.orders) selected.sort((a,b)=>String(a[key]||'').localeCompare(String(b[key]||''))*(asc?1:-1));
     const count=selected.length;
     if (this.bounds) selected=selected.slice(this.bounds[0],this.bounds[1]+1);
-    return {data:structuredClone(this.one?selected[0]||null:selected),error:null,count};
+    return {data:backendValue(this.one?selected[0]||null:selected),error:null,count};
   }
   then(resolve,reject) {return this.result().then(resolve,reject);}
 }

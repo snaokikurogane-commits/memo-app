@@ -1017,12 +1017,14 @@ function followUpChanges(body, dueAt) {
 
 function openFollowUpEditor(card, item) {
   const form = el("form", "follow-up-edit-form");
-  const body = document.createElement("input");
-  body.type = "text";
+  const linked = Boolean(item.source_quote);
+  const body = document.createElement(linked ? "textarea" : "input");
+  if (linked) { body.readOnly = true; body.rows = 3; }
+  else body.type = "text";
   body.maxLength = 5000;
   body.required = true;
   body.value = followUpQuote(item).text;
-  body.setAttribute("aria-label", "次に聞くことを編集");
+  body.setAttribute("aria-label", linked ? "元の会話の引用" : "次に聞くことを編集");
   const due = document.createElement("input");
   due.type = "date";
   due.value = String(item.due_at || "").slice(0, 10);
@@ -1032,13 +1034,14 @@ function openFollowUpEditor(card, item) {
   const cancel = el("button", "quiet-button", "キャンセル");
   cancel.type = "button";
   cancel.addEventListener("click", () => { renderAll(); if (state.person) renderDetail(); });
-  form.append(body, due, save, cancel);
+  form.append(body);
+  if (linked) form.append(el("p", "hint", "元の話は引用として残します。ここでは次回目安を変更できます。"));
+  form.append(due, save, cancel);
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const changes = followUpChanges(body.value, due.value);
+    const changes = linked ? {due_at: due.value || null} : followUpChanges(body.value, due.value);
     if (!changes) return toast("次に聞くことを入力してください。", true);
-    if(item.source_quote){changes.source_quote={...item.source_quote,text:changes.body};changes.body=Array.from(changes.body).slice(0,1000).join('');}
-    else if(changes.body.length>1000)return toast('次に聞くことは1000文字以内にしてください。',true);
+    if(!linked && changes.body.length>1000)return toast('次に聞くことは1000文字以内にしてください。',true);
     save.disabled = true;
     try {
       const { error } = await state.client.from("follow_up_items").update(changes)

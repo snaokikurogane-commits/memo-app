@@ -3,6 +3,14 @@ const {pathToFileURL}=require('node:url'),{join}=require('node:path');
 const load=()=>import(pathToFileURL(join(__dirname,'../v9-preview/conversation-store.js')).href);
 function database(seed={}) {
   const data={conversations:[],follow_up_items:[],...structuredClone(seed)};
+  // Model PostgREST timestamptz formatting and JSONB key order, not an input echo.
+  const roundTrip=value=>{
+    if(Array.isArray(value))return value.map(roundTrip);
+    if(value && typeof value==='object')return Object.fromEntries(Object.keys(value).sort().map(key=>[key,
+      ['occurred_at','completed_at','created_at'].includes(key) && typeof value[key]==='string'
+        ? value[key].replace(/Z$/,'+00:00') : roundTrip(value[key])]));
+    return value;
+  };
   let loseNextInsert=false;
   class Query {
     constructor(table){this.table=table;this.filters=[];this.op='read';}
@@ -22,11 +30,25 @@ function database(seed={}) {
       }
       const selected=rows.filter(r=>this.filters.every(f=>f(r)));
       if(this.op==='update')selected.forEach(r=>Object.assign(r,this.row));
-      return {data:structuredClone(this.one?selected[0]||null:selected),error:null};
+      return {data:roundTrip(this.one?selected[0]||null:selected),error:null};
     }
   }
   return {data,from:t=>new Query(t),loseNextInsert:()=>{loseNextInsert=true;}};
 }
+
+test('backend timestamp formatting and JSONB key order preserve the confirmed conversation and quote',async()=>{
+  const {SupabaseConversationStore}=await load(),db=database(),store=new SupabaseConversationStore(db);
+  const row={conversation_id:'c1',person_id:'p1',note:'大阪へ変更',tags:['旅行','同期'],
+    occurred_at:'2026-10-28T12:34:56.123Z',reply_quote:{text:'北海道へ旅行',occurred_at:'2026-10-01T09:00:00Z'}};
+  const saved=await store.saveConversation(row);
+  assert.equal(saved.occurred_at,'2026-10-28T12:34:56.123+00:00');
+  assert.equal(saved.reply_quote.text,row.reply_quote.text);
+  const question={follow_up_id:'f1',person_id:'p1',body:row.note,source_quote:{text:row.note,occurred_at:row.occurred_at}};
+  assert.equal((await store.saveQuestions([question],'p1'))[0].source_quote.text,row.note);
+  for(const change of [{note:'異なる文章'},{tags:['同期','旅行']},{occurred_at:'2026-10-29T12:34:56.123Z'},
+    {reply_quote:{text:'別の引用',occurred_at:row.reply_quote.occurred_at}}])
+    await assert.rejects(store.readConversation({...row,...change}),/確認/);
+});
 test('an uncertain insert is verified on retry without duplicating the conversation',async()=>{
   const {SupabaseConversationStore}=await load(),db=database(),store=new SupabaseConversationStore(db);
   const row={conversation_id:'c1',person_id:'p1',note:'大阪に変更',tags:[]};
