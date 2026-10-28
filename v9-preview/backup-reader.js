@@ -1,4 +1,4 @@
-import {decryptBackup} from './backup-crypto.js';
+import {decryptBackup} from './backup-crypto.js?v=9-20261028-linked';
 import {personAgeSummary} from './person-age.js?v=9-20261006-age';
 import {verifyPhotoBlob} from './jpeg.js';
 let opened=null;
@@ -39,10 +39,11 @@ function renderPeople() {
       copy.append(node('h3','所属履歴'));
       assignments.forEach(row=>copy.append(node('p',[row.fiscal_year,row.organization,row.department,row.role].filter(Boolean).join(' / '))));
       copy.append(node('h3','次に聞くこと'));
-      opened.tables.follow_up_items.filter(row=>row.person_id===person.person_id && row.status==='open').forEach(row=>copy.append(node('p',row.body)));
+      opened.tables.follow_up_items.filter(row=>row.person_id===person.person_id && row.status==='open').forEach(row=>copy.append(node('p',row.source_quote?.text || row.body)));
       copy.append(node('h3','会話履歴'));
       opened.tables.conversations.filter(row=>row.person_id===person.person_id).forEach(row=>{
         copy.append(node('p',`${String(row.occurred_at||'').slice(0,10)}\n${[row.recap,row.note].filter(Boolean).filter((value,index,array)=>array.indexOf(value)===index).join('\n')}`));
+        if(row.reply_quote){const quote=node('blockquote',`前の話 ${String(row.reply_quote.occurred_at || '').slice(0,10)}\n${row.reply_quote.text}`);copy.append(quote);}
       });
       copy.append(node('h3','家族・出来事'));
       const relations={child:'子ども',spouse:'配偶者',parent:'親',sibling:'きょうだい',other:'家族'};

@@ -6,6 +6,8 @@ async function loadApp(sessionStorage) {
   const personAge=await import(pathToFileURL(join(__dirname,'../v9-preview/person-age.js')).href);
   const tagLibrary=await import(pathToFileURL(join(__dirname,'../v9-preview/tag-library.js')).href);
   const drafts=await import(pathToFileURL(join(__dirname,'../v9-preview/conversation-drafts.js')).href);
+  const flow=await import(pathToFileURL(join(__dirname,'../v9-preview/conversation-flow.js')).href);
+  const store=await import(pathToFileURL(join(__dirname,'../v9-preview/conversation-store.js')).href);
   class Node {
     constructor(tag='div') {this.tagName=tag;this.children=[];this.listeners={};this.dataset={};this.style={};this.hidden=false;this.className='';this.value='';this.classList={add:(...names)=>{this.className+=' '+names.join(' ');},remove:(name)=>{this.className=this.className.split(' ').filter(item=>item!==name).join(' ');}};}
     get childNodes() {return this.children;}
@@ -18,12 +20,50 @@ async function loadApp(sessionStorage) {
     reset() {for (const id of ['conversation-note','conversation-recap','next-topics','follow-up-at']) if(elements.has(id)) elements.get(id).value='';}
   }
   const elements=new Map();
-  const context={...images,...family,...personAge,...tagLibrary,...drafts,window:{sessionStorage},document:{createElement:tag=>new Node(tag),getElementById:id=>{if (!elements.has(id)) elements.set(id,new Node());return elements.get(id);}},console,Set,Map,Intl,Date,URL,crypto:globalThis.crypto};
+  const context={...images,...family,...personAge,...tagLibrary,...drafts,...flow,...store,window:{sessionStorage},document:{createElement:tag=>new Node(tag),getElementById:id=>{if (!elements.has(id)) elements.set(id,new Node());return elements.get(id);}},console,Set,Map,Intl,Date,URL,crypto:globalThis.crypto};
   vm.createContext(context);
   const source=readFileSync(join(__dirname,'../v9-preview/app.js'),'utf8').replace(/^import[^\r\n]*\r?\n/gm,'').replace(/\r?\nboot\(\);\s*$/,'');
   vm.runInContext(source,context);
   return {call:expression=>vm.runInContext(expression,context),context,elements};
 }
+
+test('reply drafts and next-time checks are isolated from a normal memo and each other',async()=>{
+  const {call,context}=await loadApp();context.setTimeout=()=>{};
+  call('state.linksAvailable=true;state.role="owner";state.session={user:{id:"u"}};state.person={person:{person_id:"p"},followUps:[]};byId("composer").hidden=true;openComposer();byId("conversation-note").value="通常の下書き";byId("conversation-ask-next").checked=true;closeComposer();openFollowUp({follow_up_id:"f1",person_id:"p",body:"北海道へ旅行"});byId("conversation-note").value="大阪へ変更";closeComposer();openFollowUp({follow_up_id:"f2",person_id:"p",body:"別の質問"})');
+  assert.equal(call('byId("conversation-note").value'),'');
+  call('closeComposer();openFollowUp({follow_up_id:"f1",person_id:"p",body:"北海道へ旅行"})');
+  assert.equal(call('byId("conversation-note").value'),'大阪へ変更');
+  assert.equal(call('state.replyingFollowUp.follow_up_id'),'f1');
+  call('closeComposer();openComposer()');
+  assert.equal(call('byId("conversation-note").value'),'通常の下書き');
+  assert.equal(call('byId("conversation-ask-next").checked'),true);
+});
+
+test('opening a next topic does not complete it and closing keeps it pending',async()=>{
+  const {call,context}=await loadApp();context.setTimeout=()=>{};context.writes=0;
+  call('state.linksAvailable=true;state.role="owner";state.person={person:{person_id:"p"}};state.client={from(){writes++}};byId("composer").hidden=true;openFollowUp({follow_up_id:"f1",person_id:"p",body:"北海道へ旅行",status:"open"});closeComposer()');
+  assert.equal(context.writes,0);
+});
+test('adding a standalone question does not accidentally save a normal memo draft',async()=>{
+  const {call,context}=await loadApp();context.setTimeout=()=>{};
+  call('state.session={user:{id:"u"}};state.person={person:{person_id:"p"}};byId("composer").hidden=true;openComposer();byId("conversation-note").value="まだ編集中の会話";closeComposer();openComposer("next-topics")');
+  assert.equal(call('byId("conversation-note").value'),'');
+  assert.equal(call('byId("next-topics-section").hidden'),false);
+  call('byId("next-topics").value="次の大会は？";closeComposer();openComposer()');
+  assert.equal(call('byId("conversation-note").value'),'まだ編集中の会話');
+});
+
+test('person detail shows three recent conversations before optional profile and AI actions',async()=>{
+  const {call}=await loadApp();
+  call('state.role="viewer";state.person={person:{person_id:"p",canonical_name:"架空 太郎",profile_tags:[]},assignments:[],familyMembers:[],events:[],followUps:[],conversations:[1,2,3,4].map(i=>({conversation_id:"c"+i,note:"会話"+i,occurred_at:"2026-10-0"+i}))};renderDetail()');
+  const all=node=>[node,...node.children.flatMap(all)],nodes=all(call('byId("detail-body")'));
+  assert.equal(nodes.filter(n=>n.dataset.conversationId).length,3);
+  const sections=call('byId("detail-body").children');
+  const history=sections.findIndex(n=>n.className.includes('conversation-section'));
+  const ai=sections.findIndex(n=>n.className.includes('ai-consultation-action'));
+  assert.ok(history>=0 && ai>history);
+  assert.ok(nodes.some(n=>n.textContent==='最近の会話履歴'));
+});
 
 test('retrying after question failure or a lost save response never duplicates the conversation',async()=>{
   for (const lostResponse of [false,'conversation','question']) {
@@ -59,7 +99,7 @@ test('closing and reopening a draft restores its person-specific note and questi
 test('an in-flight save survives closing and reopening, clears its draft, and cannot double-submit',async()=>{
   const {call,context}=await loadApp();let release,writes=0;const committed=new Promise(resolve=>release=resolve);
   const row={conversation_id:'result',person_id:'person-a',note:'保存中の話'};
-  context.clientFixture={from:()=>({select(){return this;},eq(){return this;},single(){return this;},upsert(value){writes++;row.conversation_id=value.conversation_id;this.writing=true;return this;},then(resolve,reject){return (this.writing?committed:Promise.resolve()).then(()=>({data:this.writing?null:row,error:null})).then(resolve,reject);}})};
+  context.clientFixture={from:()=>({select(){return this;},eq(){return this;},single(){return this;},upsert(value){writes++;Object.assign(row,value);this.writing=true;return this;},then(resolve,reject){return (this.writing?committed:Promise.resolve()).then(()=>({data:this.writing?null:row,error:null})).then(resolve,reject);}})};
   context.setTimeout=()=>{};context.notices=[];
   call('state.role="owner";state.session={user:{id:"test-user"}};state.client=clientFixture;state.person={person:{person_id:"person-a"},conversations:[],followUps:[]};byId("composer").hidden=false;byId("conversation-note").value="保存中の話";toast=text=>notices.push(text);renderDetail=()=>{};loadDirectory=async()=>{throw new Error("一覧だけ失敗")}');
   const first=call('saveConversation({preventDefault(){}})');

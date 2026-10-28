@@ -40,6 +40,9 @@ export async function saveConversationJob(job,store,{isActive=()=>true,onProgres
   if(job.conversation && !job.conversationConfirmed) {
     job.savedConversation=await store.saveConversation(job.conversation,job.editId,job.personId);
     job.conversationConfirmed=true;onProgress();
+  } else if(job.conversation && !job.savedConversation) {
+    job.savedConversation=await store.readConversation(job.conversation,job.editId,job.personId);
+    onProgress();
   }
   active();
   if(job.questions.length && !job.questionsConfirmed) {

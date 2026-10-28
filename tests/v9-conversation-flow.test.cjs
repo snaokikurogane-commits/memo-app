@@ -59,3 +59,10 @@ test('a session change stops later writes and a failed note never completes a qu
   store.saveConversation=async()=>{throw Error('offline');};
   await assert.rejects(saveConversationJob(make(),store),/offline/);assert.equal(called,false);
 });
+test('a confirmed draft from the previous release is read back without rewriting its note',async()=>{
+  const {createConversationJob,saveConversationJob}=await load();
+  const job=createConversationJob({personId:'p',note:'旧版で保存済み',now:clock},ids());job.conversationConfirmed=true;
+  const store={async saveConversation(){throw Error('must not write');},async readConversation(row){return {...row};}};
+  const result=await saveConversationJob(job,store);
+  assert.equal(result.conversation.note,'旧版で保存済み');
+});

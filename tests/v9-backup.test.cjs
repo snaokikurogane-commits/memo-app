@@ -43,3 +43,20 @@ test('wrong passwords and tampered encrypted payloads fail without exposing any 
   e.ciphertext=(e.ciphertext[0]==='A'?'B':'A')+e.ciphertext.slice(1);
   await assert.rejects(decryptBackup(e,'test-password-2026'),/パスワード/);
 });
+
+test('backup validation rejects cross-person conversation links and malformed quotes',async()=>{
+  const {validateBackupPayload}=await mod();
+  const p=payload();p.tables.conversations=[{conversation_id:'a',person_id:'p1'},{conversation_id:'b',person_id:'p2',reply_to_conversation_id:'a'}];p.counts.conversations=2;
+  assert.throws(()=>validateBackupPayload(p),/関連/);
+  p.tables.conversations[1].person_id='p1';p.tables.conversations[1].reply_quote={text:42,occurred_at:null};
+  assert.throws(()=>validateBackupPayload(p),/引用/);
+});
+test('encrypted backups retain reply chains and complete source quotes',async()=>{
+  const {encryptBackup,decryptBackup}=await mod(),p=payload();
+  p.tables.conversations=[{conversation_id:'a',person_id:'p',note:'北海道へ'},{conversation_id:'b',person_id:'p',note:'大阪へ変更',reply_to_conversation_id:'a',reply_to_follow_up_id:'f',reply_quote:{text:'北海道へ',occurred_at:null}}];
+  p.tables.follow_up_items=[{follow_up_id:'f',person_id:'p',body:'北海道へ',source_conversation_id:'a',source_quote:{text:'北海道へ',occurred_at:null},status:'completed'}];
+  p.counts.conversations=2;p.counts.follow_up_items=1;
+  const decoded=await decryptBackup(await encryptBackup(p,'test-password-2026'),'test-password-2026');
+  assert.equal(decoded.tables.conversations[1].reply_quote.text,'北海道へ');
+  assert.equal(decoded.tables.follow_up_items[0].status,'completed');
+});

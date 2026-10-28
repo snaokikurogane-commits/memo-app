@@ -74,7 +74,7 @@ export async function decryptBackup(envelope, password) {
     validateBackupPayload(payload);
     return payload;
   } catch (error) {
-    if (error?.message === "バックアップの内容が正しくありません。" || error?.message?.startsWith("バックアップの写真")) throw error;
+    if (error?.message === "バックアップの内容が正しくありません。" || /^バックアップの(写真|引用|会話)/.test(error?.message || '')) throw error;
     throw new Error("パスワードが違うか、ファイルが破損しています。");
   }
 }
@@ -93,6 +93,26 @@ export function validateBackupPayload(payload) {
       throw new Error("バックアップの内容が正しくありません。");
     }
   }
+  const conversations=new Map(payload.tables.conversations.map(row=>[row.conversation_id,row]));
+  const questions=new Map(payload.tables.follow_up_items.map(row=>[row.follow_up_id,row]));
+  const checkQuote=quote=>{
+    if(quote==null)return;
+    if(typeof quote!=='object' || Array.isArray(quote) || typeof quote.text!=='string' || !quote.text.length || quote.text.length>5000 ||
+      !(quote.occurred_at===null || (typeof quote.occurred_at==='string' && !Number.isNaN(Date.parse(quote.occurred_at)))))
+      throw Error('バックアップの引用の形式が正しくありません。');
+  };
+  const checkLink=(row,id,target)=>{
+    if(id==null)return;
+    if(typeof id!=='string' || !id || (target && target.person_id!==row.person_id))
+      throw Error('バックアップの会話の関連が正しくありません。');
+  };
+  for(const row of payload.tables.conversations){
+    checkQuote(row.reply_quote);
+    checkLink(row,row.reply_to_conversation_id,conversations.get(row.reply_to_conversation_id));
+    checkLink(row,row.reply_to_follow_up_id,questions.get(row.reply_to_follow_up_id));
+    if(row.reply_to_conversation_id && row.reply_to_conversation_id===row.conversation_id)throw Error('バックアップの会話の関連が正しくありません。');
+  }
+  for(const row of payload.tables.follow_up_items){checkQuote(row.source_quote);checkLink(row,row.source_conversation_id,conversations.get(row.source_conversation_id));}
   if (payload.version === 2) {
     if (!Array.isArray(payload.media)) throw new Error("バックアップの写真が含まれていません。");
     const paths = new Set();

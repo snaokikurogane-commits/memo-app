@@ -47,6 +47,7 @@ class Query {
     const mode=await fetch('/fixture-mode.json',{cache:'no-store'}).then(r=>r.json()).catch(()=>({}));
     if (mode.failPeople && this.table==='people' && this.operation!=='select') return {data:null,error:{message:'確認用：人物の保存に失敗しました'}};
     if (mode.failQuestions && this.table==='follow_up_items' && this.operation==='insert') return {data:null,error:{message:'確認用：質問の保存に失敗しました'}};
+    if (mode.failCompletion && this.table==='follow_up_items' && this.operation==='update' && this.values?.status==='completed') return {data:null,error:{message:'確認用：完了状態の保存に失敗しました'}};
     let rows=data[this.table]||[];let selected=rows.filter(row=>this.filters.every(filter=>filter(row)));
     if (this.operation==='insert') {
       selected=(Array.isArray(this.values)?this.values:[this.values]).map(values=>({...values,[keys[this.table]]:values[keys[this.table]]||crypto.randomUUID(),created_at:new Date().toISOString(),status:values.status||'open'}));

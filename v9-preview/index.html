@@ -11,9 +11,9 @@
     <link rel="icon" type="image/png" sizes="512x512" href="./app-icon-512.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="./app-icon-180.png" />
     <link rel="manifest" href="./manifest.webmanifest" />
-    <link rel="stylesheet" href="./styles.css?v=9-20261010-drafts" />
+    <link rel="stylesheet" href="./styles.css?v=9-20261028-linked" />
     <link rel="stylesheet" href="./theme-art.css?v=9-20261004" />
-    <link rel="stylesheet" href="./v9.css?v=9-20261010-drafts" />
+    <link rel="stylesheet" href="./v9.css?v=9-20261028-linked" />
   </head>
   <body>
     <main class="shell">
@@ -437,44 +437,49 @@
         </button>
       </header>
       <form id="conversation-form" class="composer-form">
-        <p id="conversation-save-status" class="field-hint draft-status" role="status"></p>
+        <div class="composer-content">
+        <p id="composer-person" class="composer-person"></p>
+        <div id="composer-quote" hidden></div>
         <fieldset id="conversation-fields" class="conversation-fields">
           <legend class="sr-only">会話メモの内容</legend>
-        <div id="tag-list" class="tag-list" aria-label="タグ"></div>
-        <details id="conversation-tag-picker" class="tag-picker">
-          <summary>タグを選ぶ・探す</summary>
-          <label>タグを検索<input id="conversation-tag-search" type="search" maxlength="80" placeholder="趣味・家族・自分のタグを検索" /></label>
-          <div id="conversation-tag-categories" class="tag-categories" aria-label="タグの種類"></div>
-          <div id="conversation-tag-options" class="tag-options" aria-label="タグの候補"></div>
-        </details>
-        <label
-          >会話メモ<textarea
+        <label id="conversation-note-section"
+          ><span id="conversation-note-label">話したこと</span><textarea
             id="conversation-note"
             maxlength="5000"
             placeholder="今回話した内容。会話履歴として残ります"
           ></textarea>
         </label>
-        <details id="recap-options" class="recap-options">
+        <label id="conversation-ask-next-label" class="ask-next-label">
+          <input id="conversation-ask-next" type="checkbox" />
+          <span><strong id="conversation-ask-next-text">次回聞く</strong><small>このメモを「次に聞くこと」にも表示します</small></span>
+        </label>
+        <label id="next-topics-section" hidden
+          >次に聞くこと<textarea id="next-topics" maxlength="5000" placeholder="1行に1件ずつ入力"></textarea>
+        </label>
+        <details id="composer-options" class="composer-options">
+          <summary>タグ・日付・補足（任意）</summary>
+          <div id="tag-list" class="tag-list" aria-label="タグ"></div>
+          <details id="conversation-tag-picker" class="tag-picker">
+            <summary>タグを選ぶ・探す</summary>
+            <label>タグを検索<input id="conversation-tag-search" type="search" maxlength="80" placeholder="趣味・家族・自分のタグを検索" /></label>
+            <div id="conversation-tag-categories" class="tag-categories" aria-label="タグの種類"></div>
+            <div id="conversation-tag-options" class="tag-options" aria-label="タグの候補"></div>
+          </details>
+          <details id="recap-options" class="recap-options">
           <summary>短いまとめも残す（任意）</summary>
           <label>次に会う前に思い出したいこと<input id="conversation-recap" type="text" maxlength="100" placeholder="100文字まで" /></label>
           <p class="field-hint">書かなくても、会話メモの冒頭を前回の話として表示します。</p>
         </details>
-        <label id="next-topics-section"
-          >次に聞くこと<textarea
-            id="next-topics"
-            maxlength="5000"
-            placeholder="1行に1件ずつ入力&#10;例：海華ちゃんは今何歳？&#10;例：福井への帰省はどうだった？"
-          ></textarea
-          ><span class="field-hint"
-            >聞いたら質問ごとに「聞いた」を押して消せます。</span
-          ></label
-        >
         <label id="follow-up-date-section">次回目安<input id="follow-up-at" type="date" /></label>
+        </details>
         </fieldset>
-        <button id="save-conversation" class="primary" type="submit">
-          保存して履歴に戻る
-        </button>
+        <p id="conversation-save-status" class="field-hint draft-status" role="status"></p>
         <button id="discard-conversation-draft" class="quiet-button" type="button" hidden>下書きを破棄</button>
+        </div>
+        <div class="composer-actions">
+          <button id="save-conversation" class="primary" type="submit">保存する</button>
+          <button id="complete-without-note" class="quiet-button" type="button" hidden>記録せず完了</button>
+        </div>
       </form>
     </section>
 
@@ -591,6 +596,6 @@
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
     <script src="./config.js"></script>
     <script src="./topics-data.js"></script>
-    <script type="module" src="./app.js?v=9-20261010-drafts"></script>
+    <script type="module" src="./app.js?v=9-20261028-linked"></script>
   </body>
 </html>

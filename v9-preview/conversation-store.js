@@ -12,6 +12,9 @@ export class SupabaseConversationStore {
       ? await table.update(row).eq('conversation_id',editId).eq('person_id',personId)
       : await table.upsert(row,{onConflict:'conversation_id',ignoreDuplicates:true});
     if(result.error)throw result.error;
+    return this.readConversation(row,editId,personId);
+  }
+  async readConversation(row,editId=null,personId=row.person_id) {
     const saved=await this.client.from('conversations').select('*').eq('person_id',personId)
       .eq('conversation_id',editId || row.conversation_id).single();
     if(saved.error)throw saved.error;

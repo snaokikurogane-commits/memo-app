@@ -1,9 +1,11 @@
-import { encryptBackup, validateBackupPayload } from "./backup-crypto.js";
-import { hobbyIllustrations, filterHobbyIllustrations, normalizeCardImage, resolveCardArtwork, PhotoStore, preparePhoto, persistCardImage, collectPhotoMedia } from "./card-images.js?v=9-20261010-drafts";
-import {isChildrenTag, childrenInfo, childrenProfileTags, childrenPresenceAfterTagEdit, currentChildAge} from './family.js?v=9-20261010-drafts';
-import {tagChoices, tagCategories} from './tag-library.js?v=9-20261010-drafts';
-import {personAgeValues, personAgeSummary, personAgeInputs} from './person-age.js?v=9-20261010-drafts';
-import {ConversationDrafts} from './conversation-drafts.js?v=9-20261010-drafts';
+import { encryptBackup, validateBackupPayload } from "./backup-crypto.js?v=9-20261028-linked";
+import { hobbyIllustrations, filterHobbyIllustrations, normalizeCardImage, resolveCardArtwork, PhotoStore, preparePhoto, persistCardImage, collectPhotoMedia } from "./card-images.js?v=9-20261028-linked";
+import {isChildrenTag, childrenInfo, childrenProfileTags, childrenPresenceAfterTagEdit, currentChildAge} from './family.js?v=9-20261028-linked';
+import {tagChoices, tagCategories} from './tag-library.js?v=9-20261028-linked';
+import {personAgeValues, personAgeSummary, personAgeInputs} from './person-age.js?v=9-20261028-linked';
+import {ConversationDrafts} from './conversation-drafts.js?v=9-20261028-linked';
+import {createConversationJob,saveConversationJob,followUpQuote} from './conversation-flow.js?v=9-20261028-linked';
+import {SupabaseConversationStore} from './conversation-store.js?v=9-20261028-linked';
 
 const config = window.PEOPLE_NOTEBOOK_CONFIG || {};
 const standardTopics = [
@@ -186,6 +188,9 @@ const state = {
   expandedConversations: false,
   followUpAddOpen: false,
   profileDetailsOpen: false,
+  linksAvailable: false,
+  replyingFollowUp: null,
+  composerMode: 'note',
   cardFieldsAvailable: true,
   cardImageAvailable: true,
   personAgeAvailable: true,
@@ -393,6 +398,7 @@ function buildAiConsultation(detail, options = {}) {
       const recap = conversationRecap(item);
       const note = String(item.note || "").trim();
       lines.push(`・${dateText(item.occurred_at)}：${recap || note}`);
+      if(item.reply_quote)lines.push(`　前の話（${dateText(item.reply_quote.occurred_at)}）：${includeDetails?item.reply_quote.text:item.reply_quote.text.slice(0,100)}`);
       if (includeDetails && note && note !== recap) lines.push(`　詳しいメモ：${note}`);
     });
   }
@@ -400,7 +406,7 @@ function buildAiConsultation(detail, options = {}) {
     lines.push("", "まだ聞いていないこと：");
     const questions = (detail.followUps || []).filter((item) => item.status === "open");
     if (!questions.length) lines.push("なし");
-    questions.forEach((item) => lines.push(`・${item.body}`));
+    questions.forEach((item) => lines.push(`・${followUpQuote(item).text}`));
   }
   if (includePersonal) {
     lines.push("", "家族・個人的な出来事：");
@@ -663,26 +669,38 @@ async function selectAll(table, columns, options = {}) {
 }
 
 const conversationColumns = "conversation_id,person_id,occurred_at,note,next_topic,follow_up_at,tags";
+const conversationLinkColumns = () => state.linksAvailable ? ',reply_to_conversation_id,reply_to_follow_up_id,reply_quote' : '';
+const followUpColumns = () => 'follow_up_id,person_id,body,due_at,status,completed_at,created_at' +
+  (state.linksAvailable ? ',source_conversation_id,source_quote' : '');
+
+async function checkConversationLinks() {
+  const checks=await Promise.all([
+    state.client.from('conversations').select('reply_to_conversation_id,reply_to_follow_up_id,reply_quote').limit(1),
+    state.client.from('follow_up_items').select('source_conversation_id,source_quote').limit(1),
+  ]);
+  for(const result of checks)if(result.error && !['42703','PGRST204'].includes(result.error.code))throw result.error;
+  state.linksAvailable=checks.every(result=>!result.error);
+}
 
 async function selectAllConversations() {
   try {
-    const rows = await selectAll("conversations", `${conversationColumns},recap`, { order: "occurred_at", ascending: false });
+    const rows = await selectAll("conversations", `${conversationColumns},recap${conversationLinkColumns()}`, { order: "occurred_at", ascending: false });
     state.recapAvailable = true;
     return rows;
   } catch (error) {
     if (!String(error.message || "").includes("recap")) throw error;
     state.recapAvailable = false;
-    return selectAll("conversations", conversationColumns, { order: "occurred_at", ascending: false });
+    return selectAll("conversations", conversationColumns+conversationLinkColumns(), { order: "occurred_at", ascending: false });
   }
 }
 
 async function selectPersonConversations(personId) {
   const query = (columns) => state.client.from("conversations").select(columns)
     .eq("person_id", personId).order("occurred_at", { ascending: false });
-  let result = await query(`${conversationColumns},recap`);
+  let result = await query(`${conversationColumns},recap${conversationLinkColumns()}`);
   if (result.error && String(result.error.message || "").includes("recap")) {
     state.recapAvailable = false;
-    result = await query(conversationColumns);
+    result = await query(conversationColumns+conversationLinkColumns());
   } else if (!result.error) state.recapAvailable = true;
   return result;
 }
@@ -829,7 +847,7 @@ async function loadDirectory() {
     selectAllConversations(),
     selectAll(
       "follow_up_items",
-      "follow_up_id,person_id,body,due_at,status,completed_at,created_at",
+      followUpColumns(),
       { order: "created_at", ascending: false },
     ),
     selectAll('family_members','family_member_id,person_id,relationship'),
@@ -1003,7 +1021,7 @@ function openFollowUpEditor(card, item) {
   body.type = "text";
   body.maxLength = 5000;
   body.required = true;
-  body.value = item.body;
+  body.value = followUpQuote(item).text;
   body.setAttribute("aria-label", "次に聞くことを編集");
   const due = document.createElement("input");
   due.type = "date";
@@ -1019,6 +1037,8 @@ function openFollowUpEditor(card, item) {
     event.preventDefault();
     const changes = followUpChanges(body.value, due.value);
     if (!changes) return toast("次に聞くことを入力してください。", true);
+    if(item.source_quote){changes.source_quote={...item.source_quote,text:changes.body};changes.body=Array.from(changes.body).slice(0,1000).join('');}
+    else if(changes.body.length>1000)return toast('次に聞くことは1000文字以内にしてください。',true);
     save.disabled = true;
     try {
       const { error } = await state.client.from("follow_up_items").update(changes)
@@ -1092,7 +1112,11 @@ function followUpCard(item, showPerson = false, selectable = false) {
     });
     copy.append(personButton);
   }
-  copy.append(el("div", "follow-up-body", item.body));
+  const quote=followUpQuote(item);
+  const body=el(state.linksAvailable && canEditPeople()?'button':'div','follow-up-body',quote.text);
+  if(state.linksAvailable && canEditPeople()){body.type='button';body.addEventListener('click',()=>openFollowUp(item));}
+  copy.append(body);
+  if(item.source_quote)copy.append(el('div','follow-up-date',`${dateText(quote.occurred_at)}の会話メモ`));
   if (item.due_at) {
     copy.append(
       el("div", "follow-up-date", `次回目安：${dateText(item.due_at)}`),
@@ -1122,7 +1146,7 @@ function followUpCard(item, showPerson = false, selectable = false) {
   const actions = el("div", "item-actions");
   const done = el("button", "complete-button", "聞いた");
   done.type = "button";
-  done.addEventListener("click", () => completeFollowUp(item));
+  done.addEventListener("click", () => state.linksAvailable ? openFollowUp(item) : completeFollowUp(item));
   actions.append(done, followUpMoreActions(item, card));
   card.append(copy, actions);
   return card;
@@ -1650,6 +1674,27 @@ function renderPrepCard(detail) {
   return card;
 }
 
+function compactPersonIdentity(detail) {
+  const person=detail.person,section=el('section','compact-person-identity');
+  const avatar=el('span','person-initial',Array.from(String(person.canonical_name || '?').replace(/\s/g,''))[0]);
+  avatar.setAttribute('aria-label',`${person.canonical_name}の頭文字`);
+  const copy=el('div','compact-person-copy');
+  copy.append(el('h1','',person.canonical_name));
+  if(person.name_kana)copy.append(el('p','person-reading',person.name_kana));
+  const assignment=currentAssignment(detail.assignments);
+  copy.append(el('p','compact-person-assignment',assignment?[assignment.organization,assignment.department,assignment.role].filter(Boolean).join(' / '):'所属未登録'));
+  const age=personAgeSummary(person.age_info),family=childrenInfo({...person,hasKnownChildren:person.hasKnownChildren || detail.familyMembers?.some(member=>member.relationship==='child')}).label;
+  if(age.ageLabel || age.birthdayLabel || family)copy.append(el('p','compact-person-attributes',[age.ageLabel,age.birthdayLabel,family].filter(Boolean).join(' · ')));
+  section.append(avatar,copy);
+  const hobbies=hobbyIllustrations.filter(item=>(person.profile_tags || []).some(tag=>item.tags.includes(tag))).slice(0,2);
+  if(hobbies.length){
+    const cues=el('div','compact-hobby-cues');
+    hobbies.forEach(item=>{const picture=el('img','compact-hobby-icon');picture.src=`./assets/${item.id}.webp?v=20261005-simple-a`;picture.alt=item.label;picture.width=36;picture.height=36;cues.append(picture);});
+    section.append(cues);
+  }
+  return section;
+}
+
 function renderDetail() {
   const detail = state.person;
   if (!detail) return;
@@ -1657,7 +1702,7 @@ function renderDetail() {
   clear(target);
   byId("detail-title").textContent = detail.person.canonical_name;
   byId("person-edit").hidden = !canEditPeople();
-  target.append(identityCard(detail), renderPrepCard(detail));
+  target.append(compactPersonIdentity(detail), renderPrepCard(detail));
 
   const followUps = el("section", "card follow-up-section");
   const openFollowUps = detail.followUps
@@ -1735,7 +1780,6 @@ function renderDetail() {
   target.append(followUps);
   const aiAction = detailSectionButton("AIに相談する文章を作る　›", openAiConsultation);
   aiAction.classList.add("ai-consultation-action");
-  target.append(aiAction);
 
   const conversations = el("section", "card conversation-section");
   const notedConversations = detail.conversations.filter((conversation) =>
@@ -1744,14 +1788,14 @@ function renderDetail() {
   const conversationHead = el("div", "section-heading");
   const conversationTitle = el("div", "section-title-with-count");
   conversationTitle.append(
-    el("h2", "", "会話履歴"),
+    el("h2", "", "最近の会話履歴"),
     el("span", "count-pill neutral", `${notedConversations.length}件`),
   );
   conversationHead.append(conversationTitle);
   conversations.append(conversationHead);
   const shownConversations = state.expandedConversations
     ? notedConversations
-    : notedConversations.slice(0, 2);
+    : notedConversations.slice(0, 3);
   shownConversations.forEach((conversation) => {
     const card = el("article", "conversation");
     card.dataset.conversationId = conversation.conversation_id;
@@ -1767,19 +1811,30 @@ function renderDetail() {
       remove.addEventListener("click", () => deleteConversation(conversation));
       head.append(remove);
     }
-    card.append(head, el("p", "conversation-recap", conversationRecap(conversation)));
-    if (conversation.note && conversation.note !== conversationRecap(conversation))
-      card.append(el("p", "conversation-detail", conversation.note));
+    const text=conversation.note || conversation.recap || '';
+    card.append(head,el('p','conversation-history-text',text.length>180?text.slice(0,180)+'…':text));
+    if(text.length>180){const full=el('details','conversation-full');full.append(el('summary','','全文を読む'),el('p','conversation-history-text',text));card.append(full);}
+    if(conversation.reply_quote){
+      const previous=el('details','conversation-previous');
+      previous.append(el('summary','','前の話を見る'),quoteBlock(conversation.reply_quote));
+      if(conversation.reply_to_conversation_id){
+        const original=detail.conversations.find(row=>row.conversation_id===conversation.reply_to_conversation_id);
+        if(original){const link=detailSectionButton('元の会話を開く',()=>{state.expandedConversations=true;renderDetail();
+          const source=[...byId('detail-body').querySelectorAll('[data-conversation-id]')].find(node=>node.dataset.conversationId===original.conversation_id);source?.scrollIntoView({block:'center',behavior:'smooth'});});previous.append(link);}
+      }
+      card.append(previous);
+    }
+    if(detail.followUps.some(item=>item.status==='open' && item.source_conversation_id===conversation.conversation_id))card.append(el('span','history-next-badge','次回聞く'));
     conversations.append(card);
   });
   if (!notedConversations.length) {
     conversations.append(el("div", "empty", "最初の会話メモを残しましょう"));
-  } else if (notedConversations.length > 2) {
+  } else if (notedConversations.length > 3) {
     conversations.append(
       detailSectionButton(
         state.expandedConversations
-          ? "最新2件に戻す"
-          : `過去の${notedConversations.length - 2}件も見る`,
+          ? "最新3件に戻す"
+          : `すべての履歴を見る（残り${notedConversations.length - 3}件）`,
         () => {
           state.expandedConversations = !state.expandedConversations;
           renderDetail();
@@ -1788,6 +1843,9 @@ function renderDetail() {
     );
   }
   target.append(conversations, renderProfileDetails(detail));
+  const appearance=el('details','saved-appearance');appearance.append(el('summary','','保存した表紙を見る'));
+  appearance.addEventListener('toggle',()=>{if(appearance.open && !appearance.dataset.loaded){appearance.dataset.loaded='true';appearance.append(identityCard(detail));}});
+  target.append(appearance,aiAction);
 }
 
 async function openPerson(personId) {
@@ -1834,7 +1892,7 @@ async function openPerson(personId) {
       state.client
         .from("follow_up_items")
         .select(
-          "follow_up_id,person_id,body,due_at,status,completed_at,created_at",
+          followUpColumns(),
         )
         .eq("person_id", personId)
         .order("created_at", { ascending: false }),
@@ -2522,12 +2580,16 @@ function resetComposer() {
   byId("conversation-form").reset();
   state.editingConversationId = null;
   state.conversationJob = null;
+  state.replyingFollowUp = null;
+  state.composerMode = 'note';
+  byId('conversation-ask-next').checked=false;
+  byId('composer-options').open=false;
   byId('conversation-fields').disabled = false;
   byId('conversation-save-status').textContent = '';
   byId('discard-conversation-draft').hidden = true;
   byId("composer-title").textContent = "会話メモを追加";
   byId("save-conversation").textContent = "保存して履歴に戻る";
-  byId("next-topics-section").hidden = false;
+  byId("next-topics-section").hidden = true;
   byId("follow-up-date-section").hidden = false;
   state.selectedTags.clear();
   state.conversationTagCategory='all';
@@ -2539,7 +2601,8 @@ function resetComposer() {
 
 function conversationScope() {
   const user = state.session?.user?.id, person = state.person?.person.person_id;
-  return user && person ? [config.supabaseUrl || '', user, person, state.editingConversationId || 'new'] : null;
+  return user && person ? [config.supabaseUrl || '', user, person,
+    state.editingConversationId || (state.replyingFollowUp ? `reply:${state.replyingFollowUp.follow_up_id}` : state.composerMode==='questions'?'questions':'new')] : null;
 }
 
 function conversationDraftValue() {
@@ -2549,6 +2612,8 @@ function conversationDraftValue() {
     questions: byId('next-topics').value,
     due: byId('follow-up-at').value,
     tags: [...state.selectedTags],
+    askNext: Boolean(byId('conversation-ask-next').checked),
+    composerMode: state.composerMode,
     job: state.conversationJob,
   };
 }
@@ -2557,7 +2622,7 @@ function captureConversationDraft() {
   const scope = conversationScope();
   if (!scope || byId('composer').hidden) return;
   const draft = conversationDraftValue();
-  const hasContent = draft.job || draft.note || draft.recap || draft.questions || draft.due || draft.tags.length;
+  const hasContent = draft.job || draft.note || draft.recap || draft.questions || draft.due || draft.tags.length || draft.askNext;
   const durable = hasContent ? conversationDrafts.write(scope, draft) : conversationDrafts.remove(scope);
   byId('discard-conversation-draft').hidden = !hasContent;
   byId('conversation-fields').disabled = Boolean(draft.job);
@@ -2565,7 +2630,7 @@ function captureConversationDraft() {
   if (draft.job) {
     byId('save-conversation').textContent = state.conversationSaving ? '保存中…' : '保存を再試行';
     const progress = state.conversationSaving ? '保存中です。' : draft.job.conversationConfirmed
-      ? '会話メモは保存済みです。残りの質問の保存を再試行してください。'
+      ? '会話メモは保存済みです。次回の項目と完了状態の保存を再試行してください。'
       : '前回の保存完了を確認できていません。「保存を再試行」を押してください。';
     byId('conversation-save-status').textContent = progress + (durable
       ? '内容を保持しているので、閉じてもこのタブから続けられます。'
@@ -2575,6 +2640,7 @@ function captureConversationDraft() {
       ? '下書きはこのタブに保持します。再読み込み後も同じ人物から開けます。ログアウトすると削除します。'
       : '下書きはこの画面を開いている間のみ保持します。再読み込みやタブを閉じると失われます。';
   }
+  updateComposerControls();
 }
 
 function restoreConversationDraft() {
@@ -2586,6 +2652,8 @@ function restoreConversationDraft() {
     byId('follow-up-at').value = draft.due || '';
     state.selectedTags = new Set(Array.isArray(draft.tags) ? draft.tags : []);
     state.conversationJob = draft.job || null;
+    byId('conversation-ask-next').checked=Boolean(draft.askNext);
+    if(!state.replyingFollowUp && !state.editingConversationId && state.composerMode!=='questions')state.composerMode=draft.composerMode || (draft.questions?'legacy':'note');
     byId('recap-options').open = Boolean(draft.recap);
     renderTags();
   }
@@ -2615,12 +2683,57 @@ function clearConversationAccount() {
 
 function openComposer(focusId = "conversation-note") {
   if (!state.person) return;
+  if(focusId==='next-topics')state.composerMode='questions';
   byId("composer").hidden = false;
   restoreConversationDraft();
+  renderComposerContext();
   byId('composer').setAttribute('aria-label',byId('composer-title').textContent);
   setTimeout(() => {
     byId(focusId)?.focus();
   }, 0);
+}
+
+function updateComposerControls() {
+  const replying=Boolean(state.replyingFollowUp),editing=Boolean(state.editingConversationId);
+  byId('composer-quote').hidden=!replying;
+  byId('conversation-ask-next-label').hidden=!state.linksAvailable || editing || state.composerMode==='questions';
+  byId('next-topics-section').hidden=editing || !['questions','legacy'].includes(state.composerMode);
+  byId('conversation-note-section').hidden=state.composerMode==='questions';
+  byId('composer-options').hidden=false;
+  byId('recap-options').hidden=state.composerMode==='questions';
+  byId('conversation-tag-picker').hidden=state.composerMode==='questions';
+  byId('tag-list').hidden=state.composerMode==='questions';
+  if(state.composerMode==='questions')byId('next-topics-section').hidden=false;
+  byId('complete-without-note').hidden=!replying;
+  byId('complete-without-note').disabled=state.conversationSaving || Boolean(state.conversationJob) ||
+    Boolean(byId('conversation-note').value.trim() || byId('conversation-recap').value.trim() || byId('conversation-ask-next').checked);
+  byId('conversation-note-label').textContent=replying?'今回わかったこと':'話したこと';
+  byId('conversation-ask-next-text').textContent=replying?'この続きも次回聞く':'次回聞く';
+  byId('composer-title').textContent=editing?'会話メモを編集':replying?'聞いたことを記録':state.composerMode==='questions'?'次に聞くことを追加':'会話メモを追加';
+  if(!state.conversationJob)byId('save-conversation').textContent=editing?'変更を保存':replying?'保存して完了':'保存する';
+}
+
+function quoteBlock(quote,label='前の話') {
+  const block=el('blockquote','conversation-quote');
+  block.append(el('strong','',label));
+  if(quote.occurred_at)block.append(el('time','prep-date',dateText(quote.occurred_at)));
+  block.append(el('p','',quote.text));return block;
+}
+
+function renderComposerContext() {
+  byId('composer-person').textContent=state.person?.person.canonical_name || '';
+  byId('composer-quote').replaceChildren();
+  if(state.replyingFollowUp)byId('composer-quote').append(quoteBlock(followUpQuote(state.replyingFollowUp)));
+  updateComposerControls();
+}
+
+async function openFollowUp(item) {
+  if(!canEditPeople())return;
+  if(state.person?.person.person_id!==item.person_id)await openPerson(item.person_id);
+  if(state.person?.person.person_id!==item.person_id)return;
+  if(!byId('composer').hidden)closeComposer();
+  state.replyingFollowUp={...item,source_quote:item.source_quote ? {...item.source_quote} : null};
+  openComposer();
 }
 
 function openConversationEditor(conversation) {
@@ -3284,117 +3397,64 @@ async function deleteConversation(conversation) {
   }
 }
 
-async function saveConversation(event) {
+function conversationStore() { return new SupabaseConversationStore(state.client); }
+
+async function saveConversation(event, {completeOnly=false}={}) {
   event.preventDefault();
-  if (!state.person || !canEditPeople() || state.conversationSaving) return;
-  const recap = byId("conversation-recap").value.trim();
-  const note = byId("conversation-note").value.trim();
-  const followUpItems = state.editingConversationId ? [] : byId("next-topics")
-    .value.split(/\r?\n/)
-    .map((value) => value.trim())
-    .filter(Boolean);
-  if (!recap && !note && !followUpItems.length) {
-    toast("会話メモまたは次に聞くことを入力してください。", true);
-    return;
+  if(!state.person || !canEditPeople() || state.conversationSaving)return;
+  const scope=conversationScope();if(!scope)return;
+  if(!state.conversationJob) {
+    try {
+      state.conversationJob=createConversationJob({
+        personId:state.person.person.person_id,note:byId('conversation-note').value,
+        recap:byId('conversation-recap').value,tags:[...state.selectedTags],
+        questions:state.editingConversationId?[]:byId('next-topics').value.split(/\r?\n/),
+        due:byId('follow-up-at').value,editId:state.editingConversationId,
+        reply:state.replyingFollowUp,askNext:Boolean(byId('conversation-ask-next').checked),
+        completeOnly,linksAvailable:state.linksAvailable,hasRecap:state.recapAvailable,
+      });
+    } catch(error) {toast(message(error),true);return;}
   }
-  if (!state.conversationJob && followUpItems.some(body=>body.length > 1000)) {
-    toast('次に聞くことは、1行につき1000文字以内にしてください。内容を短くしてから保存できます。',true);
-    return;
-  }
-  if (!state.conversationJob && conversationNoteForSave(recap,note,state.recapAvailable).length > 5000) {
-    toast('会話メモは5000文字以内にしてください。',true);
-    return;
-  }
-  const scope = conversationScope();
-  if (!scope) return;
-  const detail = state.person, client = state.client, epoch = state.conversationEpoch;
-  if (!state.conversationJob) {
-    const changes = {note: conversationNoteForSave(recap,note,state.recapAvailable),tags:[...state.selectedTags]};
-    if (state.recapAvailable) changes.recap = recap || null;
-    state.conversationJob = {
-      id: crypto.randomUUID(),
-      personId: detail.person.person_id,
-      editId: state.editingConversationId,
-      conversation: recap || note ? {
-        ...changes,
-        ...(state.editingConversationId ? {} : {
-          conversation_id: crypto.randomUUID(), person_id: detail.person.person_id,
-          occurred_at: new Date().toISOString(), next_topic: '', follow_up_at: null,
-        }),
-      } : null,
-      questions: followUpItems.map(body=>({follow_up_id:crypto.randomUUID(),person_id:detail.person.person_id,body,due_at:byId('follow-up-at').value || null})),
-      conversationConfirmed: false,
-    };
-  }
-  const job = state.conversationJob;
-  state.conversationSaving = true;
-  byId('discard-conversation-draft').disabled = true;
-  captureConversationDraft(); // Persist stable IDs before the first request, including uncertain responses.
-  const sameLogin = () => state.conversationEpoch === epoch && state.session?.user?.id === scope[1];
-  const isCurrent = () => sameLogin() && state.person?.person.person_id === scope[2];
-  const isCurrentComposer = () => isCurrent() && (state.editingConversationId || 'new') === scope[3] && state.conversationJob?.id === job.id;
-  const persistProgress = () => {
-    const draft = conversationDrafts.read(scope);
-    if (isCurrentComposer()) state.conversationJob = job;
-    // A completed logout deliberately removes drafts, including pending jobs.
-    if (sameLogin() && draft?.job?.id === job.id) conversationDrafts.write(scope,{...draft,job});
+  const job=state.conversationJob,client=state.client,epoch=state.conversationEpoch;
+  const sameLogin=()=>state.conversationEpoch===epoch && state.session?.user?.id===scope[1] && state.client===client;
+  const isCurrent=()=>sameLogin() && state.person?.person.person_id===scope[2];
+  const isCurrentComposer=()=>isCurrent() && conversationScope()?.[3]===scope[3] && state.conversationJob?.id===job.id;
+  const persistProgress=()=>{
+    if(isCurrentComposer())state.conversationJob=job;
+    const draft=conversationDrafts.read(scope);
+    if(sameLogin() && draft?.job?.id===job.id)conversationDrafts.write(scope,{...draft,job});
   };
+  state.conversationSaving=true;
+  byId('discard-conversation-draft').disabled=true;
+  captureConversationDraft();
   try {
-    let savedConversation = null, savedQuestions = [];
-    if (job.conversation) {
-      if (!job.conversationConfirmed) {
-        const query = client.from('conversations');
-        const result = job.editId
-          ? await query.update(job.conversation).eq('conversation_id',job.editId).eq('person_id',job.personId).select().single()
-          : await query.upsert(job.conversation,{onConflict:'conversation_id',ignoreDuplicates:true});
-        if (result.error) throw result.error;
-      }
-      const result = await client.from('conversations').select('*').eq('person_id',job.personId)
-        .eq('conversation_id',job.editId || job.conversation.conversation_id).single();
-      if (result.error) throw result.error;
-      if (!result.data) throw new Error('会話メモの保存結果を確認できませんでした。');
-      savedConversation = result.data;
-      job.conversationConfirmed = true;
-      persistProgress();
-    }
-    if (job.questions.length) {
-      // Do not continue a second write after the user has logged out or changed accounts.
-      if (!sameLogin()) return;
-      const result = await client.from('follow_up_items').upsert(job.questions,{onConflict:'follow_up_id',ignoreDuplicates:true});
-      if (result.error) throw result.error;
-      const verified = await client.from('follow_up_items').select('*').eq('person_id',job.personId)
-        .in('follow_up_id',job.questions.map(row=>row.follow_up_id));
-      if (verified.error) throw verified.error;
-      if (verified.data?.length !== job.questions.length) throw new Error('質問の保存結果を確認できませんでした。');
-      savedQuestions = verified.data;
-    }
-    // Once DB writes are verified, a later directory refresh must not invite a duplicate retry.
-    if (sameLogin() && conversationDrafts.read(scope)?.job?.id === job.id) conversationDrafts.remove(scope);
-    if (isCurrent()) {
-      if (savedConversation) state.person.conversations = [savedConversation,...state.person.conversations.filter(row=>row.conversation_id !== savedConversation.conversation_id)];
-      const ids = new Set(savedQuestions.map(row=>row.follow_up_id));
-      state.person.followUps = [...savedQuestions,...state.person.followUps.filter(row=>!ids.has(row.follow_up_id))];
-      if (isCurrentComposer()) {
-        byId('composer').hidden = true;
-        resetComposer();
-      }
+    const result=await saveConversationJob(job,conversationStore(),{isActive:sameLogin,onProgress:persistProgress});
+    if(!sameLogin())return;
+    if(conversationDrafts.read(scope)?.job?.id===job.id)conversationDrafts.remove(scope);
+    if(isCurrent()) {
+      if(result.conversation)state.person.conversations=[result.conversation,...state.person.conversations.filter(row=>row.conversation_id!==result.conversation.conversation_id)];
+      const ids=new Set(result.questions.map(row=>row.follow_up_id));
+      state.person.followUps=[...result.questions,...state.person.followUps.filter(row=>!ids.has(row.follow_up_id) && row.follow_up_id!==result.completedId)];
+      if(result.completedId)state.followUps=state.followUps.filter(row=>row.follow_up_id!==result.completedId);
+      if(isCurrentComposer()){byId('composer').hidden=true;resetComposer();}
       renderDetail();
     }
-    if (!sameLogin()) return;
-    toast(job.editId ? '会話メモを更新しました' : job.conversation && job.questions.length
-      ? '会話メモと次に聞くことを保存しました' : job.conversation ? '会話メモを保存しました' : '次に聞くことを追加しました');
-    try { await loadDirectory(); }
-    catch (error) { toast(`保存は完了しました。一覧の更新に失敗しました。画面を再読み込みしてください：${message(error)}`,true); }
-  } catch (error) {
+    toast(job.editId?'会話メモを更新しました':job.completeId
+      ?job.conversation?'前の話と紐づけて保存しました':'聞いたことにしました'
+      :job.conversation && job.questions.length?'会話メモと次に聞くことを保存しました':job.conversation?'会話メモを保存しました':'次に聞くことを追加しました');
+    try {await loadDirectory();}
+    catch(error){toast(`保存は完了しました。一覧の更新に失敗しました。画面を再読み込みしてください：${message(error)}`,true);}
+  } catch(error) {
     persistProgress();
-    if (sameLogin()) toast(`${job.conversationConfirmed ? '会話メモは保存済みです。質問の保存を完了できませんでした。' : '保存の完了を確認できませんでした。'}「保存を再試行」を押してください。同じ記録を重複させずに再試行します：${message(error)}`,true);
+    if(sameLogin())toast(`${job.conversationConfirmed?'会話メモは保存済みです。残りの処理を完了できませんでした。':'保存の完了を確認できませんでした。'}内容を保持しています。「保存を再試行」を押してください：${message(error)}`,true);
   } finally {
-    state.conversationSaving = false;
-    byId('save-conversation').disabled = false;
-    byId('discard-conversation-draft').disabled = false;
-    if (isCurrentComposer() && !byId('composer').hidden) captureConversationDraft();
+    state.conversationSaving=false;
+    byId('save-conversation').disabled=false;
+    byId('discard-conversation-draft').disabled=false;
+    if(isCurrentComposer() && !byId('composer').hidden)captureConversationDraft();
   }
 }
+
 
 function switchView(view) {
   document.querySelectorAll(".view").forEach((node) => {
@@ -3459,6 +3519,7 @@ async function handleSession(session) {
     byId("person-edit").hidden = !canEditPeople();
     byId("composer-open").hidden = !canEditPeople();
     showOnly("app-screen");
+    await checkConversationLinks();
     await loadTopicPreferences();
     await loadDirectory();
   } catch (error) {
@@ -3563,6 +3624,7 @@ function bindEvents() {
   byId("composer-open").addEventListener("click", () => openComposer());
   byId("composer-close").addEventListener("click", closeComposer);
   byId("conversation-form").addEventListener("submit", saveConversation);
+  byId('complete-without-note').addEventListener('click',event=>saveConversation(event,{completeOnly:true}));
   byId('conversation-form').addEventListener('input', captureConversationDraft);
   byId('conversation-form').addEventListener('change', captureConversationDraft);
   byId('discard-conversation-draft').addEventListener('click', discardConversationDraft);
@@ -3613,8 +3675,12 @@ async function boot() {
     auth: { persistSession: true, detectSessionInUrl: true },
   });
   photoStore = new PhotoStore(state.client);
-  const updateViewport = () => document.documentElement.style.setProperty("--visible-height", `${window.visualViewport?.height || window.innerHeight}px`);
+  const updateViewport = () => {
+    document.documentElement.style.setProperty('--visible-height',`${window.visualViewport?.height || window.innerHeight}px`);
+    document.documentElement.style.setProperty('--visible-top',`${window.visualViewport?.offsetTop || 0}px`);
+  };
   window.visualViewport?.addEventListener("resize", updateViewport);
+  window.visualViewport?.addEventListener('scroll',updateViewport);
   window.addEventListener("resize", updateViewport);
   updateViewport();
   bindEvents();
