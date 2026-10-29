@@ -21,6 +21,7 @@ before(async()=>{
         .replace("canonical_name:'佐藤 健太'","canonical_name:'（佐藤 健太）'")
         .replace("profile_tags:['サッカー','同期','コーヒー']","profile_tags:['読書','登山','旅行','犬']")
         .replace("card_image:{mode:'auto'}","card_image:{mode:'illustration',illustrationId:'parenting'}")
+        .replace('onAuthStateChange:()=>{}','onAuthStateChange:callback=>{window.expireFixtureSession=()=>callback("SIGNED_OUT",null);}')
         .replace("card_image:null,icon_style:'none'","card_image:{mode:'photo',path:'demo-long/00000000-0000-4000-8000-000000000000.jpg',x:.2,y:.8,zoom:2},icon_style:'none'"));
       const types={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.webmanifest':'application/manifest+json','.png':'image/png','.webp':'image/webp','.svg':'image/svg+xml'};
       res.setHeader('Content-Type',(types[extname(file)]||'application/octet-stream')+'; charset=utf-8');res.end(body);
@@ -66,6 +67,41 @@ test('role Enter leaves the editor open; only explicit save finishes editing',as
     assert.match(await page.locator('#detail-body').innerText(),/係長/);
     assert.equal(await page.locator('#person-detail').evaluate(e=>e.inert),false);
   } finally {await context.close();}
+});
+
+for(const saving of [false,true])test(`session expiry closes person editing${saving?' during a pending save':''}`,async()=>{
+  const {page,context}=await fixture();let release;
+  try {
+    await editor(page);await page.locator('#person-role').fill('係長');
+    if(saving){
+      let notify;const requested=new Promise(done=>notify=done),blocked=new Promise(done=>release=done);let hold=true;
+      await page.route('**/fixture-mode.json',async route=>{
+        if(hold){hold=false;notify();await blocked;}
+        await route.fulfill({json:{}});
+      });
+      await page.locator('#person-save').click();await requested;
+      assert.equal(await page.locator('#person-save').isDisabled(),true);
+    }
+    await page.evaluate(()=>window.expireFixtureSession());
+    await page.waitForFunction(()=>!document.querySelector('#auth-screen').hidden);
+    const view=await page.evaluate(()=>({
+      editorHidden:document.querySelector('#person-editor').hidden,
+      detailHidden:document.querySelector('#person-detail').hidden,
+      authVisibility:getComputedStyle(document.querySelector('#auth-screen')).visibility,
+      editing:document.body.classList.contains('person-editing'),
+      appInert:document.querySelector('#app-screen').inert,
+      detailInert:document.querySelector('#person-detail').inert,
+      formInert:document.querySelector('#person-form').inert,
+      scrollLock:document.body.style.overflow,
+      focusedInput:document.activeElement?.tagName==='INPUT',
+    }));
+    assert.deepEqual(view,{editorHidden:true,detailHidden:true,authVisibility:'visible',editing:false,appInert:false,detailInert:false,formInert:false,scrollLock:'',focusedInput:false});
+    if(saving){
+      release();await page.waitForLoadState('networkidle');
+      assert.equal(await page.locator('#person-detail').isVisible(),false,'an old save must not reopen the prior person after sign-out');
+      assert.equal(await page.locator('#auth-screen').isVisible(),true);
+    }
+  } finally {release?.();await context.close();}
 });
 test('a legacy cover never replaces the person initial or registered interest icons',async()=>{
   const {page,context}=await fixture(320);try {

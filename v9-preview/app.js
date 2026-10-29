@@ -297,6 +297,7 @@ function clear(node) {
 }
 
 function showOnly(screenId) {
+  if(screenId!=="app-screen")closeSessionOverlays();
   ["setup-screen", "auth-screen", "denied-screen", "app-screen"].forEach(
     (id) => {
       byId(id).hidden = id !== screenId;
@@ -2407,6 +2408,25 @@ function syncPersonEditorLayers() {
   byId('app-screen').inert=open;
 }
 
+function closeSessionOverlays() {
+  // Session loss must bypass the normal close guard, including during a save.
+  state.conversationEpoch++;
+  document.activeElement?.blur?.();
+  disposePhotoDraft();
+  ['person-editor','person-detail','composer','topic-picker','backup-dialog'].forEach(id=>{byId(id).hidden=true;});
+  closeAiConsultation();
+  syncPersonEditorLayers();
+  byId('person-form').reset();
+  byId('person-form').inert=false;
+  byId('person-save').disabled=false;
+  byId('person-save').textContent='保存する';
+  byId('backup-form').reset();
+  state.editorTags=[];
+  state.editorPersonId=null;
+  state.person=null;
+  document.body.style.overflow='';
+}
+
 function preventPersonImplicitSubmit(event) {
   if(event.key!=='Enter' || event.isComposing || event.keyCode===229 || event.defaultPrevented) return;
   const input=event.target;
@@ -2460,6 +2480,8 @@ async function savePerson(event) {
     byId("person-name").focus();
     return;
   }
+  const saveEpoch=state.conversationEpoch,saveUser=state.session?.user?.id;
+  const sameLogin=()=>saveEpoch===state.conversationEpoch && saveUser===state.session?.user?.id;
   const personId =
     state.editorMode === "edit" && state.editorPersonId
       ? state.editorPersonId
@@ -2512,6 +2534,7 @@ async function savePerson(event) {
   let personSaved=false;
   try {
     const writePerson = async image => {
+      if(!sameLogin())throw new Error('ログイン状態が変わったため保存を中止しました。');
       if (state.cardImageAvailable) personValues.card_image = image;
       let result;
       if (state.editorMode === "edit") {
@@ -2534,9 +2557,11 @@ async function savePerson(event) {
       const image=await persistCardImage({personId,image:state.editorCardImage,photoBlob:state.editorPhotoBlob,
         oldImage:state.editorOriginalImage,store:photoStore,save:writePerson,
         onCleanupError:()=>console.warn("未使用写真の整理を完了できませんでした。")});
+      if(!sameLogin())return;
       state.editorCardImage=image;state.editorOriginalImage=image;
       disposePhotoDraft();
     } else await writePerson(null);
+    if(!sameLogin())return;
     personSaved=true;
     if (state.personAgeAvailable) state.editorOriginalAge=personValues.age_info;
     state.editorOriginalChildren=personValues.children_present ?? null;
@@ -2562,20 +2587,25 @@ async function savePerson(event) {
         if (error) throw error;
       }
     }
+    if(!sameLogin())return;
     save.disabled = false;
     closePersonEditor();
     await loadDirectory();
+    if(!sameLogin())return;
     await openPerson(personId);
-    toast(previousEditorMode === "edit" ? "人物情報を更新しました" : "人物を追加しました");
+    if(sameLogin())toast(previousEditorMode === "edit" ? "人物情報を更新しました" : "人物を追加しました");
   } catch (error) {
+    if(!sameLogin())return;
     if (personSaved) {
       renderImageEditor();renderEditorCardPreview();
       toast(`名前・タグ・画像は保存しました。所属の保存を完了できませんでした。再試行してください：${message(error)}`,true);
     } else toast(message(error), true);
   } finally {
-    byId("person-form").inert = false;
-    save.disabled = false;
-    save.textContent = "保存する";
+    if(sameLogin()){
+      byId("person-form").inert = false;
+      save.disabled = false;
+      save.textContent = "保存する";
+    }
   }
 }
 
@@ -3549,7 +3579,10 @@ async function handleSession(session) {
       showOnly("auth-screen");
       return;
     }
-    if (state.session?.user?.id && state.session.user.id !== session.user.id) clearConversationAccount();
+    if (state.session?.user?.id && state.session.user.id !== session.user.id) {
+      clearConversationAccount();
+      closeSessionOverlays();
+    }
     state.session = session;
     const { data, error } = await state.client
       .from("app_members")
