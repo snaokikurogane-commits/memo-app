@@ -194,3 +194,45 @@ h2 {font-size:19px;letter-spacing:-.025em;color:var(--ink);}
 .person-age-summary { color: var(--muted); font-size: 14px; line-height: 1.6; margin-top: 6px; }
 #person-age-options summary { cursor: pointer; min-height: 44px; display: list-item; padding-top: 12px; }
 #person-age[readonly] { background: #f4f6f3; }
+
+/* The person editor owns its visible viewport, including iOS keyboard panning. */
+#person-editor {top:var(--visible-top,0px);bottom:auto;height:var(--visible-height,100dvh);padding:0;overflow:hidden;isolation:isolate;}
+#person-editor:not([hidden]) {display:flex;flex-direction:column;}
+#person-editor > .overlay-head {position:static;flex:none;width:100%;}
+#person-form {display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;padding:0;}
+.person-form-content {flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:20px 16px 18px;scroll-padding:16px;overscroll-behavior-y:contain;}
+.person-form-actions {flex:none;padding:10px 16px max(12px,env(safe-area-inset-bottom));border-top:1px solid var(--line);background:var(--paper);}
+#person-save {position:static;width:100%;margin:0;box-shadow:none;}
+body.person-editing > main, body.person-editing > #person-detail {visibility:hidden;pointer-events:none;}
+
+/* Person identity and registered interests are independent of the saved cover. */
+.app-mark {width:38px;height:38px;object-fit:contain;border-radius:9px;}
+.person-card {grid-template-columns:64px minmax(0,1fr) 12px;gap:12px;align-items:start;}
+.person-card > .person-avatar {margin-top:3px;}
+.person-card > .chevron {align-self:center;}
+.person-avatar {position:relative;display:grid;place-items:center;flex:none;width:64px;height:64px;aspect-ratio:1;border:1px solid #d8e1da;border-radius:14px;background:#e8eee7;color:#31584c;font-size:27px;font-weight:600;overflow:hidden;}
+.person-avatar .card-art-thumbnail {position:absolute;inset:0;width:100%;height:100%;border-radius:inherit;}
+.person-avatar .art-unavailable {display:none;}
+.person-avatar-interest {position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:cover;}
+.person-name-row {display:flex;align-items:center;gap:7px;}
+.person-name-row .person-name {flex:1;min-width:0;font-size:17px;}
+.person-interests {display:flex;align-items:center;flex:none;gap:4px;}
+.person-interest-icon {display:block;width:32px;height:32px;aspect-ratio:1;object-fit:cover;border:1px solid #e5dfd5;border-radius:7px;}
+.interest-more {font-size:13px;color:var(--muted);white-space:nowrap;}
+.interest-icon-fallback {display:inline-grid;place-items:center;width:36px;height:36px;overflow:hidden;border:1px solid var(--line);border-radius:7px;font-size:13px;line-height:1.2;}
+.compact-person-identity {grid-template-columns:64px minmax(0,1fr);}
+.detail-interests {grid-column:2;display:flex;flex-wrap:wrap;gap:7px;min-width:0;}
+.detail-interest {display:inline-flex;align-items:center;gap:5px;max-width:100%;padding:3px 7px 3px 3px;border:1px solid var(--line);border-radius:8px;font-size:13px;line-height:1.4;overflow-wrap:anywhere;}
+.detail-interest-icon {display:block;flex:none;width:32px;height:32px;aspect-ratio:1;object-fit:cover;border-radius:5px;}
+.tag-interest-icon {display:block;flex:none;width:32px;height:32px;aspect-ratio:1;object-fit:cover;border-radius:6px;}
+.person-tag-chip > .tag-interest-icon {width:24px;height:24px;}
+.tag-options .person-tag-suggestion {display:flex;flex-direction:column;justify-content:center;align-items:center;gap:5px;min-height:72px;}
+.person-form-content .tag-options {max-height:none;overflow:visible;}
+@media(max-width:360px) {
+  .person-card {grid-template-columns:56px minmax(0,1fr) 10px;gap:9px;}
+  .person-avatar {width:56px;height:56px;font-size:25px;}
+  .person-interest-icon {width:28px;height:28px;}
+  .person-interests {gap:3px;}
+  .compact-person-identity {grid-template-columns:56px minmax(0,1fr);}
+  .person-name-row .person-name {font-size:16px;}
+}

@@ -1,11 +1,13 @@
-import { encryptBackup, validateBackupPayload } from "./backup-crypto.js?v=9-20261028-linked";
-import { hobbyIllustrations, filterHobbyIllustrations, normalizeCardImage, resolveCardArtwork, PhotoStore, preparePhoto, persistCardImage, collectPhotoMedia } from "./card-images.js?v=9-20261028-linked";
-import {isChildrenTag, childrenInfo, childrenProfileTags, childrenPresenceAfterTagEdit, currentChildAge} from './family.js?v=9-20261028-linked';
-import {tagChoices, tagCategories} from './tag-library.js?v=9-20261028-linked';
-import {personAgeValues, personAgeSummary, personAgeInputs} from './person-age.js?v=9-20261028-linked';
-import {ConversationDrafts} from './conversation-drafts.js?v=9-20261028-linked';
-import {createConversationJob,saveConversationJob,followUpQuote} from './conversation-flow.js?v=9-20261028-linked';
-import {SupabaseConversationStore} from './conversation-store.js?v=9-20261028-linked';
+import { encryptBackup, validateBackupPayload } from "./backup-crypto.js?v=9-20261029-usability";
+import { hobbyIllustrations, filterHobbyIllustrations, normalizeCardImage, resolveCardArtwork, PhotoStore, preparePhoto, persistCardImage, collectPhotoMedia } from "./card-images.js?v=9-20261029-usability";
+import {isChildrenTag, childrenInfo, childrenProfileTags, childrenPresenceAfterTagEdit, currentChildAge} from './family.js?v=9-20261029-usability';
+import {tagChoices, tagCategories} from './tag-library.js?v=9-20261029-usability';
+import {personAgeValues, personAgeSummary, personAgeInputs} from './person-age.js?v=9-20261029-usability';
+import {ConversationDrafts} from './conversation-drafts.js?v=9-20261029-usability';
+import {createConversationJob,saveConversationJob,followUpQuote} from './conversation-flow.js?v=9-20261029-usability';
+import {SupabaseConversationStore} from './conversation-store.js?v=9-20261029-usability';
+import {personInitial} from './person-presentation.js?v=9-20261029-usability';
+import {interestIconForTag,interestsForTags} from './interest-icons.js?v=9-20261029-usability';
 
 const config = window.PEOPLE_NOTEBOOK_CONFIG || {};
 const standardTopics = [
@@ -936,6 +938,22 @@ function createCardArtwork(person, {thumbnail=false,draftUrl=null,interactive=fa
   return art;
 }
 
+function interestImage(icon,className) {
+  const image=el('img',className);image.src=icon.src.split('?')[0]+'?v=9-20261029-usability';
+  image.alt=icon.label;image.width=40;image.height=40;image.loading='lazy';image.decoding='async';
+  image.addEventListener('error',()=>{const fallback=el('span','interest-icon-fallback',icon.label);fallback.title=icon.label;image.replaceWith(fallback);});
+  return image;
+}
+
+function createPersonAvatar(person,{draftUrl=null}={}) {
+  const avatar=el('span','person-avatar'),initial=personInitial(person.canonical_name);
+  avatar.append(el('span','person-avatar-letter',initial||'人'));
+  avatar.setAttribute('aria-label',initial?`${person.canonical_name}の頭文字`:'人物');
+  if(normalizeCardImage(person.card_image).mode==='photo')avatar.append(createCardArtwork(person,{thumbnail:true,draftUrl}));
+  else if(!initial){const icon=interestsForTags(person.profile_tags)[0];if(icon)avatar.append(interestImage(icon,'person-avatar-interest'));}
+  return avatar;
+}
+
 function personCard(person, context = null) {
   const button = el(
     "button",
@@ -943,9 +961,13 @@ function personCard(person, context = null) {
   );
   button.type = "button";
   const left = el("div", "person-card-copy");
-  left.append(el("div", "person-name", person.canonical_name));
+  const nameRow=el('div','person-name-row');nameRow.append(el('div','person-name',person.canonical_name));
+  const hobbies=interestsForTags(person.profile_tags);
+  if(hobbies.length){const cues=el('span','person-interests');hobbies.slice(0,3).forEach(icon=>cues.append(interestImage(icon,'person-interest-icon')));
+    if(hobbies.length>3)cues.append(el('span','interest-more',`＋${hobbies.length-3}`));nameRow.append(cues);}
+  left.append(nameRow);
   left.append(el("div", "assignment", assignmentText(person.assignment)));
-  const profileTags = Array.isArray(person.profile_tags) ? person.profile_tags.filter(tag=>tag && !isChildrenTag(tag)) : [];
+  const profileTags = Array.isArray(person.profile_tags) ? person.profile_tags.filter(tag=>tag && !isChildrenTag(tag) && !interestIconForTag(tag)) : [];
   const childLabel = childrenInfo(person).label;
   if (childLabel) left.append(el('div','children-badge',childLabel));
   if (profileTags.length) {
@@ -956,7 +978,7 @@ function personCard(person, context = null) {
   }
   const recap = context ? conversationRecap(context) : "";
   if (recap) left.append(el("div", "person-last-conversation", `前回：${recap}`));
-  button.append(createCardArtwork(person, {thumbnail:true}), left, el("div", "chevron", "›"));
+  button.append(createPersonAvatar(person), left, el("div", "chevron", "›"));
   button.addEventListener("click", () => {
     openPerson(person.person_id);
   });
@@ -1679,8 +1701,7 @@ function renderPrepCard(detail) {
 
 function compactPersonIdentity(detail) {
   const person=detail.person,section=el('section','compact-person-identity');
-  const avatar=el('span','person-initial',Array.from(String(person.canonical_name || '?').replace(/\s/g,''))[0]);
-  avatar.setAttribute('aria-label',`${person.canonical_name}の頭文字`);
+  const avatar=createPersonAvatar(person);
   const copy=el('div','compact-person-copy');
   copy.append(el('h1','',person.canonical_name));
   if(person.name_kana)copy.append(el('p','person-reading',person.name_kana));
@@ -1689,10 +1710,10 @@ function compactPersonIdentity(detail) {
   const age=personAgeSummary(person.age_info),family=childrenInfo({...person,hasKnownChildren:person.hasKnownChildren || detail.familyMembers?.some(member=>member.relationship==='child')}).label;
   if(age.ageLabel || age.birthdayLabel || family)copy.append(el('p','compact-person-attributes',[age.ageLabel,age.birthdayLabel,family].filter(Boolean).join(' · ')));
   section.append(avatar,copy);
-  const hobbies=hobbyIllustrations.filter(item=>(person.profile_tags || []).some(tag=>item.tags.includes(tag))).slice(0,2);
+  const hobbies=interestsForTags(person.profile_tags);
   if(hobbies.length){
-    const cues=el('div','compact-hobby-cues');
-    hobbies.forEach(item=>{const picture=el('img','compact-hobby-icon');picture.src=`./assets/${item.id}.webp?v=20261005-simple-a`;picture.alt=item.label;picture.width=36;picture.height=36;cues.append(picture);});
+    const cues=el('div','detail-interests');cues.setAttribute('aria-label','趣味・関心');
+    hobbies.forEach(icon=>{const item=el('span','detail-interest');item.append(interestImage(icon,'detail-interest-icon'),el('span','',icon.label));cues.append(item);});
     section.append(cues);
   }
   return section;
@@ -1932,6 +1953,7 @@ function closeDetail() {
   byId("composer").hidden = true;
   byId("topic-picker").hidden = true;
   byId("person-editor").hidden = true;
+  syncPersonEditorLayers();
   document.body.style.overflow = "";
   state.person = null;
   state.followUpSelectionMode = false;
@@ -1994,6 +2016,7 @@ function renderPersonTagEditor() {
   clear(list);
   state.editorTags.forEach((tag) => {
     const chip = el("span", "person-tag-chip");
+    const icon=interestIconForTag(tag);if(icon){const image=interestImage(icon,'tag-interest-icon');image.alt='';chip.append(image);}
     chip.append(el("span", "", tag));
     const remove = el("button", "person-tag-remove", "×");
     remove.type = "button";
@@ -2020,7 +2043,9 @@ function renderPersonTagEditor() {
   if (options.length) {
     suggestions.append(el("span", "person-tag-suggestions-label", "タグを選ぶ"));
     options.forEach((tag) => {
-      const button = el("button", "person-tag-suggestion", tag);
+      const button = el("button", "person-tag-suggestion");
+      const icon=interestIconForTag(tag);if(icon){const image=interestImage(icon,'tag-interest-icon');image.alt='';button.append(image);}
+      button.append(el('span','',tag));
       button.type = "button";
       button.addEventListener("click", () => {
         state.editorTags = mergePersonTags(state.editorTags, tag);
@@ -2370,9 +2395,24 @@ function renderEditorCardPreview() {
   }, {draftUrl:state.editorPhotoUrl});
   preview.classList.add("editor-preview-card");
   const thumbnail=el("div", "editor-thumbnail-preview");
-  thumbnail.append(createCardArtwork({card_image:state.editorCardImage,profile_tags:state.editorTags,card_style:state.selectedCardStyle,card_tint:state.selectedCardTint}, {thumbnail:true,draftUrl:state.editorPhotoUrl}), el("span", "muted", "一覧での見え方"));
+  thumbnail.append(createPersonAvatar({canonical_name:byId('person-name').value,card_image:state.editorCardImage,profile_tags:state.editorTags},{draftUrl:state.editorPhotoUrl}), el("span", "muted", "人物一覧のマーク（趣味はタグから表示します）"));
   target.replaceChildren(preview, thumbnail);
   updateAutoImageStatus();
+}
+
+function syncPersonEditorLayers() {
+  const open=!byId('person-editor').hidden;
+  document.body.classList[open?'add':'remove']('person-editing');
+  byId('person-detail').inert=open;
+  byId('app-screen').inert=open;
+}
+
+function preventPersonImplicitSubmit(event) {
+  if(event.key!=='Enter' || event.isComposing || event.keyCode===229 || event.defaultPrevented) return;
+  const input=event.target;
+  if(input?.tagName!=='INPUT' || ['submit','button','checkbox','radio','file','range','color'].includes(input.type)) return;
+  event.preventDefault();
+  input.blur();
 }
 
 function openPersonEditor(mode) {
@@ -2392,14 +2432,17 @@ function openPersonEditor(mode) {
   );
   document.querySelector(".card-customize").open = false;
   byId("person-editor").hidden = false;
+  syncPersonEditorLayers();
   document.body.style.overflow = "hidden";
   setTimeout(() => byId("person-name").focus(), 0);
 }
 
 function closePersonEditor() {
   if (byId("person-save").disabled && !state.photoPreparing) return;
+  document.activeElement?.blur?.();
   disposePhotoDraft();
   byId("person-editor").hidden = true;
+  syncPersonEditorLayers();
   byId("person-form").reset();
   state.editorTags = [];
   state.editorPersonId = null;
@@ -2568,7 +2611,9 @@ function renderTags() {
     captureConversationDraft();
   };
   for(const item of tagChoices(state.directory,state.conversations,state.selectedTags,query,state.conversationTagCategory)) {
-    const button=el('button','person-tag-suggestion',item.label);button.type='button';
+    const button=el('button','person-tag-suggestion');button.type='button';
+    const icon=interestIconForTag(item.label);if(icon){const image=interestImage(icon,'tag-interest-icon');image.alt='';button.append(image);}
+    button.append(el('span','',item.label));
     button.addEventListener('click',()=>add(item.label));choices.append(button);
   }
   const custom=query.trim();
@@ -3595,10 +3640,15 @@ function bindEvents() {
   byId("person-editor-close").addEventListener("click", closePersonEditor);
   bindIllustrationSearch();
   byId("person-form").addEventListener("submit", savePerson);
+  byId("person-form").addEventListener("keydown", preventPersonImplicitSubmit);
   byId('person-birthday').addEventListener('input',renderPersonAgeEditor);
   byId('person-age').addEventListener('input',renderPersonAgeEditor);
   byId("person-tag-add").addEventListener("click", commitPersonTagInput);
   byId("person-tag-input").addEventListener("input", renderPersonTagEditor);
+  byId("person-tag-input").addEventListener("focus", () => {
+    byId('person-tag-picker').open=true;
+    requestAnimationFrame(()=>byId('person-tag-input').scrollIntoView({block:'start',behavior:'auto'}));
+  });
   byId("person-tag-input").addEventListener("keydown", (event) => {
     if (event.key !== "Enter" || event.isComposing || event.keyCode === 229) return;
     event.preventDefault();

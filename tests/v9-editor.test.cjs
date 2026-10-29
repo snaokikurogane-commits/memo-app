@@ -8,11 +8,15 @@ async function loadApp(sessionStorage) {
   const drafts=await import(pathToFileURL(join(__dirname,'../v9-preview/conversation-drafts.js')).href);
   const flow=await import(pathToFileURL(join(__dirname,'../v9-preview/conversation-flow.js')).href);
   const store=await import(pathToFileURL(join(__dirname,'../v9-preview/conversation-store.js')).href);
+  const interests=await import(pathToFileURL(join(__dirname,'../v9-preview/interest-icons.js')).href);
+  const presentation=await import(pathToFileURL(join(__dirname,'../v9-preview/person-presentation.js')).href);
   class Node {
     constructor(tag='div') {this.tagName=tag;this.children=[];this.listeners={};this.dataset={};this.style={};this.hidden=false;this.className='';this.value='';this.classList={add:(...names)=>{this.className+=' '+names.join(' ');},remove:(name)=>{this.className=this.className.split(' ').filter(item=>item!==name).join(' ');}};}
     get childNodes() {return this.children;}
+    get textContent() {return (this._textContent||'')+this.children.map(node=>node.textContent||'').join('');}
+    set textContent(value) {this._textContent=String(value??'');this.children=[];}
     append(...nodes) {nodes.forEach(node=>{node.parent=this;this.children.push(node);});}
-    replaceChildren(...nodes) {this.children=[];this.append(...nodes);}
+    replaceChildren(...nodes) {this._textContent='';this.children=[];this.append(...nodes);}
     remove() {if (this.parent) this.parent.children=this.parent.children.filter(item=>item!==this);}
     addEventListener(name,handler) {this.listeners[name]=handler;}
     setAttribute(name,value) {this[name]=value;}
@@ -20,7 +24,7 @@ async function loadApp(sessionStorage) {
     reset() {for (const id of ['conversation-note','conversation-recap','next-topics','follow-up-at']) if(elements.has(id)) elements.get(id).value='';}
   }
   const elements=new Map();
-  const context={...images,...family,...personAge,...tagLibrary,...drafts,...flow,...store,window:{sessionStorage},document:{createElement:tag=>new Node(tag),getElementById:id=>{if (!elements.has(id)) elements.set(id,new Node());return elements.get(id);}},console,Set,Map,Intl,Date,URL,crypto:globalThis.crypto};
+  const context={...images,...family,...personAge,...tagLibrary,...drafts,...flow,...store,...interests,...presentation,window:{sessionStorage},document:{createElement:tag=>new Node(tag),getElementById:id=>{if (!elements.has(id)) elements.set(id,new Node());return elements.get(id);}},console,Set,Map,Intl,Date,URL,crypto:globalThis.crypto};
   vm.createContext(context);
   const source=readFileSync(join(__dirname,'../v9-preview/app.js'),'utf8').replace(/^import[^\r\n]*\r?\n/gm,'').replace(/\r?\nboot\(\);\s*$/,'');
   vm.runInContext(source,context);

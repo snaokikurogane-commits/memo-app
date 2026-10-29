@@ -8,12 +8,12 @@
     <meta name="color-scheme" content="light" />
     <meta name="theme-color" content="#164e48" />
     <title>人物ネタ帳</title>
-    <link rel="icon" type="image/png" sizes="512x512" href="./app-icon-512.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="./app-icon-180.png" />
-    <link rel="manifest" href="./manifest.webmanifest" />
-    <link rel="stylesheet" href="./styles.css?v=9-20261028-linked" />
+    <link rel="icon" type="image/png" sizes="512x512" href="./app-icon-rabbit-512.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="./app-icon-rabbit-180.png" />
+    <link rel="manifest" href="./manifest.webmanifest?v=9-20261029-usability" />
+    <link rel="stylesheet" href="./styles.css?v=9-20261029-usability" />
     <link rel="stylesheet" href="./theme-art.css?v=9-20261004" />
-    <link rel="stylesheet" href="./v9.css?v=9-20261028-linked" />
+    <link rel="stylesheet" href="./v9.css?v=9-20261029-usability" />
   </head>
   <body>
     <main class="shell">
@@ -31,7 +31,7 @@
       </section>
 
       <section id="auth-screen" class="gate card" hidden>
-        <img class="gate-app-mark" src="./app-icon-180.png" alt="" />
+        <img class="gate-app-mark" src="./app-icon-rabbit-180.png" alt="" />
         <p class="eyebrow">PEOPLE NOTEBOOK</p>
         <h1>人物ネタ帳</h1>
         <p>
@@ -55,7 +55,7 @@
       <section id="app-screen" hidden>
         <header class="topbar">
           <div class="brand-heading">
-            <img class="app-mark" src="./app-mark.svg" alt="" />
+            <img class="app-mark" src="./app-icon-rabbit-180.png" alt="" />
             <div>
               <p class="eyebrow">PEOPLE NOTEBOOK</p>
               <h1>人物ネタ帳</h1>
@@ -273,11 +273,12 @@
         </div>
       </header>
       <form id="person-form" class="person-form">
+        <div class="person-form-content">
         <section class="form-section">
           <h3>基本情報</h3>
           <div class="form-grid">
             <label class="wide"
-              >氏名 <span class="required">必須</span
+              ><span>氏名 <span class="required">必須</span></span
               ><input
                 id="person-name"
                 type="text"
@@ -345,8 +346,8 @@
 
         <details id="card-customize" class="form-section card-customize">
           <summary>
-            <span>カードの見た目を変更</span>
-            <small>趣味の絵・15種類の表紙・自分の写真から選べます</small>
+            <span>表紙・写真を変更</span>
+            <small>趣味の絵や写真を表紙に使えます。趣味アイコンは登録タグから表示します</small>
           </summary>
           <div id="card-live-preview" class="editor-card-preview"></div>
           <div id="image-method-options" class="image-method-options" role="group" aria-label="画像の選び方"></div>
@@ -416,9 +417,12 @@
           </details>
         </details>
 
+        </div>
+        <div class="person-form-actions">
         <button id="person-save" class="primary full" type="submit">
           保存する
         </button>
+        </div>
       </form>
     </section>
 
@@ -596,6 +600,6 @@
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
     <script src="./config.js"></script>
     <script src="./topics-data.js"></script>
-    <script type="module" src="./app.js?v=9-20261028-linked"></script>
+    <script type="module" src="./app.js?v=9-20261029-usability"></script>
   </body>
 </html>
