@@ -14,8 +14,12 @@ do $$ begin
       foreign key(reply_to_conversation_id) references public.conversations(conversation_id) on delete set null;
     alter table public.conversations add constraint conversations_reply_follow_up_fk
       foreign key(reply_to_follow_up_id) references public.follow_up_items(follow_up_id) on delete set null;
-    alter table public.follow_up_items add constraint follow_up_source_conversation_fk
-      foreign key(source_conversation_id) references public.conversations(conversation_id) on delete set null;
+    -- Reuse the original source FK when it is already present in the V9 database.
+    if not exists(select 1 from pg_constraint where conrelid='public.follow_up_items'::regclass
+      and conname='follow_up_items_source_conversation_id_fkey') then
+      alter table public.follow_up_items add constraint follow_up_source_conversation_fk
+        foreign key(source_conversation_id) references public.conversations(conversation_id) on delete set null;
+    end if;
     alter table public.conversations add constraint conversations_reply_not_self
       check(reply_to_conversation_id is null or reply_to_conversation_id<>conversation_id);
     alter table public.conversations add constraint conversations_reply_quote_check check(
