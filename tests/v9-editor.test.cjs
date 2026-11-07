@@ -328,6 +328,44 @@ test('a stale photo edit rejects the save and preserves the newer server image',
   assert.equal(elements.get('avatar-save').disabled,false);
 });
 
+test('a delayed avatar write can commit after an inconclusive read-back without losing its photo',async()=>{
+  const {call,context,elements}=await loadApp();
+  const oldPath='per_test/12345678-1234-1234-1234-123456789abc.jpg';
+  const newPath='per_test/87654321-1234-1234-1234-123456789abc.jpg';
+  const objects=new Set([oldPath]);
+  let row={card_image:{mode:'photo',path:oldPath,x:.5,y:.5,zoom:1}}, commit, reads=0;
+  const notices=[];
+  const writeError=new Error('write response lost');
+  context.noticeFixture=notices;
+  context.photoBlobFixture=new Blob(['photo'],{type:'image/jpeg'});
+  context.storeFixture={
+    async upload(){objects.add(newPath);return newPath;},
+    async removeIfUnused(path){if(row.card_image.path!==path)objects.delete(path);},
+  };
+  context.clientFixture={from:()=>({
+    update(value){this.value=value;return this;},
+    eq(){return this;},
+    select(){return this;},
+    async maybeSingle(){
+      if(this.value){commit=()=>{row=this.value;};throw writeError;}
+      reads++;
+      return {data:row,error:null};
+    },
+  })};
+  call(`state.role='owner';state.session={user:{id:'u'}};state.client=clientFixture;photoStore=storeFixture;
+    state.person={person:{person_id:'per_test',canonical_name:'架空の人物'}};
+    state.avatarEditor={detail:state.person,original:{mode:'photo',path:'${oldPath}',x:.5,y:.5,zoom:1},
+      mode:'photo',photo:{mode:'photo',path:'draft/00000000-0000-0000-0000-000000000000.jpg',x:.5,y:.5,zoom:1},
+      photoUrl:'blob:draft-photo',photoBlob:photoBlobFixture};toast=text=>noticeFixture.push(text)`);
+  await call('saveAvatar()');
+  assert.equal(reads,1);
+  assert.deepEqual(notices,[writeError.message]);
+  assert.equal(elements.get('avatar-save').disabled,false);
+  commit();
+  assert.equal(row.card_image.path,newPath);
+  assert.deepEqual(objects,new Set([oldPath,newPath]));
+});
+
 test('a newborn age can be saved without a nickname or manually entering the confirmation date',async()=>{
   const {call}=await loadApp();
   const value=call('familyMemberChanges({age:"0"})');

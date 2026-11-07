@@ -2266,8 +2266,11 @@ async function saveAvatar() {
     const image = await persistCardImage({
       personId, image:avatarSelection(editor), photoBlob:editor.photoBlob, oldImage:editor.original, store:photoStore,
       onCleanupError:() => console.warn("未使用写真の整理を完了できませんでした。"),
-      save:async cardImage => {
-        if (!current()) throw new Error("編集を終了したため保存を中止しました。");
+      save:async (cardImage, markWriteRejected) => {
+        if (!current()) {
+          markWriteRejected();
+          throw new Error("編集を終了したため保存を中止しました。");
+        }
         let query = client.from("people").update({card_image:cardImage}).eq("person_id", personId);
         query = editor.original === null ? query.is("card_image", null) : query.eq("card_image", JSON.stringify(editor.original));
         let data;
@@ -2276,7 +2279,7 @@ async function saveAvatar() {
           if (result.error) throw result.error;
           data = result.data;
         } catch (writeError) {
-          // A lost response can follow a committed write. Confirm the intended image before cleanup.
+          // An exact read-back confirms the save even after a lost response.
           if (current()) {
             try {
               const saved = await client.from("people").select("card_image").eq("person_id", personId).maybeSingle();
@@ -2289,7 +2292,10 @@ async function saveAvatar() {
           }
           throw writeError;
         }
-        if (!data) throw new Error("別の画面でアイコンが変更されました。人物を開き直してから編集してください。");
+        if (!data) {
+          markWriteRejected();
+          throw new Error("別の画面でアイコンが変更されました。人物を開き直してから編集してください。");
+        }
       },
     });
     if (!current()) return;

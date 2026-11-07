@@ -147,9 +147,11 @@ export async function persistCardImage({personId,image,photoBlob,oldImage,store,
   } else if (image?.mode === 'photo' && selection.mode !== 'photo') {
     throw new Error('写真を選んでください。');
   }
-  try { await save(selection); }
+  let writeRejected=false;
+  try { await save(selection,()=>{writeRejected=true;}); }
   catch (error) {
-    if (uploaded) {try {await store.removeIfUnused(uploaded);} catch (cleanupError) {onCleanupError(cleanupError);}}
+    // A dispatched write can commit after a failed response and an empty reference check.
+    if (uploaded && writeRejected) {try {await store.removeIfUnused(uploaded);} catch (cleanupError) {onCleanupError(cleanupError);}}
     throw error;
   }
   const previous=normalizeCardImage(oldImage);

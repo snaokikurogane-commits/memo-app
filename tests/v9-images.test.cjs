@@ -40,7 +40,11 @@ for (const committed of [false,true]) test(
     });
     const original=new Error('write response failed');
     await assert.rejects(persistCardImage({personId:'per_test',image:{mode:'photo'},photoBlob:new Blob(['photo'],{type:'image/jpeg'}),oldImage:{mode:'photo',path},store,
-      save:async image=>{if(committed)referenced=image.path;throw original;}}), error=>error===original);
+      save:async (image,markWriteRejected)=>{
+        if(committed) referenced=image.path;
+        else markWriteRejected();
+        throw original;
+      }}), error=>error===original);
     assert.ok(uploaded);
     assert.equal(objects.has(uploaded),committed);
     assert.equal(objects.has(path),true);
