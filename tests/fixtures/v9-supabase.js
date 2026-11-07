@@ -66,7 +66,12 @@ class Query {
         if(old) Object.assign(old,row);else rows.push(row);
         return true;
       });
-    } else if (this.operation==='update') selected.forEach(row=>Object.assign(row,this.values));
+    } else if (this.operation==='update') {
+      selected.forEach(row=>Object.assign(row,this.values));
+      if(mode.loseAvatarResponse && this.table==='people' && this.values?.card_image) {
+        return {data:null,error:{message:'確認用：アイコンの保存応答が失われました'}};
+      }
+    }
     else if (this.operation==='delete') data[this.table]=rows.filter(row=>!selected.includes(row));
     selected.sort((a,b)=>{
       for (const [key,asc] of this.orders) {

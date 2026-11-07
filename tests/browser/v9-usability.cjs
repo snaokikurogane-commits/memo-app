@@ -225,10 +225,10 @@ test('topics browse is a mobile navigation tab and adding a topic returns to the
   } finally {await context.close();}
 });
 
-test('a legacy photo keeps its crop when an attempted avatar change fails',async()=>{
+test('a failed avatar write keeps the old crop and a committed write survives a lost response',async()=>{
   const {page,context}=await fixture();try {
-    let failPeople=false;
-    await page.route('**/fixture-mode.json',route=>route.fulfill({json:{legacyPhoto:true,failPeople}}));
+    let failPeople=false,loseAvatarResponse=false;
+    await page.route('**/fixture-mode.json',route=>route.fulfill({json:{legacyPhoto:true,failPeople,loseAvatarResponse}}));
     await page.locator('#people-list .person-card').filter({hasText:'アレクサンドラ'}).click();
     const edit=page.getByRole('button',{name:'アイコンを編集'});
     await edit.click();
@@ -248,8 +248,30 @@ test('a legacy photo keeps its crop when an attempted avatar change fails',async
     const bytes=Buffer.from(readFileSync(join(__dirname,'../fixtures/tiny-jpeg.txt'),'utf8').trim(),'base64');
     await page.locator('#photo-file').setInputFiles({name:'fictional.jpg',mimeType:'image/jpeg',buffer:bytes});
     await page.locator('#photo-status').getByText(/写真を準備できました/).waitFor();
+    loseAvatarResponse=true;
     await page.locator('#avatar-save').click();
+    await page.locator('#avatar-editor').waitFor({state:'hidden'});
+    await page.waitForFunction(()=>document.querySelector('.person-avatar-edit img.art-image')?.naturalWidth>0);
     assert.deepEqual(await edit.locator('img.art-image').evaluate(img=>[img.style.objectPosition,img.style.transform]),['50% 50%','scale(1)']);
+  } finally {await context.close();}
+});
+
+test('photo selection is disabled while preparing an image and restored when the editor reopens',async()=>{
+  const {page,context}=await fixture();try {
+    await page.locator('#people-list .person-card').filter({hasText:'佐藤 健太'}).click();
+    const edit=page.getByRole('button',{name:'アイコンを編集'});
+    await edit.click();
+    await page.getByRole('button',{name:'写真',exact:true}).click();
+    await page.evaluate(()=>{HTMLImageElement.prototype.decode=()=>new Promise(()=>{});});
+    const bytes=Buffer.from(readFileSync(join(__dirname,'../fixtures/tiny-jpeg.txt'),'utf8').trim(),'base64');
+    const input=page.locator('#photo-file');
+    await input.setInputFiles({name:'fictional.jpg',mimeType:'image/jpeg',buffer:bytes});
+    await page.locator('#photo-status').getByText(/写真を準備しています/).waitFor();
+    assert.equal(await input.isDisabled(),true);
+    await page.locator('#avatar-editor-close').click();
+    await edit.click();
+    await page.getByRole('button',{name:'写真',exact:true}).click();
+    assert.equal(await input.isEnabled(),true);
   } finally {await context.close();}
 });
 

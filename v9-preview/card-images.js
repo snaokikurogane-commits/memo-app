@@ -149,7 +149,7 @@ export async function persistCardImage({personId,image,photoBlob,oldImage,store,
   }
   try { await save(selection); }
   catch (error) {
-    if (uploaded) {try {await store.remove(uploaded);} catch (cleanupError) {onCleanupError(cleanupError);}}
+    if (uploaded) {try {await store.removeIfUnused(uploaded);} catch (cleanupError) {onCleanupError(cleanupError);}}
     throw error;
   }
   const previous=normalizeCardImage(oldImage);

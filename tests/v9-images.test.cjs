@@ -24,14 +24,28 @@ test('malformed photo paths never become download paths and crop values are boun
   assert.equal(normalizeCardImage({mode:'photo',path:'../other/private.jpg'}).mode, 'theme');
   assert.deepEqual(normalizeCardImage({mode:'photo',path,x:-1,y:10,zoom:100}), {mode:'photo',path,x:0,y:1,zoom:3});
 });
-test('failed person write rolls back only the newly uploaded photo', async () => {
-  const { persistCardImage } = await mod();
-  const removed=[];
-  await assert.rejects(persistCardImage({personId:'per_test',image:{mode:'photo'},photoBlob:new Blob(['photo'],{type:'image/jpeg'}),oldImage:{mode:'photo',path},
-    store:{upload:async()=> 'per_test/87654321-1234-1234-1234-123456789abc.jpg',remove:async p=>removed.push(p)},
-    save:async()=>{throw new Error('write failed');}}), /write failed/);
-  assert.deepEqual(removed, ['per_test/87654321-1234-1234-1234-123456789abc.jpg']);
-});
+for (const committed of [false,true]) test(
+  committed ? 'a committed photo survives a lost person write response' : 'a confirmed failed write removes only the unused new photo',
+  async () => {
+    const {PhotoStore,persistCardImage}=await mod();
+    const objects=new Set([path]);
+    let referenced=path,uploaded;
+    const store=new PhotoStore({
+      storage:{from:()=>({
+        upload:async key=>{uploaded=key;objects.add(key);return {error:null};},
+        remove:async keys=>{keys.forEach(key=>objects.delete(key));return {error:null};},
+      })},
+      from:()=>({select(){return this;},contains(key,value){this.path=value.path;return this;},
+        limit(){return {data:this.path===referenced?[{person_id:'per_test'}]:[],error:null};}}),
+    });
+    const original=new Error('write response failed');
+    await assert.rejects(persistCardImage({personId:'per_test',image:{mode:'photo'},photoBlob:new Blob(['photo'],{type:'image/jpeg'}),oldImage:{mode:'photo',path},store,
+      save:async image=>{if(committed)referenced=image.path;throw original;}}), error=>error===original);
+    assert.ok(uploaded);
+    assert.equal(objects.has(uploaded),committed);
+    assert.equal(objects.has(path),true);
+  },
+);
 test('successful photo replacement never deletes an image still referenced by another save', async () => {
   const { persistCardImage } = await mod();
   const removed=[]; let saved=null;

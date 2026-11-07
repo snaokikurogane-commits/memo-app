@@ -7,6 +7,8 @@ const groups = {
   family:['子どもあり','未就学児','小学生','中学生','高校生','大学生','子育て','育児'],
   work:['雇用保険','給付経験あり','仕事','異動','転勤','新しい担当'],
 };
+const familyTags = new Set(groups.family.map(clean));
+export const isFamilyTag = value => familyTags.has(clean(value)) || isChildrenTag(value);
 
 export function tagChoices(directory = [], conversations = [], selected = [], query = '', category = 'all') {
   const items = new Map();
@@ -19,7 +21,7 @@ export function tagChoices(directory = [], conversations = [], selected = [], qu
   for (const row of [...directory,...conversations]) for (const label of (row.profile_tags || row.tags || [])) {
     if (typeof label !== 'string' || !label.trim() || label.startsWith('#') || label.includes('@@')) continue;
     const key = clean(label);
-    if (!items.has(key) && !interestIconForTag(label)) items.set(key,{label,category:isChildrenTag(label) ? 'family' : 'custom',keywords:[label]});
+    if (!items.has(key) && !interestIconForTag(label)) items.set(key,{label,category:isFamilyTag(label) ? 'family' : 'custom',keywords:[label]});
   }
   const selectedKeys = new Set(Array.from(selected,clean));
   const selectedIcons=new Set(Array.from(selected,tag=>interestIconForTag(tag)?.id).filter(Boolean));

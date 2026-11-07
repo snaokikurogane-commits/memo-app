@@ -121,6 +121,20 @@ test('including open questions never brings back an excluded or deleted conversa
   assert.doesNotMatch(output,/除外した|削除した|完了済み/);
 });
 
+test('exported profile keeps family tags and records behind the explicit family option',async()=>{
+  const {call,context}=await loadApp();
+  const familyTags=['未就学児','小学生','中学生','高校生','大学生','子育て','育児','子供２人','子どもあり'];
+  context.detailFixture={person:{canonical_name:'架空',profile_tags:['読書',...familyTags]},
+    familyMembers:[{relationship:'child',display_name:'架空の子'}],conversations:[]};
+  const profile=call('buildMemoExport(detailFixture,new Set(),{includeProfile:true})');
+  assert.match(profile,/読書/);
+  assert.doesNotMatch(profile,/架空の子/);
+  for(const tag of familyTags) assert.ok(!profile.includes(tag),tag);
+  const family=call('buildMemoExport(detailFixture,new Set(),{includePersonal:true})');
+  assert.match(family,/架空の子/);
+  for(const tag of familyTags) assert.ok(family.includes(tag),tag);
+});
+
 test('retrying after question failure or a lost save response never duplicates the conversation',async()=>{
   for (const lostResponse of [false,'conversation','question']) {
     const {call,context}=await loadApp();

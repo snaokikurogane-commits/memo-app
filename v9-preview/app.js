@@ -1,7 +1,7 @@
 import { encryptBackup, validateBackupPayload } from "./backup-crypto.js?v=9-20261107-export-avatar-topics";
 import { normalizeCardImage, resolveCardArtwork, PhotoStore, preparePhoto, persistCardImage, collectPhotoMedia } from "./card-images.js?v=9-20261107-export-avatar-topics";
 import {isChildrenTag, childrenInfo, childrenProfileTags, childrenPresenceAfterTagEdit, currentChildAge} from './family.js?v=9-20261107-export-avatar-topics';
-import {tagChoices, tagCategories} from './tag-library.js?v=9-20261107-export-avatar-topics';
+import {isFamilyTag, tagChoices, tagCategories} from './tag-library.js?v=9-20261107-export-avatar-topics';
 import {personAgeValues, personAgeSummary, personAgeInputs} from './person-age.js?v=9-20261107-export-avatar-topics';
 import {ConversationDrafts} from './conversation-drafts.js?v=9-20261107-export-avatar-topics';
 import {createConversationJob,saveConversationJob,followUpQuote} from './conversation-flow.js?v=9-20261107-export-avatar-topics';
@@ -366,14 +366,13 @@ function exportableConversations(detail) {
 
 function buildMemoExport(detail, selectedIds, options = {}) {
   const { includeName, includeProfile, includeQuestions, includePersonal, includePrompt } = options;
+  const profileTags = Array.isArray(detail.person.profile_tags) ? detail.person.profile_tags.filter(Boolean) : [];
   const lines = [];
   if (includeName) lines.push(`相手の名前：${detail.person.canonical_name}`);
   if (includeProfile) {
     const age=personAgeSummary(detail.person.age_info);
     if (age.ageLabel || age.birthdayLabel) lines.push(`本人の年齢・誕生日：${[age.ageLabel,age.birthdayLabel].filter(Boolean).join('、')}`);
-    const tags = Array.isArray(detail.person.profile_tags)
-      ? detail.person.profile_tags.filter(tag => tag && (includePersonal || !isChildrenTag(tag)))
-      : [];
+    const tags = profileTags.filter(tag => !isFamilyTag(tag));
     if (tags.length) lines.push(`特徴・関心：${tags.join("、")}`);
     const assignment = currentAssignment(detail.assignments || []);
     const affiliation = [assignment?.organization, assignment?.department, assignment?.role].filter(Boolean).join(" / ");
@@ -399,9 +398,11 @@ function buildMemoExport(detail, selectedIds, options = {}) {
   }
   if (includePersonal) {
     lines.push("", "家族・個人的な出来事：");
+    const tags = profileTags.filter(tag => isFamilyTag(tag) && (detail.person.children_present !== false || !isChildrenTag(tag)));
     const family = (detail.familyMembers || []).filter(item=>item.relationship !== 'child' || detail.person.children_present !== false);
     const events = detail.events || [];
-    if (!family.length && !events.length) lines.push("記録なし");
+    if (!tags.length && !family.length && !events.length) lines.push("記録なし");
+    if (tags.length) lines.push(`・家族のタグ：${tags.join("、")}`);
     family.forEach((item) => lines.push(`・家族：${[item.relationship, item.display_name, item.observed_age == null ? "" : `${item.observed_age}歳`, item.note].filter(Boolean).join(" / ")}`));
     events.forEach((item) => lines.push(`・出来事：${[item.event_type, item.event_date, item.note].filter(Boolean).join(" / ")}`));
   }
@@ -2125,6 +2126,7 @@ function renderAvatarPreview() {
   const draftUrl = editor.mode === "photo" ? editor.photoUrl : null;
   const person = {...editor.detail.person, card_image:avatarSelection(editor)};
   byId("avatar-preview").replaceChildren(createPersonAvatar(person, {draftUrl}));
+  byId("photo-file").disabled = Boolean(editor.preparing || editor.saving);
   byId("avatar-save").disabled = editor.saving || editor.preparing ||
     (editor.mode === "photo" && !editor.photo.path) ||
     (editor.mode === "illustration" && !editor.interestId);
@@ -2206,6 +2208,7 @@ function closeAvatarEditor({restoreFocus = true, force = false} = {}) {
   state.avatarEditor = null;
   if (editor.photoUrl) URL.revokeObjectURL(editor.photoUrl);
   byId("photo-file").value = "";
+  byId("photo-file").disabled = false;
   byId("avatar-preview").replaceChildren();
   byId("avatar-editor").hidden = true;
   byId("avatar-editor-content").inert = false;
@@ -2267,8 +2270,25 @@ async function saveAvatar() {
         if (!current()) throw new Error("編集を終了したため保存を中止しました。");
         let query = client.from("people").update({card_image:cardImage}).eq("person_id", personId);
         query = editor.original === null ? query.is("card_image", null) : query.eq("card_image", JSON.stringify(editor.original));
-        const {data, error} = await query.select("person_id").maybeSingle();
-        if (error) throw error;
+        let data;
+        try {
+          const result = await query.select("person_id").maybeSingle();
+          if (result.error) throw result.error;
+          data = result.data;
+        } catch (writeError) {
+          // A lost response can follow a committed write. Confirm the intended image before cleanup.
+          if (current()) {
+            try {
+              const saved = await client.from("people").select("card_image").eq("person_id", personId).maybeSingle();
+              const image = saved.data?.card_image;
+              if (current() && !saved.error && image?.mode === cardImage.mode &&
+                  JSON.stringify(normalizeCardImage(image)) === JSON.stringify(cardImage)) return;
+            } catch {
+              // Keep the original error when the confirmation request also fails.
+            }
+          }
+          throw writeError;
+        }
         if (!data) throw new Error("別の画面でアイコンが変更されました。人物を開き直してから編集してください。");
       },
     });
