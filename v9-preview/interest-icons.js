@@ -1,4 +1,4 @@
-import {hobbyIllustrations} from './card-images.js?v=9-20261107-export-avatar-topics';
+import {hobbyIllustrations} from './card-images.js?v=9-20261107-tag-icons';
 
 // Supplied square icons and the existing additions.
 const primary=[
@@ -22,7 +22,7 @@ const primary=[
   ['food','グルメ・食べ歩き',['食べ歩き','グルメ','外食']],['onsen','温泉',['温泉巡り']],['shopping','ショッピング',['買い物']],['other','その他',[]],
 ].map(([id,label,aliases])=>({id,label,tags:[label,...aliases],src:`./assets/interests/${id}.webp`}));
 export const interestIcons=[...primary,...hobbyIllustrations.filter(item=>!primary.some(icon=>icon.id===item.id))
-  .map(item=>({...item,src:`./assets/${item.id}.webp?v=20261005-simple-a`}))];
+  .map(item=>({...item,src:`./assets/interests/${item.id}.webp`}))];
 const clean=value=>String(value??'').normalize('NFKC').trim().toLowerCase();
 export function filterInterestIcons(query) {
   const terms = clean(query).split(/\s+/).filter(Boolean);

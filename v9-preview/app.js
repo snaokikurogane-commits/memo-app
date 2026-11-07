@@ -1,13 +1,13 @@
-import { encryptBackup, validateBackupPayload } from "./backup-crypto.js?v=9-20261107-export-avatar-topics";
-import { normalizeCardImage, resolveCardArtwork, PhotoStore, preparePhoto, persistCardImage, collectPhotoMedia } from "./card-images.js?v=9-20261107-export-avatar-topics";
-import {isChildrenTag, childrenInfo, childrenProfileTags, childrenPresenceAfterTagEdit, currentChildAge} from './family.js?v=9-20261107-export-avatar-topics';
-import {isFamilyTag, tagChoices, tagCategories} from './tag-library.js?v=9-20261107-export-avatar-topics';
-import {personAgeValues, personAgeSummary, personAgeInputs} from './person-age.js?v=9-20261107-export-avatar-topics';
-import {ConversationDrafts} from './conversation-drafts.js?v=9-20261107-export-avatar-topics';
-import {createConversationJob,saveConversationJob,followUpQuote} from './conversation-flow.js?v=9-20261107-export-avatar-topics';
-import {SupabaseConversationStore} from './conversation-store.js?v=9-20261107-export-avatar-topics';
-import {personInitial} from './person-presentation.js?v=9-20261107-export-avatar-topics';
-import {filterInterestIcons,interestIcons,interestIconForTag,interestsForTags} from './interest-icons.js?v=9-20261107-export-avatar-topics';
+import { encryptBackup, validateBackupPayload } from "./backup-crypto.js?v=9-20261107-tag-icons";
+import { normalizeCardImage, resolveCardArtwork, PhotoStore, preparePhoto, persistCardImage, collectPhotoMedia } from "./card-images.js?v=9-20261107-tag-icons";
+import {isChildrenTag, childrenInfo, childrenProfileTags, childrenPresenceAfterTagEdit, currentChildAge} from './family.js?v=9-20261107-tag-icons';
+import {isFamilyTag, tagChoices, tagCategories, tagIconForTag} from './tag-library.js?v=9-20261107-tag-icons';
+import {personAgeValues, personAgeSummary, personAgeInputs} from './person-age.js?v=9-20261107-tag-icons';
+import {ConversationDrafts} from './conversation-drafts.js?v=9-20261107-tag-icons';
+import {createConversationJob,saveConversationJob,followUpQuote} from './conversation-flow.js?v=9-20261107-tag-icons';
+import {SupabaseConversationStore} from './conversation-store.js?v=9-20261107-tag-icons';
+import {personInitial} from './person-presentation.js?v=9-20261107-tag-icons';
+import {filterInterestIcons,interestIcons,interestIconForTag,interestsForTags} from './interest-icons.js?v=9-20261107-tag-icons';
 
 const config = window.PEOPLE_NOTEBOOK_CONFIG || {};
 const standardTopics = [
@@ -953,7 +953,7 @@ function createCardArtwork(person, {thumbnail=false,draftUrl=null,interactive=fa
 }
 
 function interestImage(icon,className) {
-  const image=el('img',className);image.src=icon.src.split('?')[0]+'?v=9-20261107-export-avatar-topics';
+  const image=el('img',className);image.src=icon.src.split('?')[0]+'?v=9-20261107-tag-icons';
   image.alt=icon.label;image.width=40;image.height=40;image.loading='lazy';image.decoding='async';
   image.addEventListener('error',()=>{const fallback=el('span','interest-icon-fallback',icon.label);fallback.title=icon.label;image.replaceWith(fallback);});
   return image;
@@ -2055,7 +2055,7 @@ function renderPersonTagEditor() {
   clear(list);
   state.editorTags.forEach((tag) => {
     const chip = el("span", "person-tag-chip");
-    const icon=interestIconForTag(tag);if(icon){const image=interestImage(icon,'tag-interest-icon');image.alt='';chip.append(image);}
+    const icon=tagIconForTag(tag);if(icon){const image=interestImage(icon,'tag-interest-icon');image.alt='';chip.append(image);}
     chip.append(el("span", "", tag));
     const remove = el("button", "person-tag-remove", "×");
     remove.type = "button";
@@ -2082,7 +2082,7 @@ function renderPersonTagEditor() {
     suggestions.append(el("span", "person-tag-suggestions-label", "タグを選ぶ"));
     options.forEach((tag) => {
       const button = el("button", "person-tag-suggestion");
-      const icon=interestIconForTag(tag);if(icon){const image=interestImage(icon,'tag-interest-icon');image.alt='';button.append(image);}
+      const icon=tagIconForTag(tag);if(icon){const image=interestImage(icon,'tag-interest-icon');image.alt='';button.append(image);}
       button.append(el('span','',tag));
       button.type = "button";
       button.addEventListener("click", () => {
@@ -2595,7 +2595,7 @@ function renderTags() {
   };
   for(const item of tagChoices(state.directory,state.conversations,state.selectedTags,query,state.conversationTagCategory)) {
     const button=el('button','person-tag-suggestion');button.type='button';
-    const icon=interestIconForTag(item.label);if(icon){const image=interestImage(icon,'tag-interest-icon');image.alt='';button.append(image);}
+    const icon=tagIconForTag(item.label);if(icon){const image=interestImage(icon,'tag-interest-icon');image.alt='';button.append(image);}
     button.append(el('span','',item.label));
     button.addEventListener('click',()=>add(item.label));choices.append(button);
   }
