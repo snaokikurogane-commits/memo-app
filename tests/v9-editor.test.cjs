@@ -57,16 +57,68 @@ test('adding a standalone question does not accidentally save a normal memo draf
   assert.equal(call('byId("conversation-note").value'),'まだ編集中の会話');
 });
 
-test('person detail shows three recent conversations before optional profile and AI actions',async()=>{
+test('person detail shows three recent conversations with export in the history heading',async()=>{
   const {call}=await loadApp();
   call('state.role="viewer";state.person={person:{person_id:"p",canonical_name:"架空 太郎",profile_tags:[]},assignments:[],familyMembers:[],events:[],followUps:[],conversations:[1,2,3,4].map(i=>({conversation_id:"c"+i,note:"会話"+i,occurred_at:"2026-10-0"+i}))};renderDetail()');
   const all=node=>[node,...node.children.flatMap(all)],nodes=all(call('byId("detail-body")'));
   assert.equal(nodes.filter(n=>n.dataset.conversationId).length,3);
-  const sections=call('byId("detail-body").children');
-  const history=sections.findIndex(n=>n.className.includes('conversation-section'));
-  const ai=sections.findIndex(n=>n.className.includes('ai-consultation-action'));
-  assert.ok(history>=0 && ai>history);
-  assert.ok(nodes.some(n=>n.textContent==='最近の会話履歴'));
+  const history=nodes.find(n=>n.className.includes('conversation-section'));
+  assert.ok(all(history.children[0]).some(n=>n.tagName==='button' && n.textContent==='メモを書き出す'));
+});
+
+test('person history fetches past the row limit with a stable date and ID order',async()=>{
+  const {call,context}=await loadApp();
+  const requests=[];
+  context.clientFixture={from:()=>({orders:[],select(){return this;},eq(key,value){assert.equal(key,'person_id');assert.equal(value,'p');return this;},order(key){this.orders.push(key);return this;},async range(start,end){
+    requests.push([start,end,this.orders]);
+    return {data:Array.from({length:start===0?1000:start===1000?1:0},(_,i)=>({conversation_id:String(start+i)})),error:null,count:1001};
+  }})};
+  call('state.client=clientFixture');
+  const result=await call('selectPersonConversations("p")');
+  assert.equal(result.data.length,1001);
+  assert.deepEqual(requests,[[0,999,['occurred_at','conversation_id']],[1000,1999,['occurred_at','conversation_id']]]);
+});
+
+test('person history fails closed if the record count changes between pages',async()=>{
+  const {call,context}=await loadApp();
+  context.clientFixture={from:()=>({select(){return this;},eq(){return this;},order(){return this;},async range(start){
+    return start === 0
+      ? {data:[{conversation_id:'c1'}],count:2,error:null}
+      : {data:[],count:1,error:null};
+  }})};
+  call('state.client=clientFixture');
+  const result=await call('selectPersonConversations("p")');
+  assert.match(result.error?.message || '',/取得中に件数が変わりました/);
+  assert.equal(result.data,undefined);
+});
+
+test('selected export uses full dated text oldest first without imported quotes or duplicate recaps',async()=>{
+  const {call,context}=await loadApp();
+  context.detailFixture={person:{canonical_name:'除外する名前',profile_tags:['除外する属性']},conversations:[
+    {conversation_id:'new',occurred_at:'2026-10-06',recap:'重複なし',note:'重複なし',reply_quote:{text:'除外する引用'}},
+    {conversation_id:'excluded',occurred_at:'2026-10-05',note:'除外するメモ'},
+    {conversation_id:'old',occurred_at:'2026-10-04',recap:'要約だけの記録'},
+    {conversation_id:'full',occurred_at:'2026-10-03',recap:'短い要約',note:'長い記録'.repeat(100)},
+  ]};
+  const output=call('buildMemoExport(detailFixture,new Set(["new","old","full"]))');
+  assert.match(output,/2026年10月3日[\s\S]*2026年10月4日[\s\S]*要約だけの記録[\s\S]*2026年10月6日/);
+  assert.ok(output.includes('長い記録'.repeat(100)));
+  assert.equal(output.match(/重複なし/g)?.length,1);
+  assert.doesNotMatch(output,/除外する|提案してください/);
+  assert.equal(call('buildMemoExport(detailFixture,new Set())'),'');
+});
+
+test('including open questions never brings back an excluded or deleted conversation',async()=>{
+  const {call,context}=await loadApp();
+  context.detailFixture={person:{canonical_name:'架空'},conversations:[],followUps:[
+    {status:'open',body:'手入力の質問'},
+    {status:'open',source_conversation_id:'excluded',body:'除外した本文',source_quote:{text:'除外した引用'}},
+    {status:'open',source_quote:{text:'削除した会話'},body:'削除した本文'},
+    {status:'completed',body:'完了済みの質問'},
+  ]};
+  const output=call('buildMemoExport(detailFixture,new Set(),{includeQuestions:true})');
+  assert.match(output,/手入力の質問/);
+  assert.doesNotMatch(output,/除外した|削除した|完了済み/);
 });
 
 test('retrying after question failure or a lost save response never duplicates the conversation',async()=>{
@@ -163,18 +215,6 @@ test('question-only saves create no empty conversation and edits update the sele
     assert.equal(call('byId("composer").hidden'),true);
   }
 });
-test('enter in illustration search never implicitly submits the person form',async()=>{
-  const {call,elements}=await loadApp();
-  call('bindIllustrationSearch()');
-  const search=elements.get('illustration-search');
-  let prevented=0;
-  search.listeners.keydown({key:'Enter',preventDefault(){prevented++;}});
-  assert.equal(prevented,1);
-  search.listeners.keydown({key:'a',preventDefault(){prevented++;}});
-  search.listeners.keydown({key:'Enter',isComposing:true,preventDefault(){prevented++;}});
-  assert.equal(prevented,1);
-});
-
 test('follow-up editing is available from the overflow menu and preserves the selected question and date',async()=>{
   const {call}=await loadApp();
   call('state.role="owner"');
@@ -268,11 +308,10 @@ test('a stale photo edit rejects the save and preserves the newer server image',
   const notices=[];context.noticeFixture=notices;
   context.clientFixture={from:()=>({filters:[],update(value){this.value=value;return this;},eq(key,value){this.filters.push(current=>key==='card_image'?JSON.stringify(current[key])===value:current[key]===value);return this;},is(key,value){this.filters.push(current=>(current[key]??null)===value);return this;},select(){return this;},async maybeSingle(){if(!this.filters.every(filter=>filter(row)))return {data:null,error:null};row={...row,...this.value};return {data:{person_id:'per_test'},error:null};}})};
   context.storeFixture={remove:async()=>assert.fail('must not remove a saved image'),removeIfUnused:async()=>assert.fail('must not clean up after rejected edit')};
-  call(`state.role='owner';state.editorMode='edit';state.editorPersonId='per_test';state.client=clientFixture;photoStore=storeFixture;state.editorOriginalImage={mode:'photo',path:'${oldPath}',x:.5,y:.5,zoom:1};state.editorCardImage=state.editorOriginalImage;commitPersonTagInput=()=>true;toast=text=>noticeFixture.push(text)`);
-  call('byId("person-name").value="架空の人物";byId("person-fiscal-year").value=""');
-  await call('savePerson({preventDefault(){}})');
-  assert.equal(row.card_image.path,freshPath);assert.match(notices[0],/別の画面で人物情報/);
-  assert.equal(elements.get('person-save').disabled,false);
+  call(`state.role='owner';state.session={user:{id:'u'}};state.client=clientFixture;photoStore=storeFixture;state.person={person:{person_id:'per_test',canonical_name:'架空の人物'}};state.avatarEditor={detail:state.person,original:{mode:'photo',path:'${oldPath}',x:.5,y:.5,zoom:1},mode:'theme'};toast=text=>noticeFixture.push(text)`);
+  await call('saveAvatar()');
+  assert.equal(row.card_image.path,freshPath);assert.match(notices[0],/別の画面でアイコン/);
+  assert.equal(elements.get('avatar-save').disabled,false);
 });
 
 test('a newborn age can be saved without a nickname or manually entering the confirmation date',async()=>{
@@ -321,7 +360,7 @@ test('saving cleared children keeps age records but removes the list badge and A
   const card=call('personCard({...detailFixture.person,canonical_name:"架空の人物",card_image:{mode:"illustration",illustrationId:"reading"}})');
   const all=node=>[node,...node.children.flatMap(all)];
   assert.ok(!all(card).some(node=>node.className==='children-badge'));
-  assert.ok(!call('buildAiConsultation(detailFixture,{includePersonal:true})').includes('保留する子ども'));
+  assert.ok(!call('buildMemoExport(detailFixture,new Set(),{includePersonal:true})').includes('保留する子ども'));
   await call('persistChildrenInfo(detailFixture,{hasChildren:true,count:"2"})');
   assert.equal(row.children_present,true);
   assert.deepEqual(row.profile_tags,['読書','子ども2人']);

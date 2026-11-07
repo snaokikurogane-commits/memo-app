@@ -396,9 +396,6 @@ input:focus {
   color: var(--brand-dark);
   font-weight: 850;
 }
-.navigation button[data-topic-browser] {
-  color: #597672;
-}
 
 .overlay,
 .composer {
@@ -1441,9 +1438,6 @@ input:focus {
 .topic-picker[hidden] {
   display: none;
 }
-.topic-picker.browse-mode {
-  padding-bottom: calc(24px + env(safe-area-inset-bottom));
-}
 .topic-picker-head > div {
   min-width: 0;
 }
@@ -1696,9 +1690,6 @@ input:focus {
 }
 .topic-copy-button:hover {
   background: var(--brand-soft);
-}
-.topic-picker.browse-mode .topic-option {
-  grid-template-columns: minmax(0, 1fr) auto;
 }
 #topic-load-more {
   margin-top: 11px;
@@ -2419,13 +2410,3 @@ button.follow-up-body { min-height:44px; font-size:16px; font-weight:500; }
   .detail-body .compact-person-copy h1 { font-size:23px; }
 }
 #next-topics-section[hidden], #follow-up-date-section[hidden] { display: none; }
-.ai-consultation { position: fixed; z-index: 100; inset: 0; overflow: auto; background: var(--wash); padding-bottom: calc(25px + env(safe-area-inset-bottom)); }
-.ai-consultation[hidden] { display: none; }
-.ai-consultation .overlay-head { justify-content: space-between; }
-.ai-consultation-body { width: min(100%, 760px); margin: 0 auto; padding: 17px 14px 28px; display: grid; gap: 12px; }
-.ai-consultation-body > p { margin: 0; line-height: 1.6; }
-.ai-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
-.ai-options label { display: flex; align-items: center; gap: 7px; padding: 10px; border: 1px solid #d8e3de; border-radius: 12px; background: #fffefa; font-size: 13px; }
-.ai-options input { width: 18px; height: 18px; flex: 0 0 18px; }
-#ai-draft { min-height: 350px; width: 100%; resize: vertical; white-space: pre-wrap; line-height: 1.6; }
-@media (max-width: 520px) { .ai-options { grid-template-columns: 1fr; } }

@@ -59,15 +59,22 @@ class Query {
     let rows=data[this.table]||[];let selected=rows.filter(row=>this.filters.every(filter=>filter(row)));
     if (this.operation==='insert') {
       selected=(Array.isArray(this.values)?this.values:[this.values]).map(values=>({...values,[keys[this.table]]:values[keys[this.table]]||crypto.randomUUID(),created_at:new Date().toISOString(),status:values.status||'open'}));
+      const identity=this.options?.onConflict?.split(',') || [keys[this.table]];
       selected=selected.filter(row=>{
-        const old=rows.find(item=>item[keys[this.table]]===row[keys[this.table]]);
+        const old=rows.find(item=>identity.every(key=>item[key]===row[key]));
         if(old && this.options?.ignoreDuplicates) return false;
         if(old) Object.assign(old,row);else rows.push(row);
         return true;
       });
     } else if (this.operation==='update') selected.forEach(row=>Object.assign(row,this.values));
     else if (this.operation==='delete') data[this.table]=rows.filter(row=>!selected.includes(row));
-    for (const [key,asc] of this.orders) selected.sort((a,b)=>String(a[key]||'').localeCompare(String(b[key]||''))*(asc?1:-1));
+    selected.sort((a,b)=>{
+      for (const [key,asc] of this.orders) {
+        const order=String(a[key]||'').localeCompare(String(b[key]||''))*(asc?1:-1);
+        if (order) return order;
+      }
+      return 0;
+    });
     const count=selected.length;
     if (this.bounds) selected=selected.slice(this.bounds[0],this.bounds[1]+1);
     return {data:backendValue(this.one?selected[0]||null:selected),error:null,count};
@@ -82,6 +89,10 @@ export function createClient() {
       upload:async(path,blob)=>{photos.set(path,blob);return {error:null};},
       download:async path=>{
         const mode=await fetch('/fixture-mode.json',{cache:'no-store'}).then(r=>r.json());
+        if (mode.legacyPhoto && path==='demo-long/00000000-0000-4000-8000-000000000000.jpg') {
+          const base64=await fetch('/tests/fixtures/tiny-jpeg.txt').then(r=>r.text());
+          return {data:new Blob([Uint8Array.from(atob(base64.trim()),char=>char.charCodeAt(0))],{type:'image/jpeg'}),error:null};
+        }
         return mode.failPhoto?{error:new Error('確認用：写真の取得失敗')}:{data:photos.get(path),error:photos.has(path)?null:new Error('写真なし')};
       },
       remove:async paths=>{paths.forEach(path=>photos.delete(path));return {error:null};},

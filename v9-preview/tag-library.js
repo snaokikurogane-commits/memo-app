@@ -1,4 +1,4 @@
-import {interestIcons,interestIconForTag} from './interest-icons.js?v=9-20261029-usability';
+import {interestIcons,interestIconForTag} from './interest-icons.js?v=9-20261107-export-avatar-topics';
 import {isChildrenTag} from './family.js?v=9-20261006-family';
 const clean = value => String(value ?? '').normalize('NFKC').trim().toLowerCase();
 export const tagCategories = [['all','すべて'],['hobby','趣味'],['relationship','関係'],['family','家族'],['work','仕事'],['custom','自分のタグ']];

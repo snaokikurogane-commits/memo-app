@@ -66,6 +66,8 @@ export function normalizeCardImage(value) {
     mode:'photo',path:value.path,
     x:clamp(value.x,.5,0,1),y:clamp(value.y,.5,0,1),zoom:clamp(value.zoom,1,1,3),
   };
+  if (value.mode === 'theme' && typeof value.avatarInterestId === 'string' && /^[a-z0-9-]+$/.test(value.avatarInterestId))
+    return {mode:'theme',avatarInterestId:value.avatarInterestId};
   return {mode:'theme'};
 }
 

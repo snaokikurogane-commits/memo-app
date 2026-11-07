@@ -14,9 +14,11 @@ test('the new reader still decrypts original v1 backups',async()=>{
   const {encryptBackup,decryptBackup}=await mod();
   const original=payload(); assert.deepEqual(await decryptBackup(await encryptBackup(original,'test-password-2026'),'test-password-2026'),original);
 });
-test('v2 encryption round trip retains photo bytes and crop settings',async()=>{
+test('v2 encryption round trip retains photo bytes, crop settings, and avatar choices',async()=>{
   const {encryptBackup,decryptBackup,validateBackupPayload}=await mod();
   const original=payload(2);
+  original.tables.people.push({person_id:'per_icon',canonical_name:'架空の趣味',card_image:{mode:'theme',avatarInterestId:'stationery'}});
+  original.counts.people=2;
   original.tables.people[0].profile_tags=['読書','子ども2人'];
   original.tables.people[0].age_info={birthday:'05-12',observed_age:35,observed_on:'2026-10-06'};
   original.tables.people[0].children_present=false;

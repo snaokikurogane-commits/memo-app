@@ -1,13 +1,13 @@
-import { encryptBackup, validateBackupPayload } from "./backup-crypto.js?v=9-20261029-usability";
-import { hobbyIllustrations, filterHobbyIllustrations, normalizeCardImage, resolveCardArtwork, PhotoStore, preparePhoto, persistCardImage, collectPhotoMedia } from "./card-images.js?v=9-20261029-usability";
-import {isChildrenTag, childrenInfo, childrenProfileTags, childrenPresenceAfterTagEdit, currentChildAge} from './family.js?v=9-20261029-usability';
-import {tagChoices, tagCategories} from './tag-library.js?v=9-20261029-usability';
-import {personAgeValues, personAgeSummary, personAgeInputs} from './person-age.js?v=9-20261029-usability';
-import {ConversationDrafts} from './conversation-drafts.js?v=9-20261029-usability';
-import {createConversationJob,saveConversationJob,followUpQuote} from './conversation-flow.js?v=9-20261029-usability';
-import {SupabaseConversationStore} from './conversation-store.js?v=9-20261029-usability';
-import {personInitial} from './person-presentation.js?v=9-20261029-usability';
-import {interestIconForTag,interestsForTags} from './interest-icons.js?v=9-20261029-usability';
+import { encryptBackup, validateBackupPayload } from "./backup-crypto.js?v=9-20261107-export-avatar-topics";
+import { normalizeCardImage, resolveCardArtwork, PhotoStore, preparePhoto, persistCardImage, collectPhotoMedia } from "./card-images.js?v=9-20261107-export-avatar-topics";
+import {isChildrenTag, childrenInfo, childrenProfileTags, childrenPresenceAfterTagEdit, currentChildAge} from './family.js?v=9-20261107-export-avatar-topics';
+import {tagChoices, tagCategories} from './tag-library.js?v=9-20261107-export-avatar-topics';
+import {personAgeValues, personAgeSummary, personAgeInputs} from './person-age.js?v=9-20261107-export-avatar-topics';
+import {ConversationDrafts} from './conversation-drafts.js?v=9-20261107-export-avatar-topics';
+import {createConversationJob,saveConversationJob,followUpQuote} from './conversation-flow.js?v=9-20261107-export-avatar-topics';
+import {SupabaseConversationStore} from './conversation-store.js?v=9-20261107-export-avatar-topics';
+import {personInitial} from './person-presentation.js?v=9-20261107-export-avatar-topics';
+import {filterInterestIcons,interestIcons,interestIconForTag,interestsForTags} from './interest-icons.js?v=9-20261107-export-avatar-topics';
 
 const config = window.PEOPLE_NOTEBOOK_CONFIG || {};
 const standardTopics = [
@@ -108,6 +108,9 @@ const standardTopics = [
 ];
 const pageSize = 1000;
 const topicPageSize = 24;
+function newTopicControls() {
+  return {tab:"recommended", relationship:"work", category:"all", query:"", limit:topicPageSize, expanded:new Set()};
+}
 const cardStyles = [
   { id: "mist", label: "朝もや", category: "soft", recommended: true },
   { id: "watercolor", label: "にじみ水彩", category: "soft", recommended: true },
@@ -124,23 +127,6 @@ const cardStyles = [
   { id: "soft-stripe", label: "やわらか縞", category: "simple" },
   { id: "moonlight", label: "月明かり", category: "scenery" },
   { id: "plain", label: "無地", category: "simple" },
-];
-const cardStyleCategories = [
-  { id: "all", label: "すべて" },
-  { id: "recommended", label: "おすすめ" },
-  { id: "soft", label: "やわらか" },
-  { id: "scenery", label: "風景" },
-  { id: "season", label: "季節" },
-  { id: "simple", label: "シンプル" },
-];
-const cardTints = [
-  { value: "", label: "標準", color: "#F2F0EA" },
-  { value: "#E8CFCB", label: "くすみ桜", color: "#E8CFCB" },
-  { value: "#D9E7E2", label: "セージ", color: "#D9E7E2" },
-  { value: "#D7E3EE", label: "霧青", color: "#D7E3EE" },
-  { value: "#E9DECF", label: "砂色", color: "#E9DECF" },
-  { value: "#DDD5E7", label: "藤鼠", color: "#DDD5E7" },
-  { value: "#E8E4C7", label: "若草", color: "#E8E4C7" },
 ];
 const iconStyles = [
   { id: "none", label: "なし" },
@@ -172,19 +158,21 @@ const state = {
   familyMembers: [],
   directory: [],
   person: null,
+  detailRequest: 0,
+  memoExportIds: new Set(),
   selectedTags: new Set(),
   selectedFollowUpIds: new Set(),
   followUpSelectionMode: false,
   selectedTopicIds: new Set(),
-  expandedTopicIds: new Set(),
   topicPreferences: new Map(),
   topicHistoryAvailable: true,
-  topicPickerTab: "recommended",
-  topicRelationship: "work",
-  topicCategory: "all",
-  topicQuery: "",
-  topicLimit: topicPageSize,
-  topicPickerMode: "add",
+  browseTopicControls: newTopicControls(),
+  addTopicControls: newTopicControls(),
+  topicPickerMode: "browse",
+  topicOpener: null,
+  topicAddRequest: null,
+  view: "people",
+  topicBrowseScroll: 0,
   peopleLimit: 50,
   expandedFollowUps: false,
   expandedConversations: false,
@@ -200,11 +188,7 @@ const state = {
   editorOriginalChildren: null,
   editorOriginalTags: null,
   editorOriginalAge: null,
-  editorCardImage: {mode: "auto"},
-  editorPhotoBlob: null,
-  editorPhotoUrl: null,
-  photoPreparing: false,
-  photoSelectionToken: 0,
+  avatarEditor: null,
   cardTintAvailable: true,
   cardToneAvailable: true,
   recapAvailable: true,
@@ -217,14 +201,12 @@ const state = {
   editorTags: [],
   editorTagCategory: 'all',
   conversationTagCategory: 'all',
-  selectedCardStyle: "mist",
-  selectedCardCategory: "recommended",
-  selectedCardTint: "",
-  selectedCardTone: "light",
-  selectedIconStyle: "none",
-  selectedIconFrame: "paper",
   handlingSession: false,
 };
+
+function topicControls() {
+  return state.topicPickerMode === "browse" ? state.browseTopicControls : state.addTopicControls;
+}
 
 const byId = (id) => document.getElementById(id);
 
@@ -378,38 +360,42 @@ function conversationNoteForSave(recap, detail, hasRecapColumn = true) {
   return long || short;
 }
 
-function buildAiConsultation(detail, options = {}) {
-  const { includeName = true, includeProfile = true, includeHistory = true,
-    includeQuestions = true, includePersonal = false, includeDetails = false,
-    allHistory = false } = options;
-  const lines = ["次に話す内容について相談したいです。以下は私が記録した情報です。"];
+function exportableConversations(detail) {
+  return (detail.conversations || []).filter(item => String(item.note || "").trim() || String(item.recap || "").trim());
+}
+
+function buildMemoExport(detail, selectedIds, options = {}) {
+  const { includeName, includeProfile, includeQuestions, includePersonal, includePrompt } = options;
+  const lines = [];
   if (includeName) lines.push(`相手の名前：${detail.person.canonical_name}`);
   if (includeProfile) {
     const age=personAgeSummary(detail.person.age_info);
     if (age.ageLabel || age.birthdayLabel) lines.push(`本人の年齢・誕生日：${[age.ageLabel,age.birthdayLabel].filter(Boolean).join('、')}`);
-    const tags = Array.isArray(detail.person.profile_tags) ? detail.person.profile_tags.filter(Boolean) : [];
+    const tags = Array.isArray(detail.person.profile_tags)
+      ? detail.person.profile_tags.filter(tag => tag && (includePersonal || !isChildrenTag(tag)))
+      : [];
     if (tags.length) lines.push(`特徴・関心：${tags.join("、")}`);
     const assignment = currentAssignment(detail.assignments || []);
-    if (assignment) lines.push(`現在の所属：${[assignment.organization, assignment.department, assignment.role].filter(Boolean).join(" / ")}`);
+    const affiliation = [assignment?.organization, assignment?.department, assignment?.role].filter(Boolean).join(" / ");
+    if (affiliation) lines.push(`現在の所属：${affiliation}`);
   }
-  if (includeHistory) {
-    const history = (detail.conversations || []).filter((item) => conversationRecap(item) || item.note);
-    lines.push("", `これまでの会話（${allHistory ? "全件" : "直近5件"}）：`);
-    const shown = allHistory ? history : history.slice(0, 5);
-    if (!shown.length) lines.push("記録なし");
-    shown.forEach((item) => {
-      const recap = conversationRecap(item);
+  const selected = exportableConversations(detail).filter(item => selectedIds.has(item.conversation_id));
+  if (selected.length) {
+    lines.push("", "会話メモ");
+    selected.reverse().forEach((item) => {
+      const recap = String(item.recap || "").trim();
       const note = String(item.note || "").trim();
-      lines.push(`・${dateText(item.occurred_at)}：${recap || note}`);
-      if(item.reply_quote)lines.push(`　前の話（${dateText(item.reply_quote.occurred_at)}）：${includeDetails?item.reply_quote.text:item.reply_quote.text.slice(0,100)}`);
-      if (includeDetails && note && note !== recap) lines.push(`　詳しいメモ：${note}`);
+      lines.push("", dateText(item.occurred_at) || "日付未登録");
+      if (recap && recap !== note) lines.push(recap);
+      if (note) lines.push(note);
     });
   }
   if (includeQuestions) {
     lines.push("", "まだ聞いていないこと：");
-    const questions = (detail.followUps || []).filter((item) => item.status === "open");
+    const questions = (detail.followUps || []).filter(item => item.status === "open" &&
+      ((!item.source_quote && !item.source_conversation_id) || selectedIds.has(item.source_conversation_id)));
     if (!questions.length) lines.push("なし");
-    questions.forEach((item) => lines.push(`・${followUpQuote(item).text}`));
+    questions.forEach(item => lines.push(`・${item.body}`));
   }
   if (includePersonal) {
     lines.push("", "家族・個人的な出来事：");
@@ -419,8 +405,8 @@ function buildAiConsultation(detail, options = {}) {
     family.forEach((item) => lines.push(`・家族：${[item.relationship, item.display_name, item.observed_age == null ? "" : `${item.observed_age}歳`, item.note].filter(Boolean).join(" / ")}`));
     events.forEach((item) => lines.push(`・出来事：${[item.event_type, item.event_date, item.note].filter(Boolean).join(" / ")}`));
   }
-  lines.push("", "過去に話した内容をそのまま繰り返さず、自然に話せる次回の話題を5つ提案してください。各話題に具体的な聞き方と短い理由を付けてください。未確認の事実は推測せず、個人的な話題は配慮して扱ってください。");
-  return lines.join("\n");
+  if (includePrompt && lines.length) lines.push("", "上のメモをもとに、次に会ったときに自然に聞ける質問を3つ提案してください。未確認のことは推測せず、個人的な話題には配慮してください。");
+  return lines.join("\n").trim();
 }
 
 function topicText(value) {
@@ -698,14 +684,40 @@ async function selectAllConversations() {
 }
 
 async function selectPersonConversations(personId) {
-  const query = (columns) => state.client.from("conversations").select(columns)
-    .eq("person_id", personId).order("occurred_at", { ascending: false });
-  let result = await query(`${conversationColumns},recap${conversationLinkColumns()}`);
+  const client = state.client;
+  const links = conversationLinkColumns();
+  async function fetchHistory(columns) {
+    const rows = [];
+    const ids = new Set();
+    let expected = null;
+    for (;;) {
+      const { data, error, count } = await client.from("conversations").select(columns, {count:"exact"})
+        .eq("person_id", personId)
+        .order("occurred_at", { ascending: false })
+        .order("conversation_id", { ascending: false })
+        .range(rows.length, rows.length + pageSize - 1);
+      if (error) return { error };
+      if (!Array.isArray(data) || !Number.isInteger(count)) {
+        return {error:new Error("会話履歴の取得件数を確認できませんでした。")};
+      }
+      if (expected === null) expected = count;
+      if (count !== expected) return {error:new Error("会話履歴の取得中に件数が変わりました。人物を開き直してください。")};
+      for (const row of data) {
+        if (ids.has(row.conversation_id)) return {error:new Error("会話履歴が更新されました。人物を開き直してください。")};
+        ids.add(row.conversation_id);
+        rows.push(row);
+      }
+      if (rows.length === expected) return { data: rows };
+      if (!data.length || rows.length > expected) return {error:new Error("会話履歴をすべて取得できませんでした。")};
+    }
+  }
+  let result = await fetchHistory(`${conversationColumns},recap${links}`);
+  let recapAvailable = true;
   if (result.error && String(result.error.message || "").includes("recap")) {
-    state.recapAvailable = false;
-    result = await query(conversationColumns+conversationLinkColumns());
-  } else if (!result.error) state.recapAvailable = true;
-  return result;
+    recapAvailable = false;
+    result = await fetchHistory(conversationColumns + links);
+  }
+  return { ...result, recapAvailable };
 }
 
 async function fetchBackupTable(table, key, userId = null) {
@@ -940,7 +952,7 @@ function createCardArtwork(person, {thumbnail=false,draftUrl=null,interactive=fa
 }
 
 function interestImage(icon,className) {
-  const image=el('img',className);image.src=icon.src.split('?')[0]+'?v=9-20261029-usability';
+  const image=el('img',className);image.src=icon.src.split('?')[0]+'?v=9-20261107-export-avatar-topics';
   image.alt=icon.label;image.width=40;image.height=40;image.loading='lazy';image.decoding='async';
   image.addEventListener('error',()=>{const fallback=el('span','interest-icon-fallback',icon.label);fallback.title=icon.label;image.replaceWith(fallback);});
   return image;
@@ -949,9 +961,17 @@ function interestImage(icon,className) {
 function createPersonAvatar(person,{draftUrl=null}={}) {
   const avatar=el('span','person-avatar'),initial=personInitial(person.canonical_name);
   avatar.append(el('span','person-avatar-letter',initial||'人'));
-  avatar.setAttribute('aria-label',initial?`${person.canonical_name}の頭文字`:'人物');
-  if(normalizeCardImage(person.card_image).mode==='photo')avatar.append(createCardArtwork(person,{thumbnail:true,draftUrl}));
-  else if(!initial){const icon=interestsForTags(person.profile_tags)[0];if(icon)avatar.append(interestImage(icon,'person-avatar-interest'));}
+  const selection = normalizeCardImage(person.card_image);
+  const icon = interestIcons.find(item => item.id === selection.avatarInterestId);
+  if (selection.mode === "photo") avatar.append(createCardArtwork(person,{thumbnail:true,draftUrl}));
+  if (icon) {
+    const image = el("img", "person-avatar-interest");
+    image.alt = icon.label;
+    image.decoding = "async";
+    image.addEventListener("error", () => image.remove());
+    image.src = icon.src;
+    avatar.append(image);
+  }
   return avatar;
 }
 
@@ -1710,7 +1730,14 @@ function compactPersonIdentity(detail) {
   copy.append(el('p','compact-person-assignment',assignment?[assignment.organization,assignment.department,assignment.role].filter(Boolean).join(' / '):'所属未登録'));
   const age=personAgeSummary(person.age_info),family=childrenInfo({...person,hasKnownChildren:person.hasKnownChildren || detail.familyMembers?.some(member=>member.relationship==='child')}).label;
   if(age.ageLabel || age.birthdayLabel || family)copy.append(el('p','compact-person-attributes',[age.ageLabel,age.birthdayLabel,family].filter(Boolean).join(' · ')));
-  section.append(avatar,copy);
+  if (canEditPeople() && state.cardImageAvailable) {
+    const edit = el("button", "person-avatar-edit");
+    edit.type = "button";
+    edit.setAttribute("aria-label", "アイコンを編集");
+    edit.append(avatar, el("span", "", "編集"));
+    edit.addEventListener("click", openAvatarEditor);
+    section.append(edit, copy);
+  } else section.append(avatar,copy);
   const hobbies=interestsForTags(person.profile_tags);
   if(hobbies.length){
     const cues=el('div','detail-interests');cues.setAttribute('aria-label','趣味・関心');
@@ -1770,7 +1797,7 @@ function renderDetail() {
       "話題ボックスから選ぶ",
     );
     chooseTopic.type = "button";
-    chooseTopic.addEventListener("click", () => openTopicPicker("add"));
+    chooseTopic.addEventListener("click", openTopicPicker);
     const addDirectly = el("button", "secondary", "自分で入力");
     addDirectly.type = "button";
     addDirectly.addEventListener("click", () => openComposer("next-topics"));
@@ -1803,20 +1830,18 @@ function renderDetail() {
     );
   }
   target.append(followUps);
-  const aiAction = detailSectionButton("AIに相談する文章を作る　›", openAiConsultation);
-  aiAction.classList.add("ai-consultation-action");
-
   const conversations = el("section", "card conversation-section");
-  const notedConversations = detail.conversations.filter((conversation) =>
-    conversationRecap(conversation) || String(conversation.note || "").trim(),
-  );
+  const notedConversations = exportableConversations(detail);
   const conversationHead = el("div", "section-heading");
   const conversationTitle = el("div", "section-title-with-count");
   conversationTitle.append(
     el("h2", "", "最近の会話履歴"),
     el("span", "count-pill neutral", `${notedConversations.length}件`),
   );
-  conversationHead.append(conversationTitle);
+  const exportButton = el("button", "quiet-button compact-button", "メモを書き出す");
+  exportButton.type = "button";
+  exportButton.addEventListener("click", openMemoExport);
+  conversationHead.append(conversationTitle, exportButton);
   conversations.append(conversationHead);
   const shownConversations = state.expandedConversations
     ? notedConversations
@@ -1868,13 +1893,17 @@ function renderDetail() {
     );
   }
   target.append(conversations, renderProfileDetails(detail));
-  const appearance=el('details','saved-appearance');appearance.append(el('summary','','保存した表紙を見る'));
-  appearance.addEventListener('toggle',()=>{if(appearance.open && !appearance.dataset.loaded){appearance.dataset.loaded='true';appearance.append(identityCard(detail));}});
-  target.append(appearance,aiAction);
 }
 
 async function openPerson(personId) {
   if (!byId('composer').hidden) closeComposer();
+  closeMemoExport();
+  closeAvatarEditor({restoreFocus:false, force:true});
+  if (!byId("topic-picker").hidden) closeTopicPicker({restoreFocus:false, force:true});
+  const request = ++state.detailRequest;
+  const userId = state.session?.user?.id;
+  const current = () => request === state.detailRequest && userId === state.session?.user?.id;
+  state.person = null;
   state.profileDetailsOpen = false;
   state.followUpSelectionMode = false;
   state.selectedFollowUpIds.clear();
@@ -1882,6 +1911,8 @@ async function openPerson(personId) {
   state.expandedConversations = false;
   state.followUpAddOpen = false;
   byId("person-detail").hidden = false;
+  byId("person-edit").hidden = true;
+  byId("composer-open").hidden = true;
   document.body.style.overflow = "hidden";
   byId("detail-body").replaceChildren(el("div", "empty", "読み込み中…"));
   try {
@@ -1922,6 +1953,7 @@ async function openPerson(personId) {
         .eq("person_id", personId)
         .order("created_at", { ascending: false }),
     ]);
+    if (!current()) return;
     const error = [
       personResult,
       assignmentsResult,
@@ -1931,6 +1963,8 @@ async function openPerson(personId) {
       followUpsResult,
     ].find((result) => result.error)?.error;
     if (error) throw error;
+    if (!personResult.data) throw new Error("人物を読み込めませんでした。");
+    state.recapAvailable = conversationsResult.recapAvailable;
     state.person = {
       person: {...personResult.data,hasKnownChildren:state.directory.find(person=>person.person_id === personId)?.hasKnownChildren || false},
       assignments: assignmentsResult.data.sort(compareFiscalYear),
@@ -1939,9 +1973,11 @@ async function openPerson(personId) {
       familyMembers: familyResult.data,
       followUps: followUpsResult.data,
     };
+    byId("person-edit").hidden = !canEditPeople();
     byId("composer-open").hidden = !canEditPeople();
     renderDetail();
   } catch (error) {
+    if (!current()) return;
     toast(message(error), true);
     closeDetail();
   }
@@ -1949,10 +1985,12 @@ async function openPerson(personId) {
 
 function closeDetail() {
   captureConversationDraft();
+  state.detailRequest++;
   byId("person-detail").hidden = true;
-  closeAiConsultation();
+  closeMemoExport();
+  closeAvatarEditor({restoreFocus:false, force:true});
   byId("composer").hidden = true;
-  byId("topic-picker").hidden = true;
+  closeTopicPicker({restoreFocus:false, force:true});
   byId("person-editor").hidden = true;
   syncPersonEditorLayers();
   document.body.style.overflow = "";
@@ -1960,7 +1998,6 @@ function closeDetail() {
   state.followUpSelectionMode = false;
   state.selectedFollowUpIds.clear();
   state.selectedTopicIds.clear();
-  state.expandedTopicIds.clear();
   state.expandedFollowUps = false;
   state.expandedConversations = false;
   state.followUpAddOpen = false;
@@ -2025,8 +2062,7 @@ function renderPersonTagEditor() {
     remove.addEventListener("click", () => {
       state.editorTags = state.editorTags.filter((item) => item !== tag);
       renderPersonTagEditor();
-      renderEditorCardPreview();
-    });
+        });
     chip.append(remove);
     list.append(chip);
   });
@@ -2052,8 +2088,7 @@ function renderPersonTagEditor() {
         state.editorTags = mergePersonTags(state.editorTags, tag);
         byId("person-tag-input").value = "";
         renderPersonTagEditor();
-        renderEditorCardPreview();
-      });
+            });
       suggestions.append(button);
     });
   }
@@ -2073,222 +2108,191 @@ function commitPersonTagInput() {
   state.editorTags = next;
   input.value = "";
   renderPersonTagEditor();
-  renderEditorCardPreview();
   return true;
 }
 
-function renderCardStyleOptions() {
-  const target = byId("card-style-options");
-  clear(target);
-  const visibleStyles = cardStyles.filter((style) =>
-    state.selectedCardCategory === "all" ? true : style.id === "seaglass"
-      ? state.editorMode === "edit" && state.selectedCardStyle === "seaglass"
-      : state.selectedCardCategory === "recommended"
-        ? style.recommended
-        : style.category === state.selectedCardCategory,
-  );
-  visibleStyles.forEach((style) => {
-    const button = el(
-      "button",
-      `style-option${state.selectedCardStyle === style.id ? " selected" : ""}`,
-    );
-    button.type = "button";
-    button.setAttribute("aria-pressed", String(state.selectedCardStyle === style.id));
-    const swatch = createCardArtwork({card_style:style.id,card_tint:state.selectedCardTint});
-    swatch.classList.add("style-swatch");
-    button.append(swatch, el("span", "style-option-label", style.label));
-    button.addEventListener("click", () => {
-      state.selectedCardStyle = style.id;
-      state.editorCardImage = {mode:"theme"};
-      renderImageEditor();
-      renderCardStyleOptions();
-      renderEditorCardPreview();
-    });
-    target.append(button);
-  });
+function avatarSelection(editor) {
+  if (editor.mode === "photo") return editor.photo;
+  if (editor.mode === "illustration" && editor.interestId) {
+    return {mode:"theme", avatarInterestId:editor.interestId};
+  }
+  return {mode:"theme"};
 }
 
-function renderCardStyleFilters() {
-  const target = byId("card-style-filters");
-  clear(target);
-  cardStyleCategories.forEach((category) => {
-    const selected = state.selectedCardCategory === category.id;
-    const button = el(
-      "button",
-      `card-style-filter${selected ? " selected" : ""}`,
-      category.label,
-    );
+function renderAvatarPreview() {
+  const editor = state.avatarEditor;
+  if (!editor) return;
+  const draftUrl = editor.mode === "photo" ? editor.photoUrl : null;
+  const person = {...editor.detail.person, card_image:avatarSelection(editor)};
+  byId("avatar-preview").replaceChildren(createPersonAvatar(person, {draftUrl}));
+  byId("avatar-save").disabled = editor.saving || editor.preparing ||
+    (editor.mode === "photo" && !editor.photo.path) ||
+    (editor.mode === "illustration" && !editor.interestId);
+}
+
+function renderAvatarIllustrations() {
+  const editor = state.avatarEditor;
+  if (!editor || editor.mode !== "illustration") return;
+  const grid = byId("illustration-options");
+  const items = filterInterestIcons(byId("illustration-search").value);
+  grid.replaceChildren();
+  byId("illustration-empty").hidden = items.length > 0;
+  items.forEach(item => {
+    const button = el("button", "illustration-option");
+    const label = el("span", "", item.label);
+    const image = el("img");
+    image.alt = "";
+    image.loading = "lazy";
+    image.src = item.src;
     button.type = "button";
+    const selected = item.id === editor.interestId;
+    button.classList.toggle("selected", selected);
     button.setAttribute("aria-pressed", String(selected));
+    button.append(image, label);
     button.addEventListener("click", () => {
-      state.selectedCardCategory = category.id;
-      renderCardStyleFilters();
-      renderCardStyleOptions();
+      editor.interestId = item.id;
+      const previous = grid.querySelector('[aria-pressed="true"]');
+      previous?.classList.remove("selected");
+      previous?.setAttribute("aria-pressed", "false");
+      button.classList.add("selected");
+      button.setAttribute("aria-pressed", "true");
+      renderAvatarPreview();
     });
-    target.append(button);
+    grid.append(button);
   });
 }
 
-function selectCardTint(value) {
-  state.selectedCardTint = cardTintValue({ card_tint: value });
-  state.selectedCardTone = cardToneValue({ card_tint: state.selectedCardTint });
-  renderCardTintOptions();
-  renderCardStyleOptions();
-  renderEditorCardPreview();
-}
-
-function renderCardTintOptions() {
-  const target = byId("card-tint-options");
-  if (!target) return;
-  clear(target);
-  const visibleTints = cardTints;
-  visibleTints.forEach((tint) => {
-    const selected = state.selectedCardTint === tint.value;
-    const button = el(
-      "button",
-      `tint-option${selected ? " selected" : ""}`,
-    );
-    button.type = "button";
+function renderAvatarEditor() {
+  const editor = state.avatarEditor;
+  const methods = byId("image-method-options");
+  methods.querySelectorAll("button").forEach(button => {
+    const selected = editor.mode === button.dataset.avatarMode;
+    button.classList.toggle("selected", selected);
     button.setAttribute("aria-pressed", String(selected));
-    const swatch = el("span", `tint-swatch${tint.value ? "" : " standard"}`);
-    swatch.style.setProperty("--tint-color", tint.color);
-    button.append(swatch, el("span", "tint-label", tint.label));
-    button.addEventListener("click", () => selectCardTint(tint.value));
-    target.append(button);
   });
-  const customInput = byId("card-tint-custom");
-  const presetValues = new Set(visibleTints.map((item) => item.value));
-  const customSelected =
-    Boolean(state.selectedCardTint) && !presetValues.has(state.selectedCardTint);
-  customInput.value = state.selectedCardTint || "#D9E7E2";
-  customInput.closest("label")?.classList.toggle("selected", customSelected);
-  byId("card-tint-current").textContent = customSelected
-    ? state.selectedCardTint
-    : "好きな色を選べます";
+  byId("illustration-panel").hidden = editor.mode !== "illustration";
+  byId("photo-panel").hidden = editor.mode !== "photo";
+  byId("photo-controls").disabled = !editor.photo.path;
+  byId("photo-x").value = editor.photo.x;
+  byId("photo-y").value = editor.photo.y;
+  byId("photo-zoom").value = editor.photo.zoom;
+  renderAvatarIllustrations();
+  renderAvatarPreview();
 }
 
-function renderIconStyleOptions() {
-  const target = byId("icon-style-options");
-  clear(target);
-  iconStyles.forEach((icon) => {
-    const button = el(
-      "button",
-      `icon-option${state.selectedIconStyle === icon.id ? " selected" : ""}`,
-    );
-    button.type = "button";
-    button.setAttribute("aria-pressed", String(state.selectedIconStyle === icon.id));
-    const preview = el("span", "icon-option-preview");
-    if (icon.id === "none") preview.append(el("span", "none-mark", "—"));
-    else preview.append(svgIcon(icon.id));
-    button.append(preview, el("span", "", icon.label));
-    button.addEventListener("click", () => {
-      state.selectedIconStyle = icon.id;
-      renderIconStyleOptions();
-      renderEditorCardPreview();
-    });
-    target.append(button);
-  });
+function openAvatarEditor(event) {
+  if (!canEditPeople() || !state.cardImageAvailable || !state.person) return;
+  const original = state.person.person.card_image ?? null;
+  const image = normalizeCardImage(original);
+  const interestId = interestIcons.find(icon => icon.id === image.avatarInterestId)?.id;
+  state.avatarEditor = {
+    detail:state.person, original, opener:event?.currentTarget,
+    mode:image.mode === "photo" ? "photo" : interestId ? "illustration" : "theme",
+    interestId,
+    photo:image.mode === "photo" ? image : {mode:"photo", x:.5, y:.5, zoom:1},
+  };
+  byId("illustration-search").value = "";
+  byId("photo-status").textContent = "";
+  byId("avatar-editor").hidden = false;
+  byId("avatar-editor-content").scrollTop = 0;
+  renderAvatarEditor();
+  syncPersonEditorLayers();
+  byId("avatar-editor-close").focus({preventScroll:true});
 }
 
-function renderIconFrameOptions() {
-  const target = byId("icon-frame-options");
-  clear(target);
-  iconFrames.forEach((frame) => {
-    const button = el(
-      "button",
-      `frame-option frame-${frame.id}${state.selectedIconFrame === frame.id ? " selected" : ""}`,
-      frame.label,
-    );
-    button.type = "button";
-    button.setAttribute("aria-pressed", String(state.selectedIconFrame === frame.id));
-    button.addEventListener("click", () => {
-      state.selectedIconFrame = frame.id;
-      renderIconFrameOptions();
-      renderEditorCardPreview();
-    });
-    target.append(button);
-  });
-}
-
-function disposePhotoDraft() {
-  state.photoSelectionToken++;
-  if (state.editorPhotoUrl) URL.revokeObjectURL(state.editorPhotoUrl);
-  state.editorPhotoUrl=null;state.editorPhotoBlob=null;
-  if (state.photoPreparing) {state.photoPreparing=false;byId("person-save").disabled=false;}
-  const input=byId("photo-file");if (input) input.value="";
-}
-
-function updateAutoImageStatus() {
-  const node=byId("image-auto-status");if (!node) return;
-  if (!state.cardImageAvailable) {node.textContent="画像の保存準備がまだ完了していません。現在の表紙はそのまま使えます。";return;}
-  if (state.editorCardImage.mode !== "auto") {node.textContent="";return;}
-  const art=resolveCardArtwork({card_image:state.editorCardImage,profile_tags:state.editorTags,card_style:state.selectedCardStyle});
-  node.textContent=art.kind === "illustration" ? `趣味タグに合わせて「${hobbyIllustrations.find(item=>item.id===art.id).label}」の絵を表示します。`
-    : "対応する趣味タグがあれば絵を表示します。今は選択中の表紙を使います。";
-}
-
-function renderImageEditor() {
-  const methods=byId("image-method-options");if (!methods) return;
-  methods.replaceChildren();
-  [["auto","趣味から自動"],["illustration","イラスト"],["theme","表紙"],["photo","写真"]].forEach(([mode,label])=>{
-    const button=el("button",`image-method${state.editorCardImage.mode===mode?' selected':''}`,label);button.type="button";
-    button.setAttribute("aria-pressed",String(state.editorCardImage.mode===mode));button.disabled=!state.cardImageAvailable && mode!=="theme";
-    button.addEventListener("click",()=>{
-      if (state.photoPreparing) {state.photoSelectionToken++;state.photoPreparing=false;byId("person-save").disabled=false;}
-      if (mode==="illustration") state.editorCardImage={mode,illustrationId:state.editorCardImage.illustrationId||"reading"};
-      else if (mode==="photo") {
-        const original=normalizeCardImage(state.editorOriginalImage);
-        state.editorCardImage=state.editorPhotoBlob ? {mode,path:"draft/00000000-0000-0000-0000-000000000000.jpg",x:.5,y:.5,zoom:1}
-          : original.mode==="photo" ? original : {mode,x:.5,y:.5,zoom:1};
-      } else state.editorCardImage={mode};
-      renderImageEditor();renderEditorCardPreview();
-    });methods.append(button);
-  });
-  byId("theme-controls").hidden=state.editorCardImage.mode!=="theme";
-  byId("illustration-panel").hidden=state.editorCardImage.mode!=="illustration";
-  byId("photo-panel").hidden=state.editorCardImage.mode!=="photo";
-  renderIllustrationOptions();
-  const hasPhoto=state.editorCardImage.mode==="photo" && (state.editorPhotoBlob || state.editorCardImage.path);
-  byId("photo-controls").disabled=!hasPhoto;
-  byId("photo-x").value=state.editorCardImage.x??.5;byId("photo-y").value=state.editorCardImage.y??.5;byId("photo-zoom").value=state.editorCardImage.zoom??1;
-  updateAutoImageStatus();
-}
-
-function bindIllustrationSearch() {
-  const input=byId("illustration-search");
-  input.addEventListener("input",renderIllustrationOptions);
-  input.addEventListener("keydown",event=>{
-    if (event.key==="Enter" && !event.isComposing && event.keyCode!==229) event.preventDefault();
-  });
-}
-
-function renderIllustrationOptions() {
-  const grid=byId("illustration-options");grid.replaceChildren();
-  const items=filterHobbyIllustrations(byId("illustration-search").value);
-  byId("illustration-empty").hidden=items.length>0;
-  items.forEach(item=>{
-    const selected=state.editorCardImage.mode==="illustration" && state.editorCardImage.illustrationId===item.id;
-    const button=el("button",`illustration-option${selected?' selected':''}`);button.type="button";button.setAttribute("aria-pressed",String(selected));
-    const image=el("img");image.src=`./assets/${item.id}.webp?v=20261005-simple-a`;image.alt="";image.loading="lazy";
-    button.append(image,el("span","",item.label));button.addEventListener("click",()=>{
-      state.editorCardImage={mode:"illustration",illustrationId:item.id};renderImageEditor();renderEditorCardPreview();
-    });grid.append(button);
-  });
+function closeAvatarEditor({restoreFocus = true, force = false} = {}) {
+  const editor = state.avatarEditor;
+  if (!editor || (editor.saving && !force)) return;
+  state.avatarEditor = null;
+  if (editor.photoUrl) URL.revokeObjectURL(editor.photoUrl);
+  byId("photo-file").value = "";
+  byId("avatar-preview").replaceChildren();
+  byId("avatar-editor").hidden = true;
+  byId("avatar-editor-content").inert = false;
+  byId("avatar-editor-close").disabled = false;
+  byId("avatar-save").textContent = "保存する";
+  syncPersonEditorLayers();
+  if (restoreFocus) editor.opener?.focus({preventScroll:true});
 }
 
 async function choosePhoto() {
-  const file=byId("photo-file").files[0];if (!file) return;
-  const token=++state.photoSelectionToken;
-  state.photoPreparing=true;byId("person-save").disabled=true;byId("photo-status").textContent="写真を準備しています…";
+  const editor = state.avatarEditor;
+  const input = byId("photo-file");
+  const file = input.files[0];
+  if (!editor || editor.saving || editor.preparing || !file) return;
+  editor.preparing = true;
+  renderAvatarPreview();
+  byId("photo-status").textContent = "写真を準備しています…";
   try {
-    const blob=await preparePhoto(file);if (token!==state.photoSelectionToken) return;
-    if (state.editorPhotoUrl) URL.revokeObjectURL(state.editorPhotoUrl);
-    state.editorPhotoBlob=blob;state.editorPhotoUrl=URL.createObjectURL(blob);
-    state.editorCardImage={mode:"photo",path:"draft/00000000-0000-0000-0000-000000000000.jpg",x:.5,y:.5,zoom:1};
-    byId("photo-status").textContent="写真を準備できました。位置を調整して「保存する」を押してください。";
-    renderImageEditor();renderEditorCardPreview();
-  } catch (error) {if (token===state.photoSelectionToken) byId("photo-status").textContent=message(error);}
-  finally {if (token===state.photoSelectionToken) {state.photoPreparing=false;byId("person-save").disabled=false;byId("photo-file").value="";}}
+    const blob = await preparePhoto(file);
+    if (editor !== state.avatarEditor) return;
+    if (editor.photoUrl) URL.revokeObjectURL(editor.photoUrl);
+    editor.photoBlob = blob;
+    editor.photoUrl = URL.createObjectURL(blob);
+    editor.photo = {mode:"photo", path:"draft/00000000-0000-0000-0000-000000000000.jpg", x:.5, y:.5, zoom:1};
+    byId("photo-status").textContent = "写真を準備できました。位置を調整して保存してください。";
+  } catch (error) {
+    if (editor === state.avatarEditor) byId("photo-status").textContent = message(error);
+  } finally {
+    if (editor === state.avatarEditor) {
+      editor.preparing = false;
+      input.value = "";
+      renderAvatarEditor();
+    }
+  }
+}
+
+async function saveAvatar() {
+  const editor = state.avatarEditor;
+  if (!editor || editor.saving || editor.preparing || !canEditPeople() || !state.cardImageAvailable || !state.session) return;
+  if (editor.mode === "illustration" && !interestIcons.some(icon => icon.id === editor.interestId)) return;
+  const personId = editor.detail.person.person_id;
+  const epoch = state.conversationEpoch;
+  const userId = state.session.user.id;
+  const client = state.client;
+  const current = () => state.avatarEditor === editor && state.person === editor.detail &&
+    state.conversationEpoch === epoch && state.session?.user?.id === userId && canEditPeople();
+  if (!current()) return;
+  editor.saving = true;
+  const save = byId("avatar-save");
+  save.textContent = "保存中…";
+  byId("avatar-editor-content").inert = true;
+  byId("avatar-editor-close").disabled = true;
+  renderAvatarPreview();
+  try {
+    const image = await persistCardImage({
+      personId, image:avatarSelection(editor), photoBlob:editor.photoBlob, oldImage:editor.original, store:photoStore,
+      onCleanupError:() => console.warn("未使用写真の整理を完了できませんでした。"),
+      save:async cardImage => {
+        if (!current()) throw new Error("編集を終了したため保存を中止しました。");
+        let query = client.from("people").update({card_image:cardImage}).eq("person_id", personId);
+        query = editor.original === null ? query.is("card_image", null) : query.eq("card_image", JSON.stringify(editor.original));
+        const {data, error} = await query.select("person_id").maybeSingle();
+        if (error) throw error;
+        if (!data) throw new Error("別の画面でアイコンが変更されました。人物を開き直してから編集してください。");
+      },
+    });
+    if (!current()) return;
+    editor.detail.person.card_image = image;
+    for (const person of [...state.people, ...state.directory]) {
+      if (person.person_id === personId) person.card_image = image;
+    }
+    closeAvatarEditor({restoreFocus:false, force:true});
+    renderAll();
+    renderDetail();
+    byId("detail-body").querySelector(".person-avatar-edit")?.focus({preventScroll:true});
+    toast("アイコンを保存しました。");
+  } catch (error) {
+    if (current()) toast(message(error), true);
+  } finally {
+    if (state.avatarEditor === editor) {
+      editor.saving = false;
+      save.textContent = "保存する";
+      byId("avatar-editor-content").inert = false;
+      byId("avatar-editor-close").disabled = false;
+      renderAvatarPreview();
+    }
+  }
 }
 
 function fillPersonAgeEditor(info) {
@@ -2323,7 +2327,6 @@ function renderPersonAgeEditor() {
 }
 
 function fillPersonForm(person = null, assignments = []) {
-  byId("card-customize").open=false;
   const assignment = currentAssignment(assignments);
   byId("person-name").value = person?.canonical_name || "";
   byId("person-kana").value = person?.name_kana || "";
@@ -2337,84 +2340,34 @@ function fillPersonForm(person = null, assignments = []) {
   state.editorTagCategory='all';
   byId('person-tag-picker').open=false;
   renderPersonTagEditor();
-  byId("illustration-search").value = "";
   byId("person-fiscal-year").value =
     assignment?.fiscal_year || String(config.currentFiscalYear || "");
   byId("person-organization").value = assignment?.organization || "";
   byId("person-department").value = assignment?.department || "";
   byId("person-role").value = assignment?.role || "";
-  state.selectedCardStyle = cardStyleId(person);
-  const selectedStyle = cardStyles.find(
-    (style) => style.id === state.selectedCardStyle,
-  );
-  state.selectedCardCategory = selectedStyle?.recommended
-    ? "recommended"
-    : selectedStyle?.category === "legacy" ? "soft" : selectedStyle?.category || "recommended";
-  state.selectedCardTint = cardTintValue(person);
-  state.selectedCardTone = cardToneValue(person);
-  state.selectedIconStyle = iconStyleId(person);
-  state.selectedIconFrame = iconFrameId(person);
-  disposePhotoDraft();
-  state.editorCardImage = person ? normalizeCardImage(person.card_image) : {mode:state.cardImageAvailable ? "auto" : "theme"};
-  state.editorOriginalImage = person?.card_image || null;
-  renderImageEditor();
-  renderCardStyleFilters();
-  renderCardStyleOptions();
-  renderCardTintOptions();
-  renderIconStyleOptions();
-  renderIconFrameOptions();
-  renderEditorCardPreview();
-  document.querySelector(".card-customize").hidden = !state.cardFieldsAvailable;
-  byId("card-tint-section").hidden = !state.cardTintAvailable;
-}
-
-function renderEditorCardPreview() {
-  const target = byId("card-live-preview");
-  if (!target) return;
-  const assignment = {
-    fiscal_year: byId("person-fiscal-year").value.trim(),
-    organization: byId("person-organization").value.trim(),
-    department: byId("person-department").value.trim(),
-    role: byId("person-role").value.trim(),
-    verified_status: "verified",
-  };
-  const preview = identityCard({
-    person: {
-      canonical_name: byId("person-name").value.trim() || "人物名",
-      card_image: state.editorCardImage,
-      profile_tags: state.editorTags,
-      card_style: state.selectedCardStyle,
-      card_tint: state.selectedCardTint,
-      card_tone: state.selectedCardTone,
-      icon_style: state.selectedIconStyle,
-      icon_frame: state.selectedIconFrame,
-    },
-    assignments:
-      assignment.organization || assignment.department || assignment.role
-        ? [assignment]
-        : [],
-  }, {draftUrl:state.editorPhotoUrl});
-  preview.classList.add("editor-preview-card");
-  const thumbnail=el("div", "editor-thumbnail-preview");
-  thumbnail.append(createPersonAvatar({canonical_name:byId('person-name').value,card_image:state.editorCardImage,profile_tags:state.editorTags},{draftUrl:state.editorPhotoUrl}), el("span", "muted", "人物一覧のマーク（趣味はタグから表示します）"));
-  target.replaceChildren(preview, thumbnail);
-  updateAutoImageStatus();
 }
 
 function syncPersonEditorLayers() {
-  const open=!byId('person-editor').hidden;
-  document.body.classList[open?'add':'remove']('person-editing');
-  byId('person-detail').inert=open;
-  byId('app-screen').inert=open;
+  const editing = !byId("person-editor").hidden || !byId("avatar-editor").hidden;
+  const covered = editing || !byId("memo-export").hidden || !byId("topic-picker").hidden;
+  document.body.classList[editing ? "add" : "remove"]("person-editing");
+  byId("person-detail").inert = covered;
+  byId("app-screen").inert = covered;
 }
 
 function closeSessionOverlays() {
   // Session loss must bypass the normal close guard, including during a save.
   state.conversationEpoch++;
+  state.detailRequest++;
   document.activeElement?.blur?.();
-  disposePhotoDraft();
-  ['person-editor','person-detail','composer','topic-picker','backup-dialog'].forEach(id=>{byId(id).hidden=true;});
-  closeAiConsultation();
+  ['person-editor','person-detail','composer','backup-dialog'].forEach(id=>{byId(id).hidden=true;});
+  closeAvatarEditor({restoreFocus:false, force:true});
+  closeMemoExport();
+  closeTopicPicker({restoreFocus:false, force:true});
+  state.browseTopicControls = newTopicControls();
+  state.topicBrowseScroll = 0;
+  state.topicPreferences.clear();
+  switchView("people");
   syncPersonEditorLayers();
   byId('person-form').reset();
   byId('person-form').inert=false;
@@ -2450,7 +2403,6 @@ function openPersonEditor(mode) {
     editing ? state.person.person : null,
     editing ? state.person.assignments : [],
   );
-  document.querySelector(".card-customize").open = false;
   byId("person-editor").hidden = false;
   syncPersonEditorLayers();
   document.body.style.overflow = "hidden";
@@ -2458,9 +2410,8 @@ function openPersonEditor(mode) {
 }
 
 function closePersonEditor() {
-  if (byId("person-save").disabled && !state.photoPreparing) return;
+  if (byId("person-save").disabled) return;
   document.activeElement?.blur?.();
-  disposePhotoDraft();
   byId("person-editor").hidden = true;
   syncPersonEditorLayers();
   byId("person-form").reset();
@@ -2472,7 +2423,6 @@ function closePersonEditor() {
 async function savePerson(event) {
   event.preventDefault();
   if (!canEditPeople()) return;
-  if (state.photoPreparing) return toast("写真の準備が終わるまでお待ちください。", true);
   if (!commitPersonTagInput()) return;
   const name = byId("person-name").value.trim();
   if (!name) {
@@ -2498,17 +2448,6 @@ async function savePerson(event) {
     catch(error) {toast(message(error),true);byId('person-age-options').open=true;return;}
   }
   if (state.childrenPresenceAvailable) personValues.children_present=childrenPresenceAfterTagEdit(state.editorOriginalTags,state.editorTags,state.editorOriginalChildren);
-  if (state.cardFieldsAvailable) {
-    personValues.card_style = state.selectedCardStyle;
-    personValues.icon_style = state.selectedIconStyle;
-    personValues.icon_frame = state.selectedIconFrame;
-  }
-  if (state.cardTintAvailable) {
-    personValues.card_tint = state.selectedCardTint;
-  }
-  if (state.cardToneAvailable) {
-    personValues.card_tone = state.selectedCardTone;
-  }
   const fiscalYear = byId("person-fiscal-year").value.trim();
   const assignmentValues = {
     fiscal_year: fiscalYear,
@@ -2533,9 +2472,8 @@ async function savePerson(event) {
   byId("person-form").inert = true;
   let personSaved=false;
   try {
-    const writePerson = async image => {
+    const writePerson = async () => {
       if(!sameLogin())throw new Error('ログイン状態が変わったため保存を中止しました。');
-      if (state.cardImageAvailable) personValues.card_image = image;
       let result;
       if (state.editorMode === "edit") {
         let query=state.client.from("people").update(personValues).eq("person_id",personId);
@@ -2545,22 +2483,12 @@ async function savePerson(event) {
         }
         if (state.personAgeAvailable) query=state.editorOriginalAge===null
           ? query.is('age_info',null) : query.eq('age_info',JSON.stringify(state.editorOriginalAge));
-        // Compare the original raw setting, including legacy null, before replacing any photo.
-        if (state.cardImageAvailable) query=state.editorOriginalImage===null
-          ? query.is("card_image",null) : query.eq("card_image",JSON.stringify(state.editorOriginalImage));
         result=await query.select("person_id").maybeSingle();
         if (!result.error && !result.data) throw new Error("別の画面で人物情報が変更されました。この画面を閉じて人物を開き直し、もう一度編集してください。");
       } else result = await state.client.from("people").insert({person_id:personId,...personValues,revision:1}).select("person_id").single();
       if (result.error) throw result.error;
     };
-    if (state.cardImageAvailable) {
-      const image=await persistCardImage({personId,image:state.editorCardImage,photoBlob:state.editorPhotoBlob,
-        oldImage:state.editorOriginalImage,store:photoStore,save:writePerson,
-        onCleanupError:()=>console.warn("未使用写真の整理を完了できませんでした。")});
-      if(!sameLogin())return;
-      state.editorCardImage=image;state.editorOriginalImage=image;
-      disposePhotoDraft();
-    } else await writePerson(null);
+    await writePerson();
     if(!sameLogin())return;
     personSaved=true;
     if (state.personAgeAvailable) state.editorOriginalAge=personValues.age_info;
@@ -2597,8 +2525,7 @@ async function savePerson(event) {
   } catch (error) {
     if(!sameLogin())return;
     if (personSaved) {
-      renderImageEditor();renderEditorCardPreview();
-      toast(`名前・タグ・画像は保存しました。所属の保存を完了できませんでした。再試行してください：${message(error)}`,true);
+      toast(`名前・タグなどの基本情報は保存しました。所属の保存を完了できませんでした。再試行してください：${message(error)}`,true);
     } else toast(message(error), true);
   } finally {
     if(sameLogin()){
@@ -2836,40 +2763,76 @@ function closeComposer() {
   resetComposer();
 }
 
-function aiConsultationOptions() {
-  return {
-    includeName: byId("ai-include-name").checked,
-    includeProfile: byId("ai-include-profile").checked,
-    includeHistory: byId("ai-include-history").checked,
-    includeQuestions: byId("ai-include-questions").checked,
-    includePersonal: byId("ai-include-personal").checked,
-    includeDetails: byId("ai-include-details").checked,
-    allHistory: byId("ai-all-history").checked,
-  };
+function syncMemoExportActions() {
+  const value = byId("memo-export-preview").value;
+  byId("memo-export-status").textContent = value.trim() ? `${value.length}文字` : "書き出す内容を選んでください。";
+  byId("memo-export-copy").disabled = byId("memo-export-download").disabled = !value.trim();
 }
 
-function updateAiDraft() {
+function updateMemoExport() {
   if (!state.person) return;
-  byId("ai-draft").value = buildAiConsultation(state.person, aiConsultationOptions());
-  byId("ai-length").textContent = `${byId("ai-draft").value.length}文字。コピー前に内容を確認・編集できます。`;
+  const options = {};
+  byId("memo-export-options").querySelectorAll("input").forEach(input => {
+    options[input.name] = input.checked;
+  });
+  byId("memo-export-count").textContent = `${state.memoExportIds.size}件を選択中`;
+  byId("memo-export-preview").value = buildMemoExport(state.person, state.memoExportIds, options);
+  syncMemoExportActions();
 }
 
-function openAiConsultation() {
+function selectMemoExport(limit) {
+  const inputs = [...byId("memo-export-list").querySelectorAll("input")];
+  state.memoExportIds.clear();
+  inputs.forEach((input, index) => {
+    input.checked = index < limit;
+    if (input.checked) state.memoExportIds.add(input.value);
+  });
+  updateMemoExport();
+}
+
+function openMemoExport(event) {
   if (!state.person) return;
-  ["ai-include-name", "ai-include-profile", "ai-include-history", "ai-include-questions"].forEach((id) => { byId(id).checked = true; });
-  ["ai-include-personal", "ai-include-details", "ai-all-history"].forEach((id) => { byId(id).checked = false; });
-  byId("ai-consultation").hidden = false;
-  updateAiDraft();
+  const overlay = byId("memo-export");
+  const notes = exportableConversations(state.person);
+  const list = byId("memo-export-list");
+  list.replaceChildren();
+  notes.forEach(item => {
+    const label = el("label", "memo-export-note");
+    const input = el("input");
+    input.type = "checkbox";
+    input.value = item.conversation_id;
+    const text = (String(item.note || "").trim() || String(item.recap || "").trim()).replace(/\s+/g, " ");
+    const excerpt = text.length > 72 ? text.slice(0, 72) + "…" : text;
+    label.append(input, el("span", "", `${dateText(item.occurred_at) || "日付未登録"}　${excerpt}`));
+    list.append(label);
+  });
+  if (!notes.length) list.append(el("p", "empty", "書き出せる会話メモはありません。"));
+  byId("memo-export-presets").hidden = !notes.length;
+  byId("memo-export-options").querySelectorAll("input").forEach(input => { input.checked = false; });
+  selectMemoExport(5);
+  overlay.opener = event?.currentTarget;
+  overlay.hidden = false;
+  overlay.scrollTop = 0;
+  syncPersonEditorLayers();
+  byId("memo-export-close").focus({preventScroll:true});
 }
 
-function closeAiConsultation() {
-  byId("ai-consultation").hidden = true;
-  byId("ai-draft").value = "";
+function closeMemoExport(restoreFocus = false) {
+  const overlay = byId("memo-export");
+  if (overlay.hidden) return;
+  overlay.hidden = true;
+  state.memoExportIds.clear();
+  byId("memo-export-list").replaceChildren();
+  byId("memo-export-preview").value = "";
+  syncPersonEditorLayers();
+  if (restoreFocus) overlay.opener?.focus({preventScroll:true});
+  overlay.opener = null;
 }
 
-async function copyAiDraft() {
-  const input = byId("ai-draft");
-  if (!input.value.trim()) return toast("コピーする文章がありません。", true);
+async function copyMemoExport() {
+  const input = byId("memo-export-preview");
+  if (!input.value.trim()) return;
+  const request = state.detailRequest;
   try {
     if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(input.value);
     else {
@@ -2877,12 +2840,26 @@ async function copyAiDraft() {
       input.select();
       if (!document.execCommand("copy")) throw new Error("copy failed");
     }
-    toast("文章をコピーしました。AIのチャットに貼り付けてください。");
+    if (request === state.detailRequest && !byId("memo-export").hidden) toast("文章をコピーしました。");
   } catch (_error) {
+    if (request !== state.detailRequest || byId("memo-export").hidden) return;
     input.focus();
     input.select();
     toast("自動でコピーできませんでした。選択した文章を手動でコピーしてください。", true);
   }
+}
+
+function downloadMemoExport() {
+  const value = byId("memo-export-preview").value;
+  if (!value.trim()) return;
+  const url = URL.createObjectURL(new Blob([value], {type:"text/plain;charset=utf-8"}));
+  const link = el("a");
+  link.href = url;
+  link.download = `conversation-notes-${new Date().toISOString().slice(0, 10)}.txt`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
 function relationshipLabel(value) {
@@ -2897,34 +2874,34 @@ function relationshipLabel(value) {
 }
 
 function visibleTopics() {
-  const query = normalize(state.topicQuery);
+  const query = normalize(topicControls().query);
   const currentMonth = `${new Date().getMonth() + 1}月`;
   return topicLibrary()
     .filter(topicMatchesProfile)
     .filter((topic) => !query || topicSearchText(topic).includes(query))
     .filter((topic) => {
-      if (state.topicPickerTab === "initial") {
+      if (topicControls().tab === "initial") {
         return (
           topic.sensitivity === "low" &&
-          topic.relationships.includes(state.topicRelationship)
+          topic.relationships.includes(topicControls().relationship)
         );
       }
-      if (state.topicPickerTab === "category") {
+      if (topicControls().tab === "category") {
         return (
-          state.topicCategory === "all" ||
-          topic.category === state.topicCategory
+          topicControls().category === "all" ||
+          topic.category === topicControls().category
         );
       }
-      if (state.topicPickerTab === "favorites") {
+      if (topicControls().tab === "favorites") {
         return isFavoriteTopic(topic.id);
       }
-      if (state.topicPickerTab === "recent-used") {
+      if (topicControls().tab === "recent-used") {
         return Boolean(topicPreference(topic.id)?.last_used_at);
       }
       return topic.recommended;
     })
     .sort((left, right) => {
-      if (state.topicPickerTab === "recent-used") {
+      if (topicControls().tab === "recent-used") {
         return String(topicPreference(right.id)?.last_used_at || "").localeCompare(
           String(topicPreference(left.id)?.last_used_at || ""),
         );
@@ -2944,8 +2921,8 @@ function visibleTopics() {
 function renderTopicFilters() {
   const relationshipFilters = byId("topic-relationship-filters");
   const categoryFilters = byId("topic-category-filters");
-  relationshipFilters.hidden = state.topicPickerTab !== "initial";
-  categoryFilters.hidden = state.topicPickerTab !== "category";
+  relationshipFilters.hidden = topicControls().tab !== "initial";
+  categoryFilters.hidden = topicControls().tab !== "category";
   clear(relationshipFilters);
   clear(categoryFilters);
 
@@ -2953,14 +2930,14 @@ function renderTopicFilters() {
     ["work", "friend", "community", "other"].forEach((relationship) => {
       const button = el(
         "button",
-        `filter-chip${state.topicRelationship === relationship ? " active" : ""}`,
+        `filter-chip${topicControls().relationship === relationship ? " active" : ""}`,
         relationshipLabel(relationship),
       );
       button.type = "button";
       button.addEventListener("click", () => {
-        state.topicRelationship = relationship;
+        topicControls().relationship = relationship;
         state.selectedTopicIds.clear();
-        state.topicLimit = topicPageSize;
+        topicControls().limit = topicPageSize;
         renderTopicPicker();
       });
       relationshipFilters.append(button);
@@ -2975,13 +2952,13 @@ function renderTopicFilters() {
     categories.forEach((category) => {
       const button = el(
         "button",
-        `filter-chip${state.topicCategory === category ? " active" : ""}`,
+        `filter-chip${topicControls().category === category ? " active" : ""}`,
         category === "all" ? "すべて" : category,
       );
       button.type = "button";
       button.addEventListener("click", () => {
-        state.topicCategory = category;
-        state.topicLimit = topicPageSize;
+        topicControls().category = category;
+        topicControls().limit = topicPageSize;
         renderTopicPicker();
       });
       categoryFilters.append(button);
@@ -2990,6 +2967,7 @@ function renderTopicFilters() {
 }
 
 async function toggleTopicFavorite(topic) {
+  if (!state.session) return;
   if (!state.topicHistoryAvailable) {
     toast("先に今回のSupabase SQLを実行してください。", true);
     return;
@@ -3003,9 +2981,11 @@ async function toggleTopicFavorite(topic) {
     last_used_at: current?.last_used_at || null,
     use_count: current?.use_count || 0,
   };
+  const epoch = state.conversationEpoch;
   const { error } = await state.client
     .from("topic_preferences")
     .upsert(row, { onConflict: "user_id,topic_id" });
+  if (epoch !== state.conversationEpoch || row.user_id !== state.session?.user?.id) return;
   if (error) {
     toast(message(error), true);
     return;
@@ -3018,6 +2998,7 @@ async function toggleTopicFavorite(topic) {
 async function recordTopicUse(topics) {
   if (!state.topicHistoryAvailable || !state.session || !topics.length) return;
   const usedAt = new Date().toISOString();
+  const epoch = state.conversationEpoch;
   const rows = topics.map((topic) => {
     const current = topicPreference(topic.id);
     return {
@@ -3031,18 +3012,19 @@ async function recordTopicUse(topics) {
   const { error } = await state.client
     .from("topic_preferences")
     .upsert(rows, { onConflict: "user_id,topic_id" });
-  if (error) return;
+  if (error || epoch !== state.conversationEpoch || rows[0].user_id !== state.session?.user?.id) return;
   rows.forEach((row) => state.topicPreferences.set(row.topic_id, row));
 }
 
 function topicOptionCard(topic) {
   const browseMode = state.topicPickerMode === "browse";
-  const selected = state.selectedTopicIds.has(topic.id);
-  const expanded = state.expandedTopicIds.has(topic.id);
+  const selected = !browseMode && state.selectedTopicIds.has(topic.id);
+  const expanded = topicControls().expanded.has(topic.id);
   const card = el(
     "article",
     `topic-option${selected ? " selected" : ""}${expanded ? " expanded" : ""}`,
   );
+  card.dataset.topicId = topic.id;
   const copy = el("div", "topic-option-copy");
   const meta = el("div", "topic-meta");
   meta.append(el("span", "topic-category", topic.category));
@@ -3058,6 +3040,7 @@ function topicOptionCard(topic) {
     isFavoriteTopic(topic.id) ? "★" : "☆",
   );
   favorite.type = "button";
+  favorite.dataset.topicControl = "favorite";
   favorite.setAttribute(
     "aria-label",
     isFavoriteTopic(topic.id) ? "お気に入りから外す" : "お気に入りに追加",
@@ -3083,10 +3066,11 @@ function topicOptionCard(topic) {
       expanded ? "会話の流れを閉じる" : "会話の流れを見る",
     );
     details.type = "button";
+    details.dataset.topicControl = "details";
     details.setAttribute("aria-expanded", String(expanded));
     details.addEventListener("click", () => {
-      if (expanded) state.expandedTopicIds.delete(topic.id);
-      else state.expandedTopicIds.add(topic.id);
+      if (expanded) topicControls().expanded.delete(topic.id);
+      else topicControls().expanded.add(topic.id);
       renderTopicPicker();
     });
     copy.append(details);
@@ -3094,6 +3078,7 @@ function topicOptionCard(topic) {
   if (browseMode) {
     const copyButton = el("button", "topic-copy-button", "コピー");
     copyButton.type = "button";
+    copyButton.dataset.topicControl = "copy";
     copyButton.setAttribute("aria-label", `「${topic.question}」をコピー`);
     copyButton.addEventListener("click", () => copyTopicQuestion(topic));
     card.append(copy, copyButton);
@@ -3104,6 +3089,7 @@ function topicOptionCard(topic) {
       selected ? "✓" : "＋",
     );
     toggle.type = "button";
+    toggle.dataset.topicControl = "select";
     toggle.setAttribute(
       "aria-label",
       selected ? `「${topic.question}」の選択を解除` : `「${topic.question}」を選択`,
@@ -3120,75 +3106,88 @@ function topicOptionCard(topic) {
 
 function renderTopicPicker() {
   const browseMode = state.topicPickerMode === "browse";
+  if (browseMode && state.view !== "topics") return;
   if (!browseMode && !state.person) return;
-  const picker = byId("topic-picker");
-  picker.classList.toggle("browse-mode", browseMode);
-  byId("topic-picker-title").textContent = browseMode
-    ? "話題ボックス"
-    : "話題を選ぶ";
-  byId("topic-person-name").textContent = browseMode
-    ? "会話のきっかけを探して、必要ならコピーできます"
-    : `${state.person.person.canonical_name}さんに聞く話題`;
   byId("topic-list-help").textContent = browseMode
     ? "気になった質問をコピーできます"
     : "必要なものだけ選べます";
-  byId("topic-search").value = state.topicQuery;
+  if (byId("topic-search").value !== topicControls().query) byId("topic-search").value = topicControls().query;
   document.querySelectorAll("#topic-tabs [data-topic-tab]").forEach((button) => {
     const historyTab = ["favorites", "recent-used"].includes(button.dataset.topicTab);
     button.hidden = historyTab && !state.topicHistoryAvailable;
-    const active = button.dataset.topicTab === state.topicPickerTab;
+    const active = button.dataset.topicTab === topicControls().tab;
     button.classList.toggle("active", active);
     button.setAttribute("aria-selected", String(active));
   });
   renderTopicFilters();
   const topics = visibleTopics();
   byId("topic-result-summary").textContent =
-    state.topicPickerTab === "initial"
-      ? `${relationshipLabel(state.topicRelationship)}向け・${topics.length}件`
-      : state.topicPickerTab === "favorites"
+    topicControls().tab === "initial"
+      ? `${relationshipLabel(topicControls().relationship)}向け・${topics.length}件`
+      : topicControls().tab === "favorites"
         ? `お気に入り・${topics.length}件`
-        : state.topicPickerTab === "recent-used"
+        : topicControls().tab === "recent-used"
           ? `最近使った話題・${topics.length}件`
       : `${topics.length}件の話題`;
   const list = byId("topic-list");
+  const active = document.activeElement;
+  const focusedId = active?.closest("[data-topic-id]")?.dataset.topicId;
+  const focusedControl = active?.dataset.topicControl;
   clear(list);
   topics
-    .slice(0, state.topicLimit)
+    .slice(0, topicControls().limit)
     .forEach((topic) => list.append(topicOptionCard(topic)));
   if (!topics.length) {
     list.append(el("div", "empty", "条件に合う話題がありません"));
   }
-  byId("topic-load-more").hidden = topics.length <= state.topicLimit;
-  const count = state.selectedTopicIds.size;
-  byId("topic-selected-count").textContent = `${count}件を選択中`;
-  byId("topic-add-selected").disabled = !count;
-  byId("topic-picker-actions").hidden = browseMode;
+  byId("topic-load-more").hidden = topics.length <= topicControls().limit;
+  if (!browseMode) {
+    const count = state.selectedTopicIds.size;
+    byId("topic-selected-count").textContent = `${count}件を選択中`;
+    byId("topic-add-selected").disabled = !count || Boolean(state.topicAddRequest);
+  }
+  if (focusedId && focusedControl) {
+    const item = [...list.children].find(card => card.dataset.topicId === focusedId);
+    const control = item?.querySelector(`[data-topic-control="${focusedControl}"]`);
+    (control || byId("topic-search")).focus({preventScroll:true});
+  }
 }
 
-function openTopicPicker(mode = "add") {
-  const requestedMode = mode === "browse" ? "browse" : "add";
-  if (requestedMode === "add" && !state.person) return;
-  state.topicPickerMode = requestedMode;
+function openTopicPicker(event) {
+  if (!state.person || !canEditPeople()) return;
+  state.topicPickerMode = "add";
+  state.addTopicControls = newTopicControls();
+  state.topicOpener = event?.currentTarget;
   state.selectedTopicIds.clear();
-  state.expandedTopicIds.clear();
-  state.topicPickerTab = "recommended";
-  state.topicRelationship = "work";
-  state.topicCategory = "all";
-  state.topicQuery = "";
-  state.topicLimit = topicPageSize;
-  byId("topic-picker").hidden = false;
-  document.body.style.overflow = "hidden";
+  const picker = byId("topic-picker");
+  picker.insertBefore(byId("topic-picker-body"), byId("topic-picker-actions"));
+  byId("topic-person-name").textContent = `${state.person.person.canonical_name}さんに聞く話題`;
+  picker.hidden = false;
+  byId("topic-picker-body").scrollTop = 0;
   renderTopicPicker();
+  syncPersonEditorLayers();
+  byId("topic-picker-close").focus({preventScroll:true});
 }
 
-function closeTopicPicker() {
-  byId("topic-picker").hidden = true;
-  document.body.style.overflow = byId("person-detail").hidden ? "" : "hidden";
+function closeTopicPicker({restoreFocus = true, force = false} = {}) {
+  const picker = byId("topic-picker");
+  if (picker.hidden || (state.topicAddRequest && !force)) return;
+  picker.hidden = true;
+  state.topicAddRequest = null;
+  state.topicPickerMode = "browse";
+  byId("topic-picker-body").inert = false;
   state.selectedTopicIds.clear();
-  state.expandedTopicIds.clear();
+  byId("topic-picker-close").disabled = false;
+  byId("topic-add-selected").textContent = "次に聞くことへ追加";
+  syncPersonEditorLayers();
+  if (restoreFocus) state.topicOpener?.focus({preventScroll:true});
+  state.topicOpener = null;
 }
 
 async function copyTopicQuestion(topic) {
+  const epoch = state.conversationEpoch;
+  const userId = state.session?.user?.id;
+  const current = () => epoch === state.conversationEpoch && userId === state.session?.user?.id;
   try {
     if (navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(topic.question);
@@ -3200,18 +3199,29 @@ async function copyTopicQuestion(topic) {
       input.style.opacity = "0";
       document.body.append(input);
       input.select();
-      document.execCommand("copy");
-      input.remove();
+      try {
+        if (!document.execCommand("copy")) throw new Error("copy failed");
+      } finally {
+        input.remove();
+      }
     }
+    if (!current()) return;
     await recordTopicUse([topic]);
-    toast("話題をコピーしました");
+    if (current()) toast("話題をコピーしました");
   } catch (_error) {
-    toast("コピーできませんでした。長押しして選択してください。", true);
+    if (current()) toast("コピーできませんでした。長押しして選択してください。", true);
   }
 }
 
 async function addSelectedTopics() {
-  if (!state.person || !state.selectedTopicIds.size) return;
+  if (!state.person || !state.session || !canEditPeople() || !state.selectedTopicIds.size ||
+      state.topicPickerMode !== "add" || state.topicAddRequest) return;
+  const detail = state.person;
+  const request = {};
+  const epoch = state.conversationEpoch;
+  const userId = state.session.user.id;
+  const current = () => state.person === detail && request === state.topicAddRequest &&
+    epoch === state.conversationEpoch && userId === state.session?.user?.id;
   const existing = new Set(
     state.person.followUps
       .filter((item) => item.status === "open")
@@ -3228,6 +3238,9 @@ async function addSelectedTopics() {
     return;
   }
   const button = byId("topic-add-selected");
+  state.topicAddRequest = request;
+  byId("topic-picker-close").disabled = true;
+  byId("topic-picker-body").inert = true;
   button.disabled = true;
   button.textContent = "追加中…";
   try {
@@ -3235,29 +3248,37 @@ async function addSelectedTopics() {
       .from("follow_up_items")
       .insert(
         selected.map((topic) => ({
-          person_id: state.person.person.person_id,
+          person_id: detail.person.person_id,
           body: topic.question,
           due_at: null,
         })),
       )
       .select();
     if (error) throw error;
-    state.person.followUps.unshift(...data);
+    if (!current()) return;
+    detail.followUps.unshift(...data);
     state.followUps.unshift(...data);
     await recordTopicUse(selected);
-    closeTopicPicker();
+    if (!current()) return;
+    closeTopicPicker({restoreFocus:false, force:true});
     renderAll();
     renderDetail();
+    byId("detail-body").querySelector(".topic-library-button")?.focus({preventScroll:true});
     toast(
       skipped
         ? `${data.length}件を追加しました（重複${skipped}件は除外）`
         : `${data.length}件を「次に聞くこと」へ追加しました`,
     );
   } catch (error) {
-    toast(message(error), true);
+    if (current()) toast(message(error), true);
   } finally {
-    button.disabled = false;
-    button.textContent = "次に聞くことへ追加";
+    if (current()) {
+      state.topicAddRequest = null;
+      byId("topic-picker-body").inert = false;
+      byId("topic-picker-close").disabled = false;
+      button.disabled = !state.selectedTopicIds.size;
+      button.textContent = "次に聞くことへ追加";
+    }
   }
 }
 
@@ -3535,12 +3556,28 @@ async function saveConversation(event, {completeOnly=false}={}) {
 
 
 function switchView(view) {
+  const previous = state.view;
+  if (previous === "topics" && view !== "topics") {
+    state.topicBrowseScroll = window.scrollY;
+  }
+  state.view = view;
   document.querySelectorAll(".view").forEach((node) => {
     node.hidden = node.id !== `view-${view}`;
   });
   document.querySelectorAll("#navigation button").forEach((node) => {
-    node.classList.toggle("active", node.dataset.view === view);
+    const active = node.dataset.view === view;
+    node.classList.toggle("active", active);
+    if (active) node.setAttribute("aria-current", "page");
+    else node.removeAttribute("aria-current");
   });
+  if (view === "topics") {
+    state.topicPickerMode = "browse";
+    const body = byId("topic-picker-body");
+    const browser = byId("topic-browser");
+    if (body.parentElement !== browser) browser.append(body);
+    renderTopicPicker();
+    if (previous !== view) window.scrollTo(0, state.topicBrowseScroll);
+  } else if (previous === "topics") window.scrollTo(0, 0);
 }
 
 async function signIn() {
@@ -3560,7 +3597,6 @@ async function signOut() {
   if (error) { toast(message(error), true); return; }
   clearConversationAccount();
   photoStore?.clear();photoObserver?.disconnect();photoObserver=null;
-  disposePhotoDraft();
   state.session = null;
   state.role = null;
   showOnly("auth-screen");
@@ -3573,7 +3609,6 @@ async function handleSession(session) {
     if (!session) {
       clearConversationAccount();
       photoStore?.clear();photoObserver?.disconnect();photoObserver=null;
-      disposePhotoDraft();
       state.session = null;
       state.role = null;
       showOnly("auth-screen");
@@ -3618,13 +3653,30 @@ function bindEvents() {
     });
   });
   byId("photo-file").addEventListener("change", choosePhoto);
-  ["photo-x","photo-y","photo-zoom"].forEach(id=>byId(id).addEventListener("input",()=>{
-    state.editorCardImage={...state.editorCardImage,x:Number(byId("photo-x").value),y:Number(byId("photo-y").value),zoom:Number(byId("photo-zoom").value)};
-    renderEditorCardPreview();
+  ["x", "y", "zoom"].forEach(key => byId(`photo-${key}`).addEventListener("input", event => {
+    if (!state.avatarEditor) return;
+    state.avatarEditor.photo[key] = Number(event.target.value);
+    renderAvatarPreview();
   }));
   byId("photo-center").addEventListener("click",()=>{
-    state.editorCardImage={...state.editorCardImage,x:.5,y:.5,zoom:1};renderImageEditor();renderEditorCardPreview();
+    if (!state.avatarEditor) return;
+    Object.assign(state.avatarEditor.photo, {x:.5, y:.5, zoom:1});
+    renderAvatarEditor();
   });
+  for (const [mode, label] of [["theme", "頭文字"], ["illustration", "趣味の絵"], ["photo", "写真"]]) {
+    const button = el("button", "image-method", label);
+    button.type = "button";
+    button.dataset.avatarMode = mode;
+    button.addEventListener("click", () => {
+      if (!state.avatarEditor) return;
+      state.avatarEditor.mode = mode;
+      renderAvatarEditor();
+    });
+    byId("image-method-options").append(button);
+  }
+  byId("illustration-search").addEventListener("input", renderAvatarIllustrations);
+  byId("avatar-editor-close").addEventListener("click", () => closeAvatarEditor());
+  byId("avatar-save").addEventListener("click", saveAvatar);
   byId("sign-in").addEventListener("click", signIn);
   byId("sign-out").addEventListener("click", signOut);
   byId("backup-open").addEventListener("click", () => {
@@ -3647,11 +3699,6 @@ function bindEvents() {
     renderPeople();
   });
   byId("navigation").addEventListener("click", (event) => {
-    const topicButton = event.target.closest("button[data-topic-browser]");
-    if (topicButton) {
-      openTopicPicker("browse");
-      return;
-    }
     const button = event.target.closest("button[data-view]");
     if (button) switchView(button.dataset.view);
   });
@@ -3671,7 +3718,6 @@ function bindEvents() {
   byId("person-add").addEventListener("click", () => openPersonEditor("create"));
   byId("person-edit").addEventListener("click", () => openPersonEditor("edit"));
   byId("person-editor-close").addEventListener("click", closePersonEditor);
-  bindIllustrationSearch();
   byId("person-form").addEventListener("submit", savePerson);
   byId("person-form").addEventListener("keydown", preventPersonImplicitSubmit);
   byId('person-birthday').addEventListener('input',renderPersonAgeEditor);
@@ -3687,26 +3733,6 @@ function bindEvents() {
     event.preventDefault();
     commitPersonTagInput();
   });
-  byId("card-tint-custom").addEventListener("input", (event) => {
-    state.selectedCardTint = cardTintValue({ card_tint: event.target.value });
-    state.selectedCardTone = cardToneValue({ card_tint: state.selectedCardTint });
-    renderCardStyleOptions();
-    renderEditorCardPreview();
-    byId("card-tint-current").textContent = state.selectedCardTint;
-    event.target.closest("label")?.classList.add("selected");
-    document
-      .querySelectorAll("#card-tint-options .tint-option")
-      .forEach((button) => button.classList.remove("selected"));
-  });
-  byId("card-tint-custom").addEventListener("change", renderCardTintOptions);
-  byId("card-tint-reset").addEventListener("click", () => selectCardTint(""));
-  [
-    "person-name",
-    "person-fiscal-year",
-    "person-organization",
-    "person-department",
-    "person-role",
-  ].forEach((id) => byId(id).addEventListener("input", renderEditorCardPreview));
   byId("composer-open").addEventListener("click", () => openComposer());
   byId("composer-close").addEventListener("click", closeComposer);
   byId("conversation-form").addEventListener("submit", saveConversation);
@@ -3717,27 +3743,38 @@ function bindEvents() {
   window.addEventListener('pagehide', captureConversationDraft);
   byId('conversation-tag-search').addEventListener('input',renderTags);
   byId('conversation-tag-search').addEventListener('keydown',event=>{if(event.key === 'Enter' && !event.isComposing) {event.preventDefault();}});
-  byId("ai-consultation-close").addEventListener("click", closeAiConsultation);
-  byId("ai-copy").addEventListener("click", copyAiDraft);
-  byId("ai-draft").addEventListener("input", () => { byId("ai-length").textContent = `${byId("ai-draft").value.length}文字。コピー前に内容を確認・編集できます。`; });
-  document.querySelectorAll("#ai-consultation input[type=checkbox]").forEach((input) => input.addEventListener("change", updateAiDraft));
-  byId("topic-picker-close").addEventListener("click", closeTopicPicker);
+  byId("memo-export-close").addEventListener("click", () => closeMemoExport(true));
+  byId("memo-export-copy").addEventListener("click", copyMemoExport);
+  byId("memo-export-download").addEventListener("click", downloadMemoExport);
+  byId("memo-export-preview").addEventListener("input", syncMemoExportActions);
+  byId("memo-export-options").addEventListener("change", updateMemoExport);
+  byId("memo-export-presets").addEventListener("click", event => {
+    const preset = event.target.closest("[data-memo-selection]")?.dataset.memoSelection;
+    if (preset) selectMemoExport(preset === "all" ? Infinity : Number(preset));
+  });
+  byId("memo-export-list").addEventListener("change", event => {
+    const input = event.target;
+    if (input.checked) state.memoExportIds.add(input.value);
+    else state.memoExportIds.delete(input.value);
+    updateMemoExport();
+  });
+  byId("topic-picker-close").addEventListener("click", () => closeTopicPicker());
   byId("topic-tabs").addEventListener("click", (event) => {
     const button = event.target.closest("button[data-topic-tab]");
     if (!button) return;
-    state.topicPickerTab = button.dataset.topicTab;
+    topicControls().tab = button.dataset.topicTab;
     state.selectedTopicIds.clear();
-    state.expandedTopicIds.clear();
-    state.topicLimit = topicPageSize;
+    topicControls().expanded.clear();
+    topicControls().limit = topicPageSize;
     renderTopicPicker();
   });
   byId("topic-search").addEventListener("input", (event) => {
-    state.topicQuery = event.target.value;
-    state.topicLimit = topicPageSize;
+    topicControls().query = event.target.value;
+    topicControls().limit = topicPageSize;
     renderTopicPicker();
   });
   byId("topic-load-more").addEventListener("click", () => {
-    state.topicLimit += topicPageSize;
+    topicControls().limit += topicPageSize;
     renderTopicPicker();
   });
   byId("topic-add-selected").addEventListener("click", addSelectedTopics);

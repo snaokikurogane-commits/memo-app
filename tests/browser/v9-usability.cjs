@@ -3,6 +3,7 @@ const {test,before,after}=require('node:test');
 const assert=require('node:assert/strict');
 const {createServer}=require('node:http');
 const {readFile}=require('node:fs/promises');
+const {readFileSync}=require('node:fs');
 const {resolve,sep,extname,join}=require('node:path');
 const {chromium}=require('playwright');
 const root=resolve(__dirname,'../..');
@@ -123,8 +124,153 @@ test('a legacy cover never replaces the person initial or registered interest ic
     assert.equal(await choice.locator('img').count(),1);
     await page.waitForFunction(()=>Array.from(document.querySelectorAll('#person-tag-suggestions img')).every(i=>i.complete && i.naturalWidth>0));
     assert.equal(await choice.locator('img').evaluate(i=>i.complete && i.naturalWidth>0),true);
-    const resultBox=await choice.boundingBox(),footerBox=await page.locator('.person-form-actions').boundingBox();
+    const resultBox=await choice.boundingBox(),footerBox=await page.locator('#person-form .person-form-actions').boundingBox();
     assert.ok(resultBox.y+resultBox.height<=footerBox.y,'the filtered tag must remain visible above the save row');
     if(process.env.UX_PROOF_DIR)await page.screenshot({path:join(process.env.UX_PROOF_DIR,'v9-tag-search-icons.png')});
   } finally {await context.close();}
+});
+
+test('memo export selects dated records and copies and downloads the edited preview',async()=>{
+  const {page,context}=await fixture();try {
+    await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{window.copiedFixtureText=text;}}}));
+    await page.locator('#people-list .person-card').filter({hasText:'佐藤 健太'}).click();
+    await page.getByRole('button',{name:'メモを書き出す'}).click({timeout:1500});
+    const preview=page.locator('#memo-export-preview');
+    assert.match(await preview.inputValue(),/浅煎りがおすすめ/);
+    assert.doesNotMatch(await preview.inputValue(),/佐藤|はる|市役所/);
+    await page.getByRole('checkbox',{name:/浅煎り/}).uncheck();
+    assert.doesNotMatch(await preview.inputValue(),/浅煎り/);
+    await page.getByRole('button',{name:'すべて解除'}).click();
+    assert.equal(await preview.inputValue(),'');
+    assert.equal(await page.getByRole('button',{name:'ダウンロード'}).isDisabled(),true);
+    await page.getByRole('button',{name:'全選択'}).click();
+    await preview.fill('手で編集した日本語\n追記');
+    await page.getByRole('button',{name:'コピー',exact:true}).click();
+    assert.equal(await page.evaluate(()=>window.copiedFixtureText),'手で編集した日本語\n追記');
+    const downloadPromise=page.waitForEvent('download');
+    await page.getByRole('button',{name:'ダウンロード'}).click();
+    const download=await downloadPromise;
+    assert.match(download.suggestedFilename(),/^conversation-notes.*\.txt$/);
+    assert.equal(readFileSync(await download.path(),'utf8'),'手で編集した日本語\n追記');
+    await page.evaluate(()=>{navigator.clipboard.writeText=async()=>{throw new Error('clipboard blocked');};});
+    await page.getByRole('button',{name:'コピー',exact:true}).click();
+    await page.locator('#toast').getByText(/手動でコピー/).waitFor();
+    assert.equal(await preview.evaluate(input=>input.value.slice(input.selectionStart,input.selectionEnd)),'手で編集した日本語\n追記');
+  } finally {await context.close();}
+});
+
+test('avatar editor uses registry icons and basic edits retain the saved avatar',async()=>{
+  const {page,context}=await fixture();try {
+    const row=page.locator('#people-list .person-card').filter({hasText:'佐藤 健太'});
+    await row.click();
+    const editAvatar=page.getByRole('button',{name:'アイコンを編集'});
+    await editAvatar.click({timeout:1500});
+    await page.getByRole('button',{name:'趣味の絵',exact:true}).click();
+    const search=page.locator('#illustration-search');
+    for(const [query,label] of [['カメラ','写真'],['ジム','筋トレ'],['文房具','文房具']]){
+      await search.fill(query);
+      await page.locator('#illustration-options').getByRole('button',{name:label,exact:true}).waitFor();
+    }
+    await page.locator('#illustration-options').getByRole('button',{name:'文房具',exact:true}).click();
+    await page.locator('#avatar-preview img[alt="文房具"]').waitFor();
+    await page.locator('#avatar-save').click();
+    await editAvatar.locator('img[alt="文房具"]').waitFor();
+    await page.locator('#person-edit').click();
+    assert.equal(await page.locator('#card-customize').count(),0);
+    await page.locator('#person-role').fill('求人係');
+    await page.locator('#person-save').click();
+    await editAvatar.locator('img[alt="文房具"]').waitFor();
+    await editAvatar.click();
+    await page.locator('#avatar-preview img[alt="文房具"]').waitFor();
+    await page.getByRole('button',{name:'頭文字',exact:true}).click();
+    await page.getByRole('button',{name:'アイコン編集を閉じる'}).click();
+    await editAvatar.locator('img[alt="文房具"]').waitFor();
+    await page.locator('#detail-close').click();
+    await row.locator('img[alt="文房具"]').waitFor();
+  } finally {await context.close();}
+});
+
+test('topics browse is a mobile navigation tab and adding a topic returns to the same person',async()=>{
+  const {page,context}=await fixture(320);try {
+    await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{window.copiedFixtureText=text;}}}));
+    const topicTab=page.locator('#navigation').getByRole('button',{name:'話題',exact:true});
+    await topicTab.click();
+    assert.equal(await topicTab.getAttribute('aria-current'),'page');
+    await page.locator('#navigation').getByRole('button',{name:'最近',exact:true}).click();
+    await topicTab.click();
+    await page.locator('#topic-search').fill('休日はどう過ごす');
+    const copy=page.locator('#topic-list .topic-copy-button').first();
+    await copy.click();
+    assert.equal(await page.evaluate(()=>window.copiedFixtureText),'休日はどう過ごすことが多いですか？');
+    const favorite=page.locator('#topic-list .topic-option').first().getByRole('button',{name:'お気に入りに追加'});
+    await favorite.click();
+    await page.locator('#topic-list .topic-option').first().getByRole('button',{name:'お気に入りから外す'}).waitFor();
+    assert.equal(await page.evaluate(()=>document.activeElement.getAttribute('aria-label')),'お気に入りから外す');
+    await page.locator('#topic-tabs').getByRole('tab',{name:'お気に入り'}).click();
+    assert.equal(await page.locator('#topic-list .topic-question').innerText(),'休日はどう過ごすことが多いですか？');
+    await page.locator('#navigation').getByRole('button',{name:'人物',exact:true}).click();
+    await page.locator('#people-list .person-card').filter({hasText:'佐藤 健太'}).click();
+    await page.locator('.follow-up-section').getByRole('button',{name:'＋ 追加'}).click();
+    await page.locator('.topic-library-button').click();
+    await page.locator('#topic-list .topic-toggle').first().click();
+    const selected=await page.locator('#topic-list .topic-option.selected .topic-question').innerText();
+    await page.locator('#topic-add-selected').click();
+    await page.locator('#person-detail').getByText(selected,{exact:true}).first().waitFor();
+    assert.match(await page.locator('#detail-body h1').innerText(),/佐藤/);
+    assert.equal(await page.locator('#topic-picker').isVisible(),false);
+    await page.locator('#detail-close').click();
+    await topicTab.click();
+    assert.equal(await page.locator('#topic-search').inputValue(),'休日はどう過ごす');
+    assert.equal(await page.locator('#topic-list .topic-toggle').count(),0);
+  } finally {await context.close();}
+});
+
+test('a legacy photo keeps its crop when an attempted avatar change fails',async()=>{
+  const {page,context}=await fixture();try {
+    let failPeople=false;
+    await page.route('**/fixture-mode.json',route=>route.fulfill({json:{legacyPhoto:true,failPeople}}));
+    await page.locator('#people-list .person-card').filter({hasText:'アレクサンドラ'}).click();
+    const edit=page.getByRole('button',{name:'アイコンを編集'});
+    await edit.click();
+    const image=page.locator('#avatar-preview img.art-image');
+    await page.waitForFunction(()=>document.querySelector('#avatar-preview img.art-image')?.naturalWidth>0);
+    const crop=await image.evaluate(img=>[img.style.objectPosition,img.style.transform]);
+    assert.deepEqual(crop,['20% 80%','scale(2)']);
+    await page.getByRole('button',{name:'頭文字',exact:true}).click();
+    failPeople=true;
+    await page.locator('#avatar-save').click();
+    await page.locator('#toast').getByText(/人物の保存に失敗/).waitFor();
+    await page.locator('#avatar-editor-close').click();
+    assert.deepEqual(await edit.locator('img.art-image').evaluate(img=>[img.style.objectPosition,img.style.transform]),crop);
+    await edit.click();
+    await image.waitFor();
+    failPeople=false;
+    const bytes=Buffer.from(readFileSync(join(__dirname,'../fixtures/tiny-jpeg.txt'),'utf8').trim(),'base64');
+    await page.locator('#photo-file').setInputFiles({name:'fictional.jpg',mimeType:'image/jpeg',buffer:bytes});
+    await page.locator('#photo-status').getByText(/写真を準備できました/).waitFor();
+    await page.locator('#avatar-save').click();
+    assert.deepEqual(await edit.locator('img.art-image').evaluate(img=>[img.style.objectPosition,img.style.transform]),['50% 50%','scale(1)']);
+  } finally {await context.close();}
+});
+
+test('late detail reads cannot supply another person’s export',async()=>{
+  const {page,context}=await fixture();let release;
+  try {
+    let notify, hold=true;
+    const requested=new Promise(done=>{notify=done;});
+    const blocked=new Promise(done=>{release=done;});
+    await page.route('**/fixture-mode.json',async route=>{
+      if(hold){hold=false;notify();await blocked;}
+      await route.fulfill({json:{}});
+    });
+    await page.locator('#people-list .person-card').filter({hasText:'佐藤 健太'}).click();
+    await requested;
+    await page.locator('#detail-close').click();
+    await page.locator('#people-list .person-card').filter({hasText:'森 悠介'}).click();
+    await page.getByRole('button',{name:'メモを書き出す'}).click();
+    release();await page.waitForLoadState('networkidle');
+    assert.equal(await page.locator('#memo-export-preview').inputValue(),'');
+    assert.match(await page.locator('#memo-export-list').innerText(),/書き出せる会話メモはありません/);
+    assert.match(await page.locator('#detail-body h1').innerText(),/森 悠介/);
+  } finally {release?.();await context.close();}
 });

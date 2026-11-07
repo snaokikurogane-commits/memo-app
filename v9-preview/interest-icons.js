@@ -1,6 +1,6 @@
-import {hobbyIllustrations} from './card-images.js?v=9-20261029-usability';
+import {hobbyIllustrations} from './card-images.js?v=9-20261107-export-avatar-topics';
 
-// Supplied 50 square icons. Cover artwork remains a separate saved setting.
+// Supplied square icons and the existing additions.
 const primary=[
   ['cooking','料理',['料理好き']],['travel','旅行',['旅','海外旅行']],['movie','映画',['映画鑑賞','シネマ']],
   ['coffee','カフェ',['コーヒー','珈琲','カフェ巡り']],['gardening','ガーデニング',['園芸','家庭菜園']],
@@ -24,6 +24,14 @@ const primary=[
 export const interestIcons=[...primary,...hobbyIllustrations.filter(item=>!primary.some(icon=>icon.id===item.id))
   .map(item=>({...item,src:`./assets/${item.id}.webp?v=20261005-simple-a`}))];
 const clean=value=>String(value??'').normalize('NFKC').trim().toLowerCase();
+export function filterInterestIcons(query) {
+  const terms = clean(query).split(/\s+/).filter(Boolean);
+  return interestIcons.filter(icon => {
+    const legacy = hobbyIllustrations.find(item => item.id === icon.id);
+    const searchable = clean([icon.id, icon.label, ...icon.tags, ...(legacy?.tags || []), ...(legacy?.keywords || [])].join(' '));
+    return terms.every(term => searchable.includes(term));
+  });
+}
 export function interestIconForTag(tag) {
   const value=clean(tag);if(!value)return null;
   return interestIcons.find(icon=>[icon.id,...icon.tags].some(alias=>clean(alias)===value))||null;
